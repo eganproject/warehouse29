@@ -21,4 +21,9 @@ class Item extends Model
     {
         return $this->belongsTo(Category::class, 'category_id');
     }
+
+    public function stock()
+    {
+        return $this->hasOne(ItemStock::class, 'item_id');
+    }
 }

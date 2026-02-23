@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Models\Item;
+use App\Models\ItemStock;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -91,6 +92,7 @@ class ItemController extends Controller
         DB::beginTransaction();
         try {
             $item = Item::create($validated);
+            ItemStock::firstOrCreate(['item_id' => $item->id], ['stock' => 0]);
             DB::commit();
 
             return response()->json([
@@ -234,6 +236,7 @@ class ItemController extends Controller
                     ['sku' => $sku],
                     $payload
                 );
+                ItemStock::firstOrCreate(['item_id' => $item->id], ['stock' => 0]);
                 $item->wasRecentlyCreated ? $created++ : $updated++;
             }
             DB::commit();

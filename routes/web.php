@@ -3,6 +3,7 @@
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
+use App\Http\Controllers\Admin\ItemStockController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\MenuController;
 use App\Http\Controllers\Admin\PermissionController;
@@ -66,5 +67,11 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         Route::get('/permissions', [PermissionController::class, 'index'])->name('permissions.index');
         Route::get('/permissions/{role}/edit', [PermissionController::class, 'edit'])->name('permissions.edit');
         Route::put('/permissions/{role}', [PermissionController::class, 'update'])->name('permissions.update');
+    });
+
+    Route::prefix('inventory')->as('inventory.')->group(function () {
+        // Item Stocks
+        Route::get('/item-stocks', [ItemStockController::class, 'index'])->name('item-stocks.index');
+        Route::get('/item-stocks/data', [ItemStockController::class, 'data'])->name('item-stocks.data');
     });
 });
