@@ -73,7 +73,7 @@
                     </div>
                     <div class="fv-row mb-7">
                         <label class="fs-6 fw-bold form-label mb-2">Tanggal</label>
-                        <input type="datetime-local" class="form-control form-control-solid" name="transacted_at" id="flow_transacted_at" />
+                        <input type="text" class="form-control form-control-solid" name="transacted_at" id="flow_transacted_at" placeholder="YYYY-MM-DD HH:mm" />
                         <div class="invalid-feedback" id="error_transacted_at"></div>
                     </div>
                     <div class="fv-row mb-7">
@@ -127,10 +127,12 @@
         const modalTitle = document.getElementById('flow_modal_title');
         const dateFromEl = document.getElementById('filter_date_from');
         const dateToEl = document.getElementById('filter_date_to');
+        const transactedAtEl = document.getElementById('flow_transacted_at');
         const filterApplyBtn = document.getElementById('filter_apply');
         const filterResetBtn = document.getElementById('filter_reset');
         let fpFrom = null;
         let fpTo = null;
+        let fpTransacted = null;
 
         const resolveRoute = (type, key) => {
             if (routeMap && routeMap[type] && routeMap[type][key]) return routeMap[type][key];
@@ -159,6 +161,9 @@
             }
             if (dateToEl) {
                 fpTo = flatpickr(dateToEl, { dateFormat: 'Y-m-d', allowInput: true });
+            }
+            if (transactedAtEl) {
+                fpTransacted = flatpickr(transactedAtEl, { enableTime: true, dateFormat: 'Y-m-d H:i', allowInput: true });
             }
         }
 
@@ -217,6 +222,7 @@
             form.dataset.editId = '';
             form.dataset.flowType = defaultTypeFilter || '';
             if (modalTitle) modalTitle.textContent = 'Tambah';
+            if (fpTransacted) fpTransacted.clear();
             itemsContainer.innerHTML = '';
             createItemRow();
             clearErrors();
@@ -318,7 +324,11 @@
             if (modalTitle) modalTitle.textContent = `Edit ${json.code || ''}`.trim();
                 document.getElementById('flow_ref_no').value = json.ref_no || '';
                 document.getElementById('flow_note').value = json.note || '';
-                document.getElementById('flow_transacted_at').value = json.transacted_at || '';
+                if (fpTransacted) {
+                    fpTransacted.setDate(json.transacted_at || null, true, 'Y-m-d\\TH:i');
+                } else {
+                    document.getElementById('flow_transacted_at').value = json.transacted_at || '';
+                }
 
                 itemsContainer.innerHTML = '';
                 (json.items || []).forEach(item => createItemRow(item));
