@@ -21,13 +21,6 @@
             <div class="d-flex align-items-center gap-2 me-4">
                 <input type="text" class="form-control form-control-solid w-150px" id="filter_date_from" placeholder="Dari" />
                 <input type="text" class="form-control form-control-solid w-150px" id="filter_date_to" placeholder="Sampai" />
-                @if(!empty($typeOptions))
-                    <select class="form-select form-select-solid w-180px" id="filter_type">
-                        @foreach($typeOptions as $value => $label)
-                            <option value="{{ $value }}" {{ $value === $typeDefault ? 'selected' : '' }}>{{ $label }}</option>
-                        @endforeach
-                    </select>
-                @endif
                 <button type="button" class="btn btn-light" id="filter_apply">Filter</button>
                 <button type="button" class="btn btn-light" id="filter_reset">Reset</button>
             </div>
@@ -134,7 +127,6 @@
         const modalTitle = document.getElementById('flow_modal_title');
         const dateFromEl = document.getElementById('filter_date_from');
         const dateToEl = document.getElementById('filter_date_to');
-        const typeFilterEl = document.getElementById('filter_type');
         const filterApplyBtn = document.getElementById('filter_apply');
         const filterResetBtn = document.getElementById('filter_reset');
         let fpFrom = null;
@@ -160,15 +152,6 @@
                     .on('select2:opening select2:closing select2:close', function(e){ e.stopPropagation(); });
             }
         };
-
-        const initFilterSelect2 = (selectEl) => {
-            if (selectEl && typeof $ !== 'undefined' && $.fn.select2) {
-                $(selectEl).select2({ placeholder: 'Jenis', allowClear: true, width: '100%' })
-                    .on('select2:opening select2:closing select2:close', function(e){ e.stopPropagation(); });
-            }
-        };
-
-        initFilterSelect2(typeFilterEl);
 
         if (typeof flatpickr !== 'undefined') {
             if (dateFromEl) {
@@ -232,7 +215,7 @@
         const resetForm = () => {
             form?.reset();
             form.dataset.editId = '';
-            form.dataset.flowType = typeFilterEl?.value || defaultTypeFilter || '';
+            form.dataset.flowType = defaultTypeFilter || '';
             if (modalTitle) modalTitle.textContent = 'Tambah';
             itemsContainer.innerHTML = '';
             createItemRow();
@@ -273,7 +256,6 @@
                     params.q = searchInput?.value || '';
                     if (dateFromEl?.value) params.date_from = dateFromEl.value;
                     if (dateToEl?.value) params.date_to = dateToEl.value;
-                    if (typeFilterEl?.value) params.type = typeFilterEl.value;
                 }
             },
             columns: [
@@ -316,14 +298,6 @@
         filterResetBtn?.addEventListener('click', () => {
             if (fpFrom) fpFrom.clear(); else if (dateFromEl) dateFromEl.value = '';
             if (fpTo) fpTo.clear(); else if (dateToEl) dateToEl.value = '';
-            if (typeFilterEl) {
-                const nextVal = defaultTypeFilter || (typeFilterEl.querySelector('option')?.value ?? '');
-                if (typeof $ !== 'undefined' && $(typeFilterEl).data('select2')) {
-                    $(typeFilterEl).val(nextVal).trigger('change.select2');
-                } else {
-                    typeFilterEl.value = nextVal;
-                }
-            }
             reloadTable();
         });
 
