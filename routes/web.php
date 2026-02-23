@@ -9,7 +9,7 @@ use App\Http\Controllers\Admin\PermissionController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
-    return view('welcome');
+    return redirect()->route('login');
 });
 
 // Basic health check route for debugging blank page on '/'
