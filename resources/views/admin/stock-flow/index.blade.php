@@ -272,8 +272,8 @@
                 { data: 'item' },
                 { data: 'qty' },
                 { data: 'note' },
-                { data: 'id', orderable:false, searchable:false, className:'text-end', render: (data)=>{
-                    const rowType = row.type || defaultTypeFilter;
+                { data: 'id', orderable:false, searchable:false, className:'text-end', render: (data, type, row)=>{
+                    const rowType = row?.type || defaultTypeFilter;
                     const detailItem = `<div class="menu-item px-3"><a href="${resolveRoute(rowType, 'detail').replace(':id', data)}" class="menu-link px-3">Detail</a></div>`;
                     const editItem = `<div class="menu-item px-3"><a href="#" class="menu-link px-3 btn-edit" data-id="${data}" data-type="${rowType}">Edit</a></div>`;
                     const delItem = `<div class="menu-item px-3"><a href="#" class="menu-link px-3 text-danger btn-delete" data-id="${data}" data-type="${rowType}">Hapus</a></div>`;

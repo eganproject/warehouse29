@@ -179,20 +179,15 @@ class OutboundController extends Controller
         }
 
         $query = OutboundTransaction::query()
+            ->with(['items.item'])
             ->select([
                 'outbound_transactions.id',
                 'outbound_transactions.code',
                 'outbound_transactions.transacted_at',
                 'outbound_transactions.type',
                 'outbound_transactions.ref_no',
-                'outbound_transactions.note as tx_note',
-                'items.sku',
-                'items.name as item_name',
-                'outbound_items.qty',
-                'outbound_items.note as item_note',
+                'outbound_transactions.note',
             ])
-            ->join('outbound_items', 'outbound_items.outbound_transaction_id', '=', 'outbound_transactions.id')
-            ->join('items', 'items.id', '=', 'outbound_items.item_id')
             ->orderBy('outbound_transactions.transacted_at', 'desc');
         if ($baseType) {
             $query->where('outbound_transactions.type', $baseType);
@@ -203,16 +198,18 @@ class OutboundController extends Controller
             $query->where(function ($q) use ($search) {
                 $q->where('outbound_transactions.code', 'like', "%{$search}%")
                     ->orWhere('outbound_transactions.ref_no', 'like', "%{$search}%")
-                    ->orWhere('items.sku', 'like', "%{$search}%")
-                    ->orWhere('items.name', 'like', "%{$search}%");
+                    ->orWhereHas('items.item', function ($itemQ) use ($search) {
+                        $itemQ->where('sku', 'like', "%{$search}%")
+                            ->orWhere('name', 'like', "%{$search}%");
+                    });
             });
         }
 
         $this->applyDateFilter($query, $request);
 
-        $recordsTotalQuery = OutboundItem::join('outbound_transactions', 'outbound_transactions.id', '=', 'outbound_items.outbound_transaction_id');
+        $recordsTotalQuery = OutboundTransaction::query();
         if ($baseType) {
-            $recordsTotalQuery->where('outbound_transactions.type', $baseType);
+            $recordsTotalQuery->where('type', $baseType);
         }
         $recordsTotal = $recordsTotalQuery->count();
         $recordsFiltered = (clone $query)->count();
@@ -224,16 +221,27 @@ class OutboundController extends Controller
         }
 
         $data = $query->get()->map(function ($row) {
-            $itemLabel = trim(($row->sku ?? '').' - '.($row->item_name ?? ''));
             $ts = $row->transacted_at ? Carbon::parse($row->transacted_at)->format('Y-m-d H:i') : '';
-            $note = $row->item_note ?: ($row->tx_note ?? '');
+            $items = $row->items ?? collect();
+            $labels = $items->map(function ($it) {
+                $sku = $it->item?->sku ?? '';
+                $name = $it->item?->name ?? '';
+                return trim($sku.' - '.$name);
+            })->filter()->values();
+            $shown = $labels->take(3);
+            $more = $labels->count() - $shown->count();
+            $itemLabel = $shown->implode(', ');
+            if ($more > 0) {
+                $itemLabel .= " +{$more} item";
+            }
+            $totalQty = (int) $items->sum('qty');
             return [
                 'id' => $row->id,
                 'code' => $row->code,
                 'transacted_at' => $ts,
-                'item' => $itemLabel,
-                'qty' => (int) $row->qty,
-                'note' => $note,
+                'item' => $itemLabel ?: '-',
+                'qty' => $totalQty,
+                'note' => $row->note ?? '',
                 'type' => $row->type,
             ];
         });
