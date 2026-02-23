@@ -13,6 +13,7 @@ class Item extends Model
         'sku',
         'name',
         'category_id',
+        'address',
         'description',
     ];
 

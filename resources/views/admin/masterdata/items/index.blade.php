@@ -65,6 +65,7 @@
                         <th>SKU</th>
                         <th>Nama</th>
                         <th>Kategori</th>
+                        <th>Alamat</th>
                         <th>Deskripsi</th>
                         <th class="text-end">Aksi</th>
                     </tr>
@@ -115,6 +116,11 @@
                         <div class="invalid-feedback" id="error_category_id"></div>
                     </div>
                     <div class="fv-row mb-7">
+                        <label class="fs-6 fw-bold form-label mb-2">Alamat</label>
+                        <textarea class="form-control form-control-solid" name="address" id="item_address" rows="2"></textarea>
+                        <div class="invalid-feedback" id="error_address"></div>
+                    </div>
+                    <div class="fv-row mb-7">
                         <label class="fs-6 fw-bold form-label mb-2">Deskripsi</label>
                         <textarea class="form-control form-control-solid" name="description" id="item_description" rows="3"></textarea>
                         <div class="invalid-feedback" id="error_description"></div>
@@ -157,9 +163,10 @@
                         <li><strong>name</strong> (wajib)</li>
                         <li><strong>parent_category</strong> (opsional, parent kategori; akan dibuat jika belum ada)</li>
                         <li><strong>category</strong> (opsional, anak kategori; jika kosong akan dimasukkan ke kategori default "Tanpa Kategori")</li>
+                        <li><strong>address</strong> (opsional)</li>
                         <li><strong>description</strong> (opsional)</li>
                     </ul>
-                    <p class="text-muted small mb-1">Contoh header: <code>sku,name,parent_category,category,description</code></p>
+                    <p class="text-muted small mb-1">Contoh header: <code>sku,name,parent_category,category,address,description</code></p>
                     <p class="text-muted small mb-1">Gunakan format CSV standar (separator koma / comma separated).</p>
                     <p class="text-muted small mb-0">Jika kolom category dikosongkan, item otomatis dimasukkan ke kategori "Tanpa Kategori".</p>
                 </div>
@@ -216,6 +223,7 @@
         const formName = document.getElementById('item_name');
         const formCategory = document.getElementById('item_category_id');
         const formId = document.getElementById('item_id');
+        const formAddress = document.getElementById('item_address');
         const formDescription = document.getElementById('item_description');
         const titleEl = document.getElementById('modal_item_title');
         const importBtn = document.getElementById('btn_import_items');
@@ -312,9 +320,10 @@
                 { data: 'sku' },
                 { data: 'name' },
                 { data: 'category' },
+                { data: 'address' },
                 { data: 'description' },
                 { data: 'id', orderable:false, searchable:false, className:'text-end', render: (data, type, row)=>{
-                    const editItem = `<div class="menu-item px-3"><a href="#" class="menu-link px-3 btn-edit" data-id="${data}" data-sku="${row.sku}" data-name="${row.name}" data-category="${row.category_id}" data-description="${row.description}">Edit</a></div>`;
+                    const editItem = `<div class="menu-item px-3"><a href="#" class="menu-link px-3 btn-edit" data-id="${data}" data-sku="${row.sku}" data-name="${row.name}" data-category="${row.category_id}" data-address="${row.address ?? ''}" data-description="${row.description}">Edit</a></div>`;
                     const delItem = `<div class="menu-item px-3"><a href="#" class="menu-link px-3 text-danger btn-delete" data-id="${data}">Hapus</a></div>`;
                     return `
                         <div class="text-end">
@@ -353,7 +362,7 @@
         });
 
         const clearErrors = () => {
-            ['error_sku','error_name','error_category_id','error_description'].forEach(id => {
+            ['error_sku','error_name','error_category_id','error_address','error_description'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.textContent = '';
             });
@@ -475,11 +484,13 @@
             const sku = this.getAttribute('data-sku');
             const name = this.getAttribute('data-name');
             const categoryId = this.getAttribute('data-category');
+            const address = this.getAttribute('data-address') || '';
             const description = this.getAttribute('data-description') || '';
             if (!form) return;
             formId.value = id;
             if (formSku) formSku.value = sku || '';
             formName.value = name;
+            if (formAddress) formAddress.value = address;
             formDescription.value = description;
             setCategoryValue(categoryId || '0');
             clearErrors();

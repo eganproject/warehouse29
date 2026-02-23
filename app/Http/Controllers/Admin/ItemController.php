@@ -27,6 +27,7 @@ class ItemController extends Controller
             $query->where(function ($q) use ($search) {
                 $q->where('sku', 'like', "%{$search}%")
                     ->orWhere('name', 'like', "%{$search}%")
+                    ->orWhere('address', 'like', "%{$search}%")
                     ->orWhere('description', 'like', "%{$search}%");
             });
         }
@@ -56,6 +57,7 @@ class ItemController extends Controller
                 'name' => $i->name,
                 'category' => $i->category?->name ?? '-',
                 'category_id' => $i->category_id,
+                'address' => $i->address ?? '',
                 'description' => $i->description ?? '',
             ];
         });
@@ -79,6 +81,7 @@ class ItemController extends Controller
                     $fail('Kategori tidak valid');
                 }
             }],
+            'address' => ['nullable', 'string'],
             'description' => ['nullable', 'string'],
         ]);
 
@@ -119,6 +122,7 @@ class ItemController extends Controller
                     $fail('Kategori tidak valid');
                 }
             }],
+            'address' => ['nullable', 'string'],
             'description' => ['nullable', 'string'],
         ]);
 
@@ -186,9 +190,9 @@ class ItemController extends Controller
             return strtolower(trim($clean));
         }, $headers);
 
-        $expected = ['sku', 'name', 'parent_category', 'category', 'description'];
-        if (array_diff($expected, $headers)) {
-            return response()->json(['message' => 'Header harus: sku, name, parent_category, category, description'], 422);
+        $required = ['sku', 'name', 'parent_category', 'category', 'description'];
+        if (array_diff($required, $headers)) {
+            return response()->json(['message' => 'Header harus minimal: sku, name, parent_category, category, description (address opsional)'], 422);
         }
 
         $idx = array_flip($headers);
@@ -202,6 +206,8 @@ class ItemController extends Controller
                 $name = trim($row[$idx['name']] ?? '');
                 $parentCategoryName = trim($row[$idx['parent_category']] ?? '');
                 $categoryName = trim($row[$idx['category']] ?? '');
+                $hasAddress = isset($idx['address']);
+                $address = $hasAddress ? trim($row[$idx['address']] ?? '') : '';
                 $description = trim($row[$idx['description']] ?? '');
                 if ($sku === '' || $name === '') {
                     continue;
@@ -216,9 +222,17 @@ class ItemController extends Controller
                     $category = $this->findOrCreateCategory($categoryName, $parentCategoryId);
                     $catId = $category?->id ?? $defaultCategoryId;
                 }
+                $payload = [
+                    'name' => $name,
+                    'category_id' => $catId,
+                    'description' => $description,
+                ];
+                if ($hasAddress) {
+                    $payload['address'] = $address;
+                }
                 $item = Item::updateOrCreate(
                     ['sku' => $sku],
-                    ['name' => $name, 'category_id' => $catId, 'description' => $description]
+                    $payload
                 );
                 $item->wasRecentlyCreated ? $created++ : $updated++;
             }

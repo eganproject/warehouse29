@@ -12,6 +12,7 @@ return new class extends Migration {
             $table->string('sku', 100)->unique();
             $table->string('name', 150);
             $table->unsignedBigInteger('category_id')->default(0);
+            $table->text('address')->nullable();
             $table->text('description')->nullable();
             $table->timestamps();
         });
