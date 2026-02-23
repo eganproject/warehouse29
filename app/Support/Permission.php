@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Models\Menu;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class Permission
 {
@@ -35,7 +36,12 @@ class Permission
         }
 
         $roleIds = $user->roles()->pluck('roles.id');
-        if ($roleIds->isEmpty()) return false;
+        if ($roleIds->isEmpty()) {
+            if (Schema::hasTable('role_user') && DB::table('role_user')->count() === 0) {
+                return true;
+            }
+            return false;
+        }
 
         // Always allow admin role
         if ($user->roles()->where('slug', 'admin')->exists()) {
@@ -43,7 +49,7 @@ class Permission
         }
 
         // If permissions table is empty (not seeded yet), allow access
-        if (!DB::table('permission_menu')->exists()) {
+        if (!Schema::hasTable('permission_menu') || DB::table('permission_menu')->count() === 0) {
             return true;
         }
 
@@ -64,11 +70,16 @@ class Permission
     public static function viewableMenuIds(User $user)
     {
         $roleIds = $user->roles()->pluck('roles.id');
-        if ($roleIds->isEmpty()) return collect();
+        if ($roleIds->isEmpty()) {
+            if (Schema::hasTable('role_user') && DB::table('role_user')->count() === 0) {
+                return Menu::pluck('id');
+            }
+            return collect();
+        }
         if ($user->roles()->where('slug', 'admin')->exists()) {
             return Menu::pluck('id');
         }
-        if (!DB::table('permission_menu')->exists()) {
+        if (!Schema::hasTable('permission_menu') || DB::table('permission_menu')->count() === 0) {
             return Menu::pluck('id');
         }
         return DB::table('permission_menu')
