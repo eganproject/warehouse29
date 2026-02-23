@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>{{ config('app.name', 'Metronic') }} | {{ __('Sign In') }}</title>
+    <title>Gudang 29 | Login</title>
     <link rel="shortcut icon" href="{{ asset('metronic/media/logos/logo-demo3.png') }}">
     <link href="{{ asset('metronic/plugins/global/plugins.bundle.css') }}" rel="stylesheet" type="text/css">
     <link href="{{ asset('metronic/css/style.bundle.css') }}" rel="stylesheet" type="text/css">
@@ -20,10 +20,10 @@
                         <img alt="Logo" src="{{ asset('metronic/media/logos/logo-demo3.png') }}" class="h-60px">
                     </a>
                     <h1 class="fw-bolder fs-2qx pb-5 pb-md-10" style="color:#986923;">
-                        {{ __('Welcome to') }} {{ config('app.name', 'Metronic') }}
+                        Login ke Gudang 29
                     </h1>
                     <p class="fw-bold fs-2" style="color:#986923;">
-                        {{ __('Discover reliable visibility & insights for your supply chain') }}
+                        Kelola stok, inbound, outbound, dan opname Gudang 29.
                     </p>
                 </div>
                 <div class="d-flex flex-row-auto bgi-no-repeat bgi-position-x-center bgi-size-contain bgi-position-y-bottom min-h-100px min-h-lg-350px"
@@ -43,17 +43,17 @@
                     <form class="form w-100" method="POST" action="{{ route('login') }}" id="kt_sign_in_form">
                         @csrf
                         <div class="text-center mb-10">
-                            <h1 class="text-dark mb-3">{{ __('Sign In to') }} {{ config('app.name', 'Metronic') }}</h1>
+                            <h1 class="text-dark mb-3">Login ke Gudang 29</h1>
                             <div class="text-gray-400 fw-bold fs-4">
-                                {{ __('New here?') }}
+                                Belum punya akun?
                                 @if (Route::has('register'))
-                                    <a href="{{ route('register') }}" class="link-primary fw-bolder">{{ __('Create an account') }}</a>
+                                    <a href="{{ route('register') }}" class="link-primary fw-bolder">Buat akun</a>
                                 @endif
                             </div>
                         </div>
 
                         <div class="fv-row mb-10">
-                            <label class="form-label fs-6 fw-bolder text-dark">{{ __('Email') }}</label>
+                            <label class="form-label fs-6 fw-bolder text-dark">Email</label>
                             <input class="form-control form-control-lg form-control-solid @error('email') is-invalid @enderror"
                                    type="email"
                                    name="email"
@@ -66,9 +66,9 @@
 
                         <div class="fv-row mb-10">
                             <div class="d-flex flex-stack mb-2">
-                                <label class="form-label fw-bolder text-dark fs-6 mb-0">{{ __('Password') }}</label>
+                                <label class="form-label fw-bolder text-dark fs-6 mb-0">Password</label>
                                 @if (Route::has('password.request'))
-                                    <a href="{{ route('password.request') }}" class="link-primary fs-6 fw-bolder">{{ __('Forgot Password?') }}</a>
+                                    <a href="{{ route('password.request') }}" class="link-primary fs-6 fw-bolder">Lupa Password?</a>
                                 @endif
                             </div>
                             <input class="form-control form-control-lg form-control-solid @error('password') is-invalid @enderror"
@@ -83,15 +83,15 @@
                         <div class="d-flex justify-content-between mb-7">
                             <label class="form-check form-check-custom form-check-solid">
                                 <input class="form-check-input" type="checkbox" name="remember">
-                                <span class="form-check-label text-gray-600">{{ __('Remember me') }}</span>
+                                <span class="form-check-label text-gray-600">Ingat saya</span>
                             </label>
                         </div>
 
                         <div class="text-center">
                             <button type="submit" id="kt_sign_in_submit" class="btn btn-lg btn-primary w-100 mb-5">
-                                <span class="indicator-label">{{ __('Continue') }}</span>
+                                <span class="indicator-label">Masuk</span>
                                 <span class="indicator-progress">
-                                    {{ __('Please wait...') }}
+                                    Mohon tunggu...
                                     <span class="spinner-border spinner-border-sm align-middle ms-2"></span>
                                 </span>
                             </button>
