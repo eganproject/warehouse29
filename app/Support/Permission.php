@@ -37,6 +37,16 @@ class Permission
         $roleIds = $user->roles()->pluck('roles.id');
         if ($roleIds->isEmpty()) return false;
 
+        // Always allow admin role
+        if ($user->roles()->where('slug', 'admin')->exists()) {
+            return true;
+        }
+
+        // If permissions table is empty (not seeded yet), allow access
+        if (!DB::table('permission_menu')->exists()) {
+            return true;
+        }
+
         $col = match ($action) {
             'create' => 'can_create',
             'update' => 'can_update',
@@ -55,6 +65,12 @@ class Permission
     {
         $roleIds = $user->roles()->pluck('roles.id');
         if ($roleIds->isEmpty()) return collect();
+        if ($user->roles()->where('slug', 'admin')->exists()) {
+            return Menu::pluck('id');
+        }
+        if (!DB::table('permission_menu')->exists()) {
+            return Menu::pluck('id');
+        }
         return DB::table('permission_menu')
             ->whereIn('role_id', $roleIds)
             ->where('can_view', true)

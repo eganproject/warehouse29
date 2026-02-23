@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\ItemStockController;
 use App\Http\Controllers\Admin\InboundController;
 use App\Http\Controllers\Admin\OutboundController;
 use App\Http\Controllers\Admin\StockMutationController;
+use App\Http\Controllers\Admin\StockOpnameController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\MenuController;
 use App\Http\Controllers\Admin\PermissionController;
@@ -80,6 +81,11 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         // Stock Mutations
         Route::get('/stock-mutations', [StockMutationController::class, 'index'])->name('stock-mutations.index');
         Route::get('/stock-mutations/data', [StockMutationController::class, 'data'])->name('stock-mutations.data');
+
+        // Stock Opname
+        Route::get('/stock-opname', [StockOpnameController::class, 'index'])->name('stock-opname.index');
+        Route::get('/stock-opname/data', [StockOpnameController::class, 'data'])->name('stock-opname.data');
+        Route::post('/stock-opname', [StockOpnameController::class, 'store'])->name('stock-opname.store');
     });
 
     Route::prefix('inbound')->as('inbound.')->group(function () {

@@ -1,0 +1,208 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Models\Item;
+use App\Models\ItemStock;
+use App\Models\StockOpname;
+use App\Models\StockOpnameItem;
+use App\Support\StockService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+
+class StockOpnameController extends Controller
+{
+    public function index()
+    {
+        $items = Item::leftJoin('item_stocks', 'item_stocks.item_id', '=', 'items.id')
+            ->orderBy('items.name')
+            ->get([
+                'items.id',
+                'items.sku',
+                'items.name',
+                DB::raw('COALESCE(item_stocks.stock, 0) as stock'),
+            ]);
+
+        return view('admin.inventory.stock-opname.index', [
+            'items' => $items,
+            'dataUrl' => route('admin.inventory.stock-opname.data'),
+            'storeUrl' => route('admin.inventory.stock-opname.store'),
+        ]);
+    }
+
+    public function data(Request $request)
+    {
+        $query = StockOpname::query()
+            ->select([
+                'stock_opnames.id',
+                'stock_opnames.code',
+                'stock_opnames.transacted_at',
+                'stock_opnames.note as opname_note',
+                'items.sku',
+                'items.name as item_name',
+                'stock_opname_items.system_qty',
+                'stock_opname_items.counted_qty',
+                'stock_opname_items.adjustment',
+                'stock_opname_items.note as item_note',
+            ])
+            ->join('stock_opname_items', 'stock_opname_items.stock_opname_id', '=', 'stock_opnames.id')
+            ->join('items', 'items.id', '=', 'stock_opname_items.item_id')
+            ->orderBy('stock_opnames.transacted_at', 'desc');
+
+        $search = trim((string) $request->input('q', ''));
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('stock_opnames.code', 'like', "%{$search}%")
+                    ->orWhere('items.sku', 'like', "%{$search}%")
+                    ->orWhere('items.name', 'like', "%{$search}%");
+            });
+        }
+
+        $recordsTotal = StockOpnameItem::count();
+        $recordsFiltered = (clone $query)->count();
+
+        $start = (int) $request->input('start', 0);
+        $length = (int) $request->input('length', 10);
+        if ($length > 0) {
+            $query->skip($start)->take($length);
+        }
+
+        $data = $query->get()->map(function ($row) {
+            $itemLabel = trim(($row->sku ?? '').' - '.($row->item_name ?? ''));
+            $ts = $row->transacted_at ? Carbon::parse($row->transacted_at)->format('Y-m-d H:i') : '';
+            $note = $row->item_note ?: ($row->opname_note ?? '');
+            return [
+                'id' => $row->id,
+                'code' => $row->code,
+                'transacted_at' => $ts,
+                'item' => $itemLabel,
+                'system_qty' => (int) $row->system_qty,
+                'counted_qty' => (int) $row->counted_qty,
+                'adjustment' => (int) $row->adjustment,
+                'note' => $note,
+            ];
+        });
+
+        return response()->json([
+            'draw' => (int) $request->input('draw'),
+            'recordsTotal' => $recordsTotal,
+            'recordsFiltered' => $recordsFiltered,
+            'data' => $data,
+        ]);
+    }
+
+    public function store(Request $request)
+    {
+        $validated = $this->validatePayload($request);
+
+        $code = $this->generateCode('OPN');
+        $transactedAt = $validated['transacted_at'] ?? now();
+
+        DB::beginTransaction();
+        try {
+            $opname = StockOpname::create([
+                'code' => $code,
+                'note' => $validated['note'] ?? null,
+                'transacted_at' => $transactedAt,
+                'created_by' => auth()->id(),
+            ]);
+
+            foreach ($validated['items'] as $row) {
+                $stock = ItemStock::where('item_id', $row['item_id'])->lockForUpdate()->first();
+                if (!$stock) {
+                    ItemStock::create(['item_id' => $row['item_id'], 'stock' => 0]);
+                    $stock = ItemStock::where('item_id', $row['item_id'])->lockForUpdate()->first();
+                }
+                $systemQty = (int) ($stock?->stock ?? 0);
+                $countedQty = (int) $row['counted_qty'];
+                $adjustment = $countedQty - $systemQty;
+
+                StockOpnameItem::create([
+                    'stock_opname_id' => $opname->id,
+                    'item_id' => $row['item_id'],
+                    'system_qty' => $systemQty,
+                    'counted_qty' => $countedQty,
+                    'adjustment' => $adjustment,
+                    'note' => $row['note'] ?? null,
+                ]);
+
+                if ($adjustment !== 0) {
+                    StockService::mutate([
+                        'item_id' => $row['item_id'],
+                        'direction' => $adjustment > 0 ? 'in' : 'out',
+                        'qty' => abs($adjustment),
+                        'source_type' => 'opname',
+                        'source_subtype' => null,
+                        'source_id' => $opname->id,
+                        'source_code' => $opname->code,
+                        'note' => $row['note'] ?? null,
+                        'occurred_at' => $transactedAt,
+                        'created_by' => auth()->id(),
+                    ]);
+                }
+            }
+
+            DB::commit();
+        } catch (ValidationException $e) {
+            DB::rollBack();
+            throw $e;
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Gagal menyimpan stock opname',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+
+        return response()->json([
+            'message' => 'Stock opname berhasil disimpan',
+        ]);
+    }
+
+    private function validatePayload(Request $request): array
+    {
+        $validated = $request->validate([
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.item_id' => ['required', 'integer', 'exists:items,id'],
+            'items.*.counted_qty' => ['required', 'integer', 'min:0'],
+            'items.*.note' => ['nullable', 'string'],
+            'note' => ['nullable', 'string'],
+            'transacted_at' => ['nullable', 'date'],
+        ]);
+
+        $items = collect($validated['items'] ?? [])
+            ->filter(fn ($row) => (int) ($row['item_id'] ?? 0) > 0)
+            ->map(function ($row) {
+                return [
+                    'item_id' => (int) $row['item_id'],
+                    'counted_qty' => (int) $row['counted_qty'],
+                    'note' => $row['note'] ?? null,
+                ];
+            })->values();
+
+        $duplicates = $items->groupBy('item_id')->filter(fn ($rows) => $rows->count() > 1);
+        if ($duplicates->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                'items' => 'Item tidak boleh duplikat pada stock opname',
+            ]);
+        }
+
+        $validated['items'] = $items->all();
+        if (!empty($validated['transacted_at'])) {
+            $validated['transacted_at'] = Carbon::parse($validated['transacted_at']);
+        } else {
+            $validated['transacted_at'] = null;
+        }
+
+        return $validated;
+    }
+
+    private function generateCode(string $prefix): string
+    {
+        return $prefix.'-'.now()->format('YmdHis').'-'.Str::upper(Str::random(4));
+    }
+}
