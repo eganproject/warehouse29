@@ -10,7 +10,7 @@ class Permission
 {
     public static function resolveBaseRoute(string $routeName): string
     {
-        $base = preg_replace('/\.(create|store|edit|update|destroy|show|data|import)$/', '.index', $routeName);
+        $base = preg_replace('/\.(create|store|edit|update|destroy|show|data|import|detail)$/', '.index', $routeName);
         return $base;
     }
 

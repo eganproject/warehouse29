@@ -4,6 +4,9 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Admin\ItemStockController;
+use App\Http\Controllers\Admin\InboundController;
+use App\Http\Controllers\Admin\OutboundController;
+use App\Http\Controllers\Admin\StockMutationController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\MenuController;
 use App\Http\Controllers\Admin\PermissionController;
@@ -73,5 +76,61 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         // Item Stocks
         Route::get('/item-stocks', [ItemStockController::class, 'index'])->name('item-stocks.index');
         Route::get('/item-stocks/data', [ItemStockController::class, 'data'])->name('item-stocks.data');
+
+        // Stock Mutations
+        Route::get('/stock-mutations', [StockMutationController::class, 'index'])->name('stock-mutations.index');
+        Route::get('/stock-mutations/data', [StockMutationController::class, 'data'])->name('stock-mutations.data');
+    });
+
+    Route::prefix('inbound')->as('inbound.')->group(function () {
+        Route::get('/receipts', [InboundController::class, 'receipts'])->name('receipts.index');
+        Route::get('/receipts/data', [InboundController::class, 'receiptsData'])->name('receipts.data');
+        Route::post('/receipts', [InboundController::class, 'receiptsStore'])->name('receipts.store');
+        Route::get('/receipts/{id}', [InboundController::class, 'receiptsShow'])->name('receipts.show');
+        Route::put('/receipts/{id}', [InboundController::class, 'receiptsUpdate'])->name('receipts.update');
+        Route::delete('/receipts/{id}', [InboundController::class, 'receiptsDestroy'])->name('receipts.destroy');
+        Route::get('/receipts/{id}/detail', [InboundController::class, 'receiptsDetail'])->name('receipts.detail');
+
+        Route::get('/returns', [InboundController::class, 'returns'])->name('returns.index');
+        Route::get('/returns/data', [InboundController::class, 'returnsData'])->name('returns.data');
+        Route::post('/returns', [InboundController::class, 'returnsStore'])->name('returns.store');
+        Route::get('/returns/{id}', [InboundController::class, 'returnsShow'])->name('returns.show');
+        Route::put('/returns/{id}', [InboundController::class, 'returnsUpdate'])->name('returns.update');
+        Route::delete('/returns/{id}', [InboundController::class, 'returnsDestroy'])->name('returns.destroy');
+        Route::get('/returns/{id}/detail', [InboundController::class, 'returnsDetail'])->name('returns.detail');
+
+        Route::get('/manuals', [InboundController::class, 'manuals'])->name('manuals.index');
+        Route::get('/manuals/data', [InboundController::class, 'manualsData'])->name('manuals.data');
+        Route::post('/manuals', [InboundController::class, 'manualsStore'])->name('manuals.store');
+        Route::get('/manuals/{id}', [InboundController::class, 'manualsShow'])->name('manuals.show');
+        Route::put('/manuals/{id}', [InboundController::class, 'manualsUpdate'])->name('manuals.update');
+        Route::delete('/manuals/{id}', [InboundController::class, 'manualsDestroy'])->name('manuals.destroy');
+        Route::get('/manuals/{id}/detail', [InboundController::class, 'manualsDetail'])->name('manuals.detail');
+    });
+
+    Route::prefix('outbound')->as('outbound.')->group(function () {
+        Route::get('/pickers', [OutboundController::class, 'pickers'])->name('pickers.index');
+        Route::get('/pickers/data', [OutboundController::class, 'pickersData'])->name('pickers.data');
+        Route::post('/pickers', [OutboundController::class, 'pickersStore'])->name('pickers.store');
+        Route::get('/pickers/{id}', [OutboundController::class, 'pickersShow'])->name('pickers.show');
+        Route::put('/pickers/{id}', [OutboundController::class, 'pickersUpdate'])->name('pickers.update');
+        Route::delete('/pickers/{id}', [OutboundController::class, 'pickersDestroy'])->name('pickers.destroy');
+        Route::get('/pickers/{id}/detail', [OutboundController::class, 'pickersDetail'])->name('pickers.detail');
+
+        Route::get('/manuals', [OutboundController::class, 'manuals'])->name('manuals.index');
+        Route::get('/manuals/data', [OutboundController::class, 'manualsData'])->name('manuals.data');
+        Route::post('/manuals', [OutboundController::class, 'manualsStore'])->name('manuals.store');
+        Route::get('/manuals/{id}', [OutboundController::class, 'manualsShow'])->name('manuals.show');
+        Route::put('/manuals/{id}', [OutboundController::class, 'manualsUpdate'])->name('manuals.update');
+        Route::delete('/manuals/{id}', [OutboundController::class, 'manualsDestroy'])->name('manuals.destroy');
+        Route::get('/manuals/{id}/detail', [OutboundController::class, 'manualsDetail'])->name('manuals.detail');
+
+        Route::get('/returns', [OutboundController::class, 'returns'])->name('returns.index');
+        Route::get('/returns/data', [OutboundController::class, 'returnsData'])->name('returns.data');
+        Route::post('/returns', [OutboundController::class, 'returnsStore'])->name('returns.store');
+        Route::get('/returns/{id}', [OutboundController::class, 'returnsShow'])->name('returns.show');
+        Route::put('/returns/{id}', [OutboundController::class, 'returnsUpdate'])->name('returns.update');
+        Route::delete('/returns/{id}', [OutboundController::class, 'returnsDestroy'])->name('returns.destroy');
+        Route::get('/returns/{id}/detail', [OutboundController::class, 'returnsDetail'])->name('returns.detail');
     });
 });

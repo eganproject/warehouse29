@@ -39,15 +39,16 @@ class RoleSeeder extends Seeder
             ['name' => 'Categories', 'slug' => 'categories', 'route' => 'admin.masterdata.categories.index', 'icon' => 'fa-solid fa-sitemap', 'parent_slug' => 'master-data', 'sort_order' => 21.5],
             ['name' => 'Items', 'slug' => 'items', 'route' => 'admin.masterdata.items.index', 'icon' => 'fa-solid fa-box', 'parent_slug' => 'master-data', 'sort_order' => 21.6],
             ['name' => 'Item Stocks', 'slug' => 'item-stocks', 'route' => 'admin.inventory.item-stocks.index', 'icon' => 'fa-solid fa-boxes-stacked', 'parent_slug' => 'inventory', 'sort_order' => 10],
+            ['name' => 'Stock Mutations', 'slug' => 'stock-mutations', 'route' => 'admin.inventory.stock-mutations.index', 'icon' => 'fa-solid fa-right-left', 'parent_slug' => 'inventory', 'sort_order' => 11],
             ['name' => 'Stores', 'slug' => 'stores', 'route' => 'admin.masterdata.stores.index', 'icon' => 'fa-solid fa-store', 'parent_slug' => 'master-data', 'sort_order' => 21.7],
             ['name' => 'Menus', 'slug' => 'menus', 'route' => 'admin.masterdata.menus.index', 'icon' => 'fa-solid fa-bars', 'parent_slug' => 'master-data', 'sort_order' => 22],
             ['name' => 'Permissions', 'slug' => 'permissions', 'route' => 'admin.masterdata.permissions.index', 'icon' => 'fa-solid fa-lock', 'parent_slug' => 'master-data', 'sort_order' => 23],
-            ['name' => 'Penerimaan Barang', 'slug' => 'inbound-receiving', 'route' => null, 'icon' => 'fa-solid fa-dolly', 'parent_slug' => 'inbound', 'sort_order' => 10],
-            ['name' => 'Retur', 'slug' => 'inbound-return', 'route' => null, 'icon' => 'fa-solid fa-rotate-left', 'parent_slug' => 'inbound', 'sort_order' => 11],
-            ['name' => 'Manual', 'slug' => 'inbound-manual', 'route' => null, 'icon' => 'fa-solid fa-pen-to-square', 'parent_slug' => 'inbound', 'sort_order' => 12],
-            ['name' => 'Picker', 'slug' => 'outbound-picker', 'route' => null, 'icon' => 'fa-solid fa-people-carry-box', 'parent_slug' => 'outbound', 'sort_order' => 10],
-            ['name' => 'Manual', 'slug' => 'outbound-manual', 'route' => null, 'icon' => 'fa-solid fa-pen-to-square', 'parent_slug' => 'outbound', 'sort_order' => 11],
-            ['name' => 'Retur', 'slug' => 'outbound-return', 'route' => null, 'icon' => 'fa-solid fa-rotate-left', 'parent_slug' => 'outbound', 'sort_order' => 12],
+            ['name' => 'Penerimaan Barang', 'slug' => 'inbound-receiving', 'route' => 'admin.inbound.receipts.index', 'icon' => 'fa-solid fa-dolly', 'parent_slug' => 'inbound', 'sort_order' => 10],
+            ['name' => 'Retur', 'slug' => 'inbound-return', 'route' => 'admin.inbound.returns.index', 'icon' => 'fa-solid fa-rotate-left', 'parent_slug' => 'inbound', 'sort_order' => 11],
+            ['name' => 'Manual', 'slug' => 'inbound-manual', 'route' => 'admin.inbound.manuals.index', 'icon' => 'fa-solid fa-pen-to-square', 'parent_slug' => 'inbound', 'sort_order' => 12],
+            ['name' => 'Picker', 'slug' => 'outbound-picker', 'route' => 'admin.outbound.pickers.index', 'icon' => 'fa-solid fa-people-carry-box', 'parent_slug' => 'outbound', 'sort_order' => 10],
+            ['name' => 'Manual', 'slug' => 'outbound-manual', 'route' => 'admin.outbound.manuals.index', 'icon' => 'fa-solid fa-pen-to-square', 'parent_slug' => 'outbound', 'sort_order' => 11],
+            ['name' => 'Retur', 'slug' => 'outbound-return', 'route' => 'admin.outbound.returns.index', 'icon' => 'fa-solid fa-rotate-left', 'parent_slug' => 'outbound', 'sort_order' => 12],
         ];
 
         // Insert parents first
