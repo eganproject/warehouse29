@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Item;
 use App\Models\PickerSession;
 use App\Models\PickerSessionItem;
+use App\Support\StockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -150,22 +151,56 @@ class PickerSessionController extends Controller
 
     public function submit()
     {
-        $session = $this->currentDraftSession();
-        if (!$session) {
-            throw ValidationException::withMessages([
-                'session' => 'Sesi belum tersedia',
-            ]);
-        }
+        DB::beginTransaction();
+        try {
+            $session = PickerSession::where('user_id', auth()->id())
+                ->where('status', 'draft')
+                ->lockForUpdate()
+                ->first();
+            if (!$session) {
+                throw ValidationException::withMessages([
+                    'session' => 'Sesi belum tersedia',
+                ]);
+            }
 
-        if ($session->items()->count() === 0) {
-            throw ValidationException::withMessages([
-                'items' => 'Minimal 1 item diperlukan',
-            ]);
-        }
+            $session->load('items');
+            if ($session->items->isEmpty()) {
+                throw ValidationException::withMessages([
+                    'items' => 'Minimal 1 item diperlukan',
+                ]);
+            }
 
-        $session->status = 'submitted';
-        $session->submitted_at = now();
-        $session->save();
+            $occurredAt = now();
+            foreach ($session->items as $row) {
+                StockService::mutate([
+                    'item_id' => $row->item_id,
+                    'direction' => 'out',
+                    'qty' => (int) $row->qty,
+                    'source_type' => 'picker',
+                    'source_subtype' => 'mobile',
+                    'source_id' => $session->id,
+                    'source_code' => $session->code,
+                    'note' => $row->note ?? null,
+                    'occurred_at' => $occurredAt,
+                    'created_by' => auth()->id(),
+                ]);
+            }
+
+            $session->status = 'submitted';
+            $session->submitted_at = $occurredAt;
+            $session->save();
+
+            DB::commit();
+        } catch (ValidationException $e) {
+            DB::rollBack();
+            throw $e;
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Gagal menyelesaikan sesi',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
 
         return response()->json([
             'message' => 'Penginputan selesai',

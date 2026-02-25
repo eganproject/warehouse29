@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\OutboundController;
 use App\Http\Controllers\Admin\StockMutationController;
 use App\Http\Controllers\Admin\StockOpnameController;
 use App\Http\Controllers\Admin\DamagedGoodsController;
+use App\Http\Controllers\Admin\PickerHistoryController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\MenuController;
 use App\Http\Controllers\Admin\PermissionController;
@@ -159,5 +160,8 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         Route::put('/returns/{id}', [OutboundController::class, 'returnsUpdate'])->name('returns.update');
         Route::delete('/returns/{id}', [OutboundController::class, 'returnsDestroy'])->name('returns.destroy');
         Route::get('/returns/{id}/detail', [OutboundController::class, 'returnsDetail'])->name('returns.detail');
+
+        Route::get('/picker-sessions', [PickerHistoryController::class, 'index'])->name('picker-sessions.index');
+        Route::get('/picker-sessions/data', [PickerHistoryController::class, 'data'])->name('picker-sessions.data');
     });
 });
