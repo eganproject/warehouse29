@@ -224,16 +224,14 @@ class OutboundController extends Controller
             $ts = $row->transacted_at ? Carbon::parse($row->transacted_at)->format('Y-m-d H:i') : '';
             $items = $row->items ?? collect();
             $labels = $items->map(function ($it) {
-                $sku = $it->item?->sku ?? '';
-                $name = $it->item?->name ?? '';
-                return trim($sku.' - '.$name);
+                $sku = trim($it->item?->sku ?? '');
+                if ($sku === '') {
+                    return '';
+                }
+                $qty = (int) ($it->qty ?? 0);
+                return sprintf('%s (%d)', $sku, $qty);
             })->filter()->values();
-            $shown = $labels->take(3);
-            $more = $labels->count() - $shown->count();
-            $itemLabel = $shown->implode(', ');
-            if ($more > 0) {
-                $itemLabel .= " +{$more} item";
-            }
+            $itemLabel = $labels->implode(', ');
             $totalQty = (int) $items->sum('qty');
             return [
                 'id' => $row->id,
