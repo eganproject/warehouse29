@@ -95,6 +95,7 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         // Stock Mutations
         Route::get('/stock-mutations', [StockMutationController::class, 'index'])->name('stock-mutations.index');
         Route::get('/stock-mutations/data', [StockMutationController::class, 'data'])->name('stock-mutations.data');
+        Route::get('/stock-mutations/{id}', [StockMutationController::class, 'show'])->name('stock-mutations.show');
 
         // Stock Opname
         Route::get('/stock-opname', [StockOpnameController::class, 'index'])->name('stock-opname.index');

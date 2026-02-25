@@ -3,7 +3,12 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\DamagedGood;
+use App\Models\InboundTransaction;
+use App\Models\OutboundTransaction;
+use App\Models\PickerSession;
 use App\Models\StockMutation;
+use App\Models\StockOpname;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
@@ -17,7 +22,7 @@ class StockMutationController extends Controller
     public function data(Request $request)
     {
         $query = StockMutation::query()
-            ->with('item')
+            ->with(['item', 'creator'])
             ->orderBy('occurred_at', 'desc');
 
         $search = trim((string) $request->input('q', ''));
@@ -26,6 +31,10 @@ class StockMutationController extends Controller
                 $q->where('source_code', 'like', "%{$search}%")
                     ->orWhere('source_type', 'like', "%{$search}%")
                     ->orWhere('source_subtype', 'like', "%{$search}%")
+                    ->orWhereHas('creator', function ($userQ) use ($search) {
+                        $userQ->where('name', 'like', "%{$search}%")
+                            ->orWhere('email', 'like', "%{$search}%");
+                    })
                     ->orWhereHas('item', function ($itemQ) use ($search) {
                         $itemQ->where('sku', 'like', "%{$search}%")
                             ->orWhere('name', 'like', "%{$search}%");
@@ -51,6 +60,7 @@ class StockMutationController extends Controller
                 'id' => $m->id,
                 'occurred_at' => $ts,
                 'item' => $itemLabel,
+                'user' => $m->creator?->name ?? '-',
                 'direction' => $direction,
                 'qty' => (int) $m->qty,
                 'source' => trim($source),
@@ -65,5 +75,137 @@ class StockMutationController extends Controller
             'recordsFiltered' => $recordsFiltered,
             'data' => $data,
         ]);
+    }
+
+    public function show(int $id)
+    {
+        $mutation = StockMutation::with(['item', 'creator'])->findOrFail($id);
+        [$sourceSummary, $sourceItems] = $this->resolveSource($mutation);
+
+        $itemLabel = trim(($mutation->item?->sku ?? '').' - '.($mutation->item?->name ?? ''));
+        $direction = $mutation->direction === 'in' ? 'IN' : 'OUT';
+        $source = strtoupper($mutation->source_type ?? '').($mutation->source_subtype ? ' / '.$mutation->source_subtype : '');
+
+        return response()->json([
+            'mutation' => [
+                'id' => $mutation->id,
+                'occurred_at' => $mutation->occurred_at?->format('Y-m-d H:i'),
+                'item' => $itemLabel,
+                'direction' => $direction,
+                'qty' => (int) $mutation->qty,
+                'source' => trim($source),
+                'source_code' => $mutation->source_code ?? '',
+                'note' => $mutation->note ?? '',
+                'user' => $mutation->creator?->name ?? '-',
+            ],
+            'source' => $sourceSummary ? array_merge($sourceSummary, ['items' => $sourceItems]) : null,
+        ]);
+    }
+
+    private function resolveSource(StockMutation $mutation): array
+    {
+        $sourceSummary = null;
+        $sourceItems = [];
+
+        switch ($mutation->source_type) {
+            case 'inbound':
+                $tx = InboundTransaction::with('items.item')->find($mutation->source_id);
+                if ($tx) {
+                    $sourceSummary = [
+                        'label' => 'Inbound / '.$tx->type,
+                        'code' => $tx->code,
+                        'ref' => $tx->ref_no ?? '-',
+                        'date' => $tx->transacted_at?->format('Y-m-d H:i'),
+                        'note' => $tx->note ?? '-',
+                    ];
+                    $sourceItems = $tx->items->map(function ($row) {
+                        return [
+                            'label' => trim(($row->item?->sku ?? '').' - '.($row->item?->name ?? '')),
+                            'qty' => (int) $row->qty,
+                            'note' => $row->note ?? '-',
+                        ];
+                    })->values()->all();
+                }
+                break;
+            case 'outbound':
+                $tx = OutboundTransaction::with('items.item')->find($mutation->source_id);
+                if ($tx) {
+                    $sourceSummary = [
+                        'label' => 'Outbound / '.$tx->type,
+                        'code' => $tx->code,
+                        'ref' => $tx->ref_no ?? '-',
+                        'date' => $tx->transacted_at?->format('Y-m-d H:i'),
+                        'note' => $tx->note ?? '-',
+                    ];
+                    $sourceItems = $tx->items->map(function ($row) {
+                        return [
+                            'label' => trim(($row->item?->sku ?? '').' - '.($row->item?->name ?? '')),
+                            'qty' => (int) $row->qty,
+                            'note' => $row->note ?? '-',
+                        ];
+                    })->values()->all();
+                }
+                break;
+            case 'opname':
+                $opname = StockOpname::with('items.item')->find($mutation->source_id);
+                if ($opname) {
+                    $sourceSummary = [
+                        'label' => 'Stock Opname',
+                        'code' => $opname->code,
+                        'ref' => '-',
+                        'date' => $opname->transacted_at?->format('Y-m-d H:i'),
+                        'note' => $opname->note ?? '-',
+                    ];
+                    $sourceItems = $opname->items->map(function ($row) {
+                        return [
+                            'label' => trim(($row->item?->sku ?? '').' - '.($row->item?->name ?? '')),
+                            'qty' => (int) $row->adjustment,
+                            'note' => $row->note ?? '-',
+                            'meta' => 'System '.$row->system_qty.', Counted '.$row->counted_qty.', Adj '.$row->adjustment,
+                        ];
+                    })->values()->all();
+                }
+                break;
+            case 'damaged':
+                $damage = DamagedGood::with('items.item')->find($mutation->source_id);
+                if ($damage) {
+                    $sourceSummary = [
+                        'label' => 'Barang Rusak / '.$damage->source_type,
+                        'code' => $damage->code,
+                        'ref' => $damage->source_ref ?? '-',
+                        'date' => $damage->transacted_at?->format('Y-m-d H:i'),
+                        'note' => $damage->note ?? '-',
+                    ];
+                    $sourceItems = $damage->items->map(function ($row) {
+                        return [
+                            'label' => trim(($row->item?->sku ?? '').' - '.($row->item?->name ?? '')),
+                            'qty' => (int) $row->qty,
+                            'note' => $row->note ?? '-',
+                        ];
+                    })->values()->all();
+                }
+                break;
+            case 'picker':
+                $session = PickerSession::with('items.item', 'user')->find($mutation->source_id);
+                if ($session) {
+                    $sourceSummary = [
+                        'label' => 'Picker Mobile',
+                        'code' => $session->code,
+                        'ref' => $session->user?->name ?? '-',
+                        'date' => ($session->submitted_at ?? $session->started_at)?->format('Y-m-d H:i'),
+                        'note' => $session->note ?? '-',
+                    ];
+                    $sourceItems = $session->items->map(function ($row) {
+                        return [
+                            'label' => trim(($row->item?->sku ?? '').' - '.($row->item?->name ?? '')),
+                            'qty' => (int) $row->qty,
+                            'note' => $row->note ?? '-',
+                        ];
+                    })->values()->all();
+                }
+                break;
+        }
+
+        return [$sourceSummary, $sourceItems];
     }
 }
