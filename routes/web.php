@@ -12,6 +12,7 @@ use App\Http\Controllers\Admin\DamagedGoodsController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\MenuController;
 use App\Http\Controllers\Admin\PermissionController;
+use App\Http\Controllers\Picker\PickerSessionController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -31,6 +32,17 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+});
+
+Route::middleware('auth')->prefix('picker')->as('picker.')->group(function () {
+    Route::get('/', [PickerSessionController::class, 'index'])->name('index');
+    Route::get('/current', [PickerSessionController::class, 'current'])->name('current');
+    Route::post('/start', [PickerSessionController::class, 'start'])->name('start');
+    Route::get('/items/search', [PickerSessionController::class, 'searchItems'])->name('items.search');
+    Route::post('/items', [PickerSessionController::class, 'storeItem'])->name('items.store');
+    Route::put('/items/{id}', [PickerSessionController::class, 'updateItem'])->name('items.update');
+    Route::delete('/items/{id}', [PickerSessionController::class, 'destroyItem'])->name('items.destroy');
+    Route::post('/submit', [PickerSessionController::class, 'submit'])->name('submit');
 });
 
 require __DIR__.'/auth.php';
