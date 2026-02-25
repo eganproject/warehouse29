@@ -107,12 +107,53 @@
         const transactedAtEl = document.getElementById('opname_transacted_at');
         let fpTransacted = null;
 
+        const formatDateTime = (date) => {
+            const pad = (n) => String(n).padStart(2, '0');
+            return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+        };
+
+        const getJakartaNow = () => {
+            const jkt = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
+            return formatDateTime(jkt);
+        };
+
         const clearErrors = () => {
             ['error_transacted_at','error_note'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.textContent = '';
             });
             itemsContainer?.querySelectorAll('[data-error-for]')?.forEach(el => { el.textContent = ''; });
+            itemsContainer?.querySelectorAll('.opname-item-select.is-invalid')?.forEach(el => { el.classList.remove('is-invalid'); });
+        };
+
+        const validateUniqueItems = () => {
+            if (!itemsContainer) return true;
+            const rows = Array.from(itemsContainer.querySelectorAll('.opname-item-row'));
+            const counts = {};
+            rows.forEach((row) => {
+                const selectEl = row.querySelector('.opname-item-select');
+                const val = selectEl?.value;
+                if (val) {
+                    counts[val] = (counts[val] || 0) + 1;
+                }
+            });
+            let hasDuplicate = false;
+            rows.forEach((row) => {
+                const selectEl = row.querySelector('.opname-item-select');
+                const val = selectEl?.value;
+                const errEl = row.querySelector('[data-error-for="item_id"]');
+                if (selectEl && val && counts[val] > 1) {
+                    hasDuplicate = true;
+                    if (errEl) errEl.textContent = 'Item tidak boleh duplikat';
+                    selectEl.classList.add('is-invalid');
+                } else {
+                    if (errEl && errEl.textContent === 'Item tidak boleh duplikat') {
+                        errEl.textContent = '';
+                    }
+                    selectEl?.classList.remove('is-invalid');
+                }
+            });
+            return !hasDuplicate;
         };
 
         const initSelect2 = (selectEl) => {
@@ -190,20 +231,28 @@
             initSelect2(selectEl);
             updateSystemQty(row);
             renumberRows();
+            validateUniqueItems();
         };
 
         const resetForm = () => {
             form?.reset();
-            if (fpTransacted) fpTransacted.clear();
+            const nowJkt = getJakartaNow();
+            if (fpTransacted) {
+                fpTransacted.setDate(nowJkt, true, 'Y-m-d H:i');
+            } else if (transactedAtEl) {
+                transactedAtEl.value = nowJkt;
+            }
             itemsContainer.innerHTML = '';
             createItemRow();
             clearErrors();
+            validateUniqueItems();
         };
 
         itemsContainer?.addEventListener('change', (e) => {
             if (e.target.matches('.opname-item-select')) {
                 const row = e.target.closest('.opname-item-row');
                 if (row) updateSystemQty(row);
+                validateUniqueItems();
             }
         });
 
@@ -217,6 +266,7 @@
             } else {
                 renumberRows();
             }
+            validateUniqueItems();
         });
 
         addItemBtn?.addEventListener('click', () => createItemRow());
@@ -261,6 +311,10 @@
         form?.addEventListener('submit', async (e) => {
             e.preventDefault();
             clearErrors();
+            if (!validateUniqueItems()) {
+                if (typeof Swal !== 'undefined') Swal.fire('Error', 'Item tidak boleh duplikat', 'error');
+                return;
+            }
             const formData = new FormData(form);
             try {
                 const res = await fetch(storeUrl, {

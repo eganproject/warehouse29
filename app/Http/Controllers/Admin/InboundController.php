@@ -449,7 +449,7 @@ class InboundController extends Controller
             'items.*.note' => ['nullable', 'string'],
             'ref_no' => ['nullable', 'string', 'max:100'],
             'note' => ['nullable', 'string'],
-            'transacted_at' => ['nullable', 'date'],
+            'transacted_at' => ['required', 'date'],
         ]);
 
         $items = collect($validated['items'] ?? [])
@@ -460,11 +460,18 @@ class InboundController extends Controller
                     'qty' => (int) $row['qty'],
                     'note' => $row['note'] ?? null,
                 ];
-            });
+            })->values();
 
         if ($items->isEmpty()) {
             throw ValidationException::withMessages([
                 'items' => 'Minimal 1 item diperlukan',
+            ]);
+        }
+
+        $duplicates = $items->groupBy('item_id')->filter(fn ($rows) => $rows->count() > 1);
+        if ($duplicates->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                'items' => 'Item tidak boleh duplikat pada inbound',
             ]);
         }
 

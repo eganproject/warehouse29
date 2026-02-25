@@ -171,7 +171,7 @@ class StockOpnameController extends Controller
             'items.*.counted_qty' => ['required', 'integer', 'min:0'],
             'items.*.note' => ['nullable', 'string'],
             'note' => ['nullable', 'string'],
-            'transacted_at' => ['nullable', 'date'],
+            'transacted_at' => ['required', 'date'],
         ]);
 
         $items = collect($validated['items'] ?? [])

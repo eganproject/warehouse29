@@ -134,6 +134,16 @@
         let fpTo = null;
         let fpTransacted = null;
 
+        const formatDateTime = (date) => {
+            const pad = (n) => String(n).padStart(2, '0');
+            return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+        };
+
+        const getJakartaNow = () => {
+            const jkt = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
+            return formatDateTime(jkt);
+        };
+
         const resolveRoute = (type, key) => {
             if (routeMap && routeMap[type] && routeMap[type][key]) return routeMap[type][key];
             if (routeMap && routeMap[defaultTypeFilter] && routeMap[defaultTypeFilter][key]) return routeMap[defaultTypeFilter][key];
@@ -146,6 +156,37 @@
                 if (el) el.textContent = '';
             });
             itemsContainer?.querySelectorAll('[data-error-for]')?.forEach(el => { el.textContent = ''; });
+            itemsContainer?.querySelectorAll('.flow-item-select.is-invalid')?.forEach(el => { el.classList.remove('is-invalid'); });
+        };
+
+        const validateUniqueItems = () => {
+            if (!itemsContainer) return true;
+            const rows = Array.from(itemsContainer.querySelectorAll('.flow-item-row'));
+            const counts = {};
+            rows.forEach((row) => {
+                const selectEl = row.querySelector('.flow-item-select');
+                const val = selectEl?.value;
+                if (val) {
+                    counts[val] = (counts[val] || 0) + 1;
+                }
+            });
+            let hasDuplicate = false;
+            rows.forEach((row) => {
+                const selectEl = row.querySelector('.flow-item-select');
+                const val = selectEl?.value;
+                const errEl = row.querySelector('[data-error-for="item_id"]');
+                if (selectEl && val && counts[val] > 1) {
+                    hasDuplicate = true;
+                    if (errEl) errEl.textContent = 'Item tidak boleh duplikat';
+                    selectEl.classList.add('is-invalid');
+                } else {
+                    if (errEl && errEl.textContent === 'Item tidak boleh duplikat') {
+                        errEl.textContent = '';
+                    }
+                    selectEl?.classList.remove('is-invalid');
+                }
+            });
+            return !hasDuplicate;
         };
 
         const initSelect2 = (selectEl) => {
@@ -221,6 +262,7 @@
 
             initSelect2(selectEl);
             renumberRows();
+            validateUniqueItems();
         };
 
         const resetForm = () => {
@@ -228,14 +270,26 @@
             form.dataset.editId = '';
             form.dataset.flowType = defaultTypeFilter || '';
             if (modalTitle) modalTitle.textContent = 'Tambah';
-            if (fpTransacted) fpTransacted.clear();
+            const nowJkt = getJakartaNow();
+            if (fpTransacted) {
+                fpTransacted.setDate(nowJkt, true, 'Y-m-d H:i');
+            } else if (transactedAtEl) {
+                transactedAtEl.value = nowJkt;
+            }
             itemsContainer.innerHTML = '';
             createItemRow();
             clearErrors();
+            validateUniqueItems();
         };
 
         addItemBtn?.addEventListener('click', () => createItemRow());
         openCreateBtn?.addEventListener('click', resetForm);
+
+        itemsContainer?.addEventListener('change', (e) => {
+            if (e.target.matches('.flow-item-select')) {
+                validateUniqueItems();
+            }
+        });
 
         itemsContainer?.addEventListener('click', (e) => {
             const btn = e.target.closest('.btn-remove-item');
@@ -247,6 +301,7 @@
             } else {
                 renumberRows();
             }
+            validateUniqueItems();
         });
 
         if (!tableEl.length || !$.fn.DataTable) {
@@ -342,6 +397,7 @@
                     createItemRow();
                 }
                 clearErrors();
+                validateUniqueItems();
                 modal?.show();
             } catch (err) {
                 console.error(err);
@@ -398,6 +454,10 @@
         form?.addEventListener('submit', async (e) => {
             e.preventDefault();
             clearErrors();
+            if (!validateUniqueItems()) {
+                if (typeof Swal !== 'undefined') Swal.fire('Error', 'Item tidak boleh duplikat', 'error');
+                return;
+            }
 
             const isEdit = !!form.dataset.editId;
             const flowType = form.dataset.flowType || defaultTypeFilter || '';
