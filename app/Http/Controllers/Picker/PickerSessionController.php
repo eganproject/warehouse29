@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Picker;
 
 use App\Http\Controllers\Controller;
 use App\Models\Item;
+use App\Models\ItemStock;
 use App\Models\PickerSession;
 use App\Models\PickerSessionItem;
 use App\Support\StockService;
@@ -163,11 +164,35 @@ class PickerSessionController extends Controller
                 ]);
             }
 
-            $session->load('items');
+            $session->load('items.item');
             if ($session->items->isEmpty()) {
                 throw ValidationException::withMessages([
                     'items' => 'Minimal 1 item diperlukan',
                 ]);
+            }
+
+            $insufficient = [];
+            foreach ($session->items as $row) {
+                $stock = ItemStock::where('item_id', $row->item_id)->lockForUpdate()->first();
+                $available = (int) ($stock?->stock ?? 0);
+                $required = (int) $row->qty;
+                if ($available < $required) {
+                    $insufficient[] = [
+                        'item_id' => $row->item_id,
+                        'sku' => $row->item?->sku ?? '',
+                        'name' => $row->item?->name ?? '',
+                        'available' => $available,
+                        'required' => $required,
+                    ];
+                }
+            }
+
+            if (!empty($insufficient)) {
+                DB::rollBack();
+                return response()->json([
+                    'message' => 'Stok tidak mencukupi',
+                    'insufficient' => $insufficient,
+                ], 422);
             }
 
             $occurredAt = now();

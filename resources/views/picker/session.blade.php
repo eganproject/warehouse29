@@ -108,9 +108,30 @@
                     message = first[0];
                 }
             }
-            throw new Error(message);
+            const error = new Error(message);
+            if (json?.insufficient) {
+                error.insufficient = json.insufficient;
+            }
+            throw error;
         }
         return json;
+    };
+
+    const showInsufficientStock = (details) => {
+        if (!Array.isArray(details) || !details.length) return;
+        if (typeof Swal === 'undefined') return;
+        const list = details.map((row) => {
+            const sku = row.sku || '-';
+            const name = row.name ? ` • ${row.name}` : '';
+            const available = typeof row.available !== 'undefined' ? row.available : '-';
+            const required = typeof row.required !== 'undefined' ? row.required : '-';
+            return `<li style="margin-bottom:6px;"><strong>${sku}</strong>${name}<br><span style="color:#64748b;">Tersedia ${available}, butuh ${required}</span></li>`;
+        }).join('');
+        Swal.fire({
+            icon: 'error',
+            title: 'Stok tidak mencukupi',
+            html: `<div style="text-align:left; font-size:14px;">Item berikut stoknya kurang:</div><ul style="text-align:left; padding-left:18px; margin-top:8px;">${list}</ul>`,
+        });
     };
 
     const renderSession = () => {
@@ -273,6 +294,11 @@
             renderSession();
             setSaveStatus('Sesi selesai dikirim');
         } catch (err) {
+            if (err?.insufficient) {
+                showInsufficientStock(err.insufficient);
+                setSaveStatus('Stok tidak mencukupi');
+                return;
+            }
             setSaveStatus(err.message || 'Gagal mengunci sesi');
         }
     };
