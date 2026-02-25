@@ -30,32 +30,22 @@ class DamagedGoodsController extends Controller
     public function data(Request $request)
     {
         $query = DamagedGood::query()
-            ->select([
-                'damaged_goods.id',
-                'damaged_goods.code',
-                'damaged_goods.source_type',
-                'damaged_goods.source_ref',
-                'damaged_goods.transacted_at',
-                'damaged_goods.note as damage_note',
-                'items.sku',
-                'items.name as item_name',
-                'damaged_good_items.qty',
-                'damaged_good_items.note as item_note',
-            ])
-            ->join('damaged_good_items', 'damaged_good_items.damaged_good_id', '=', 'damaged_goods.id')
-            ->join('items', 'items.id', '=', 'damaged_good_items.item_id')
-            ->orderBy('damaged_goods.transacted_at', 'desc');
+            ->with(['items.item'])
+            ->orderBy('transacted_at', 'desc');
 
         $search = trim((string) $request->input('q', ''));
         if ($search !== '') {
             $query->where(function ($q) use ($search) {
                 $q->where('damaged_goods.code', 'like', "%{$search}%")
-                    ->orWhere('items.sku', 'like', "%{$search}%")
-                    ->orWhere('items.name', 'like', "%{$search}%");
+                    ->orWhere('damaged_goods.source_ref', 'like', "%{$search}%")
+                    ->orWhereHas('items.item', function ($itemQ) use ($search) {
+                        $itemQ->where('sku', 'like', "%{$search}%")
+                            ->orWhere('name', 'like', "%{$search}%");
+                    });
             });
         }
 
-        $recordsTotal = DamagedGoodItem::count();
+        $recordsTotal = DamagedGood::count();
         $recordsFiltered = (clone $query)->count();
 
         $start = (int) $request->input('start', 0);
@@ -66,17 +56,27 @@ class DamagedGoodsController extends Controller
 
         $sourceLabels = $this->sourceLabels();
         $data = $query->get()->map(function ($row) use ($sourceLabels) {
-            $itemLabel = trim(($row->sku ?? '').' - '.($row->item_name ?? ''));
+            $items = $row->items ?? collect();
+            $labels = $items->map(function ($it) {
+                $sku = trim($it->item?->sku ?? '');
+                if ($sku === '') {
+                    return '';
+                }
+                $qty = (int) ($it->qty ?? 0);
+                return sprintf('%s (%d)', $sku, $qty);
+            })->filter()->values();
+            $itemLabel = $labels->implode(', ');
             $ts = $row->transacted_at ? Carbon::parse($row->transacted_at)->format('Y-m-d H:i') : '';
-            $note = $row->item_note ?: ($row->damage_note ?? '');
+            $note = $row->note ?? '';
+            $totalQty = (int) $items->sum('qty');
             return [
                 'id' => $row->id,
                 'code' => $row->code,
                 'source' => $sourceLabels[$row->source_type] ?? $row->source_type,
                 'source_ref' => $row->source_ref ?? '',
                 'transacted_at' => $ts,
-                'item' => $itemLabel,
-                'qty' => (int) $row->qty,
+                'item' => $itemLabel ?: '-',
+                'qty' => $totalQty,
                 'note' => $note,
             ];
         });
