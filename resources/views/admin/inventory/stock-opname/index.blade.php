@@ -117,7 +117,13 @@
 
         const initSelect2 = (selectEl) => {
             if (selectEl && typeof $ !== 'undefined' && $.fn.select2) {
-                $(selectEl).select2({ placeholder: 'Pilih item', allowClear: true, width: '100%' })
+                $(selectEl).select2({
+                    placeholder: 'Pilih item',
+                    allowClear: true,
+                    width: '100%',
+                    dropdownParent: modalEl,
+                    minimumResultsForSearch: 0,
+                })
                     .on('select2:opening select2:closing select2:close', function(e){ e.stopPropagation(); });
             }
         };
