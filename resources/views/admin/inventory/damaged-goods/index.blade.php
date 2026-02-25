@@ -33,6 +33,7 @@
                         <th>Item</th>
                         <th>Qty</th>
                         <th>Catatan</th>
+                        <th class="text-end">Aksi</th>
                     </tr>
                 </thead>
                 <tbody></tbody>
@@ -45,7 +46,7 @@
     <div class="modal-dialog modal-dialog-centered mw-900px">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 class="fw-bolder">Tambah Barang Rusak</h2>
+                <h2 class="fw-bolder" id="damage_modal_title">Tambah Barang Rusak</h2>
                 <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
                     <span class="svg-icon svg-icon-1">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -109,6 +110,9 @@
 <script>
     const dataUrl = '{{ $dataUrl }}';
     const storeUrl = '{{ $storeUrl }}';
+    const showUrlTpl = '{{ route('admin.inventory.damaged-goods.show', ':id') }}';
+    const updateUrlTpl = '{{ route('admin.inventory.damaged-goods.update', ':id') }}';
+    const deleteUrlTpl = '{{ route('admin.inventory.damaged-goods.destroy', ':id') }}';
     const csrfToken = '{{ csrf_token() }}';
     const itemOptionsHtml = `@foreach($items as $item)<option value="{{ $item->id }}">{{ $item->sku }} - {{ $item->name }}</option>@endforeach`;
 
@@ -121,6 +125,7 @@
         const itemsContainer = document.getElementById('damage_items_container');
         const addItemBtn = document.getElementById('btn_add_damage_item');
         const openBtn = document.getElementById('btn_open_damage');
+        const modalTitle = document.getElementById('damage_modal_title');
         const transactedAtEl = document.getElementById('damage_transacted_at');
         let fpTransacted = null;
 
@@ -239,6 +244,8 @@
 
         const resetForm = () => {
             form?.reset();
+            form.dataset.editId = '';
+            if (modalTitle) modalTitle.textContent = 'Tambah Barang Rusak';
             const nowJkt = getJakartaNow();
             if (fpTransacted) {
                 fpTransacted.setDate(nowJkt, true, 'Y-m-d H:i');
@@ -302,11 +309,121 @@
                 { data: 'item' },
                 { data: 'qty' },
                 { data: 'note' },
+                { data: 'id', orderable: false, searchable: false, className: 'text-end', render: (data) => {
+                    const editItem = `<div class="menu-item px-3"><a href="#" class="menu-link px-3 btn-edit" data-id="${data}">Edit</a></div>`;
+                    const delItem = `<div class="menu-item px-3"><a href="#" class="menu-link px-3 text-danger btn-delete" data-id="${data}">Hapus</a></div>`;
+                    return `
+                        <div class="text-end">
+                            <a href="#" class="btn btn-sm btn-light btn-active-light-primary" data-kt-menu-trigger="click" data-kt-menu-placement="bottom-end">
+                                Actions
+                                <span class="svg-icon svg-icon-5 m-0">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                        <path d="M11.4343 12.7344L7.25 8.55005C6.83579 8.13583 6.16421 8.13584 5.75 8.55005C5.33579 8.96426 5.33579 9.63583 5.75 10.05L11.2929 15.5929C11.6834 15.9835 12.3166 15.9835 12.7071 15.5929L18.25 10.05C18.6642 9.63584 18.6642 8.96426 18.25 8.55005C17.8358 8.13584 17.1642 8.13584 16.75 8.55005L12.5657 12.7344C12.2533 13.0468 11.7467 13.0468 11.4343 12.7344Z" fill="black"></path>
+                                    </svg>
+                                </span>
+                            </a>
+                            <div class="menu menu-sub menu-sub-dropdown menu-column menu-rounded menu-gray-600 menu-state-bg-light-primary fw-bold fs-7 w-175px py-3" data-kt-menu="true">
+                                ${editItem}${delItem}
+                            </div>
+                        </div>
+                    `;
+                } },
             ]
         });
 
+        const refreshMenus = () => { if (window.KTMenu) KTMenu.createInstances(); };
+        refreshMenus();
+        dt.on('draw', refreshMenus);
+
         const reloadTable = () => dt.ajax.reload();
         searchInput?.addEventListener('keyup', reloadTable);
+
+        tableEl.on('click', '.btn-edit', async function(e) {
+            e.preventDefault();
+            const id = this.getAttribute('data-id');
+            if (!id) return;
+            try {
+                const res = await fetch(showUrlTpl.replace(':id', id), { headers: { 'Accept': 'application/json' }});
+                const json = await res.json();
+                if (!res.ok) {
+                    if (typeof Swal !== 'undefined') Swal.fire('Error', json.message || 'Gagal memuat data', 'error');
+                    return;
+                }
+                form.dataset.editId = id;
+                if (modalTitle) modalTitle.textContent = `Edit ${json.code || ''}`.trim();
+                document.getElementById('damage_source_type').value = json.source_type || '';
+                document.getElementById('damage_source_ref').value = json.source_ref || '';
+                document.getElementById('damage_note').value = json.note || '';
+                if (fpTransacted) {
+                    fpTransacted.setDate(json.transacted_at || null, true, 'Y-m-d H:i');
+                } else {
+                    document.getElementById('damage_transacted_at').value = json.transacted_at || '';
+                }
+
+                itemsContainer.innerHTML = '';
+                (json.items || []).forEach(item => createItemRow(item));
+                if ((json.items || []).length === 0) {
+                    createItemRow();
+                }
+                clearErrors();
+                validateUniqueItems();
+                modal?.show();
+            } catch (err) {
+                console.error(err);
+                if (typeof Swal !== 'undefined') Swal.fire('Error', 'Gagal memuat data', 'error');
+            }
+        });
+
+        tableEl.on('click', '.btn-delete', async function(e) {
+            e.preventDefault();
+            const id = this.getAttribute('data-id');
+            if (!id) return;
+            let confirmed = true;
+            if (typeof Swal !== 'undefined') {
+                const res = await Swal.fire({
+                    title: 'Apakah Anda yakin?',
+                    text: 'Data barang rusak akan dihapus',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Hapus',
+                    cancelButtonText: 'Batal',
+                    buttonsStyling: false,
+                    customClass: {
+                        confirmButton: 'btn btn-danger',
+                        cancelButton: 'btn btn-light'
+                    }
+                });
+                confirmed = res.isConfirmed;
+            }
+            if (!confirmed) return;
+            try {
+                const res = await fetch(deleteUrlTpl.replace(':id', id), {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'Accept': 'application/json',
+                    },
+                    body: new URLSearchParams({ _method: 'DELETE' }),
+                });
+                const text = await res.text();
+                let json;
+                try { json = JSON.parse(text); } catch (err) {
+                    console.error('Invalid JSON', text);
+                    if (typeof Swal !== 'undefined') Swal.fire('Error', 'Respons server tidak valid', 'error');
+                    return;
+                }
+                if (!res.ok) {
+                    if (typeof Swal !== 'undefined') Swal.fire('Error', json.message || 'Gagal menghapus', 'error');
+                    return;
+                }
+                if (typeof Swal !== 'undefined') Swal.fire('Berhasil', json.message || 'Berhasil', 'success');
+                reloadTable();
+            } catch (err) {
+                console.error(err);
+                if (typeof Swal !== 'undefined') Swal.fire('Error', 'Gagal menghapus', 'error');
+            }
+        });
 
         form?.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -315,7 +432,12 @@
                 if (typeof Swal !== 'undefined') Swal.fire('Error', 'Item tidak boleh duplikat', 'error');
                 return;
             }
+            const isEdit = !!form.dataset.editId;
+            const url = isEdit
+                ? updateUrlTpl.replace(':id', form.dataset.editId)
+                : storeUrl;
             const formData = new FormData(form);
+            if (isEdit) formData.append('_method', 'PUT');
             try {
                 const res = await fetch(storeUrl, {
                     method: 'POST',

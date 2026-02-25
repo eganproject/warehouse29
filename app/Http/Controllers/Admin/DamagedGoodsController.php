@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\DamagedGood;
 use App\Models\DamagedGoodItem;
 use App\Models\Item;
+use App\Models\StockMutation;
 use App\Support\StockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -145,6 +146,116 @@ class DamagedGoodsController extends Controller
 
         return response()->json([
             'message' => 'Barang rusak berhasil disimpan',
+        ]);
+    }
+
+    public function show(int $id)
+    {
+        $damage = DamagedGood::with('items')
+            ->findOrFail($id);
+
+        return response()->json([
+            'id' => $damage->id,
+            'code' => $damage->code,
+            'source_type' => $damage->source_type,
+            'source_ref' => $damage->source_ref,
+            'note' => $damage->note,
+            'transacted_at' => $damage->transacted_at?->format('Y-m-d H:i'),
+            'items' => $damage->items->map(function ($row) {
+                return [
+                    'item_id' => $row->item_id,
+                    'qty' => (int) $row->qty,
+                    'note' => $row->note,
+                ];
+            })->values(),
+        ]);
+    }
+
+    public function update(Request $request, int $id)
+    {
+        $validated = $this->validatePayload($request);
+
+        DB::beginTransaction();
+        try {
+            $damage = DamagedGood::findOrFail($id);
+
+            StockService::rollbackBySource('damaged', $damage->id);
+            StockMutation::where('source_type', 'damaged')
+                ->where('source_id', $damage->id)
+                ->delete();
+            DamagedGoodItem::where('damaged_good_id', $damage->id)->delete();
+
+            $damage->update([
+                'source_type' => $validated['source_type'],
+                'source_ref' => $validated['source_ref'] ?? null,
+                'note' => $validated['note'] ?? null,
+                'transacted_at' => $validated['transacted_at'] ?? now(),
+            ]);
+
+            foreach ($validated['items'] as $row) {
+                DamagedGoodItem::create([
+                    'damaged_good_id' => $damage->id,
+                    'item_id' => $row['item_id'],
+                    'qty' => $row['qty'],
+                    'note' => $row['note'] ?? null,
+                ]);
+
+                if ($validated['source_type'] === 'display') {
+                    StockService::mutate([
+                        'item_id' => $row['item_id'],
+                        'direction' => 'out',
+                        'qty' => $row['qty'],
+                        'source_type' => 'damaged',
+                        'source_subtype' => $validated['source_type'],
+                        'source_id' => $damage->id,
+                        'source_code' => $damage->code,
+                        'note' => $row['note'] ?? null,
+                        'occurred_at' => $validated['transacted_at'] ?? now(),
+                        'created_by' => auth()->id(),
+                    ]);
+                }
+            }
+
+            DB::commit();
+        } catch (ValidationException $e) {
+            DB::rollBack();
+            throw $e;
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Gagal memperbarui barang rusak',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+
+        return response()->json([
+            'message' => 'Barang rusak berhasil diperbarui',
+        ]);
+    }
+
+    public function destroy(int $id)
+    {
+        DB::beginTransaction();
+        try {
+            $damage = DamagedGood::findOrFail($id);
+            StockService::rollbackBySource('damaged', $damage->id);
+            StockMutation::where('source_type', 'damaged')
+                ->where('source_id', $damage->id)
+                ->delete();
+            DamagedGoodItem::where('damaged_good_id', $damage->id)->delete();
+            $damage->delete();
+
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Gagal menghapus barang rusak',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+
+        return response()->json([
+            'message' => 'Barang rusak berhasil dihapus',
         ]);
     }
 
