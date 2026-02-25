@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\InboundController;
 use App\Http\Controllers\Admin\OutboundController;
 use App\Http\Controllers\Admin\StockMutationController;
 use App\Http\Controllers\Admin\StockOpnameController;
+use App\Http\Controllers\Admin\DamagedGoodsController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\MenuController;
 use App\Http\Controllers\Admin\PermissionController;
@@ -86,6 +87,11 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         Route::get('/stock-opname', [StockOpnameController::class, 'index'])->name('stock-opname.index');
         Route::get('/stock-opname/data', [StockOpnameController::class, 'data'])->name('stock-opname.data');
         Route::post('/stock-opname', [StockOpnameController::class, 'store'])->name('stock-opname.store');
+
+        // Damaged Goods
+        Route::get('/damaged-goods', [DamagedGoodsController::class, 'index'])->name('damaged-goods.index');
+        Route::get('/damaged-goods/data', [DamagedGoodsController::class, 'data'])->name('damaged-goods.data');
+        Route::post('/damaged-goods', [DamagedGoodsController::class, 'store'])->name('damaged-goods.store');
     });
 
     Route::prefix('inbound')->as('inbound.')->group(function () {
