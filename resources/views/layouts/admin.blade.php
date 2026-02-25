@@ -88,6 +88,61 @@
     <script src="{{ asset('metronic/plugins/global/plugins.bundle.js') }}"></script>
     <script src="{{ asset('metronic/js/scripts.bundle.js') }}"></script>
     <script src="{{ asset('metronic/plugins/custom/datatables/datatables.bundle.js') }}"></script>
+    <script>
+        (function () {
+            const applyModalStaticBackdrop = (modalEl) => {
+                if (!modalEl || !modalEl.setAttribute) return;
+                modalEl.setAttribute('data-bs-backdrop', 'static');
+            };
+
+            const enforceModalBackdrops = () => {
+                document.querySelectorAll('.modal').forEach(applyModalStaticBackdrop);
+            };
+
+            const enforceSweetalertBackdrop = () => {
+                if (!window.Swal || window.__swalNoOutsideClickApplied) {
+                    return;
+                }
+                const originalFire = window.Swal.fire.bind(window.Swal);
+                window.Swal.fire = function (...args) {
+                    if (args.length === 1 && args[0] && typeof args[0] === 'object' && !Array.isArray(args[0])) {
+                        const options = { ...args[0], allowOutsideClick: false };
+                        return originalFire(options);
+                    }
+                    const options = {
+                        title: args[0],
+                        text: args[1],
+                        icon: args[2],
+                        allowOutsideClick: false,
+                    };
+                    return originalFire(options);
+                };
+                window.__swalNoOutsideClickApplied = true;
+            };
+
+            enforceModalBackdrops();
+            enforceSweetalertBackdrop();
+
+            document.addEventListener('DOMContentLoaded', () => {
+                enforceModalBackdrops();
+                if (document.body && !window.__modalBackdropObserver) {
+                    const observer = new MutationObserver((mutations) => {
+                        mutations.forEach((mutation) => {
+                            mutation.addedNodes.forEach((node) => {
+                                if (!node || node.nodeType !== 1) return;
+                                if (node.classList?.contains('modal')) {
+                                    applyModalStaticBackdrop(node);
+                                }
+                                node.querySelectorAll?.('.modal')?.forEach(applyModalStaticBackdrop);
+                            });
+                        });
+                    });
+                    observer.observe(document.body, { childList: true, subtree: true });
+                    window.__modalBackdropObserver = observer;
+                }
+            });
+        })();
+    </script>
     @stack('scripts')
     @yield('scripts')
 </body>
