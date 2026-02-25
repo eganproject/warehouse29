@@ -439,7 +439,7 @@
             const formData = new FormData(form);
             if (isEdit) formData.append('_method', 'PUT');
             try {
-                const res = await fetch(storeUrl, {
+                const res = await fetch(url, {
                     method: 'POST',
                     headers: {
                         'X-CSRF-TOKEN': csrfToken,
