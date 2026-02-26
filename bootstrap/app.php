@@ -17,7 +17,10 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'menu.permission' => \App\Http\Middleware\AuthorizeMenuPermission::class,
+            'restrict.picker' => \App\Http\Middleware\RestrictPickerAccess::class,
         ]);
+
+        $middleware->appendToGroup('web', 'restrict.picker');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

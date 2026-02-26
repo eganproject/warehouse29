@@ -13,6 +13,7 @@ class RoleSeeder extends Seeder
         $roles = [
             ['name' => 'Administrator', 'slug' => 'admin', 'description' => 'Full access to system'],
             ['name' => 'User', 'slug' => 'user', 'description' => 'Standard user role'],
+            ['name' => 'Picker', 'slug' => 'picker', 'description' => 'Picker mobile role'],
         ];
 
         foreach ($roles as $role) {
@@ -48,7 +49,7 @@ class RoleSeeder extends Seeder
             ['name' => 'Penerimaan Barang', 'slug' => 'inbound-receiving', 'route' => 'admin.inbound.receipts.index', 'icon' => 'fa-solid fa-dolly', 'parent_slug' => 'inbound', 'sort_order' => 10],
             ['name' => 'Retur', 'slug' => 'inbound-return', 'route' => 'admin.inbound.returns.index', 'icon' => 'fa-solid fa-rotate-left', 'parent_slug' => 'inbound', 'sort_order' => 11],
             ['name' => 'Manual', 'slug' => 'inbound-manual', 'route' => 'admin.inbound.manuals.index', 'icon' => 'fa-solid fa-pen-to-square', 'parent_slug' => 'inbound', 'sort_order' => 12],
-            ['name' => 'Picker', 'slug' => 'outbound-picker', 'route' => 'admin.outbound.pickers.index', 'icon' => 'fa-solid fa-people-carry-box', 'parent_slug' => 'outbound', 'sort_order' => 10],
+            // ['name' => 'Picker', 'slug' => 'outbound-picker', 'route' => 'admin.outbound.pickers.index', 'icon' => 'fa-solid fa-people-carry-box', 'parent_slug' => 'outbound', 'sort_order' => 10],
             ['name' => 'Manual', 'slug' => 'outbound-manual', 'route' => 'admin.outbound.manuals.index', 'icon' => 'fa-solid fa-pen-to-square', 'parent_slug' => 'outbound', 'sort_order' => 11],
             ['name' => 'Retur', 'slug' => 'outbound-return', 'route' => 'admin.outbound.returns.index', 'icon' => 'fa-solid fa-rotate-left', 'parent_slug' => 'outbound', 'sort_order' => 12],
             ['name' => 'History Picker', 'slug' => 'outbound-picker-history', 'route' => 'admin.outbound.picker-sessions.index', 'icon' => 'fa-solid fa-clipboard-list', 'parent_slug' => 'outbound', 'sort_order' => 13],
