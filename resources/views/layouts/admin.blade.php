@@ -123,6 +123,37 @@
             enforceModalBackdrops();
             enforceSweetalertBackdrop();
 
+            if (!window.AppSwal) {
+                window.AppSwal = {
+                    confirm: (title, options = {}) => {
+                        if (!window.Swal) {
+                            return Promise.resolve(window.confirm(title));
+                        }
+                        const confirmButtonText = options.confirmButtonText || 'Ya';
+                        const cancelButtonText = options.cancelButtonText || 'Batal';
+                        const confirmButtonType = options.confirmButtonType || 'primary';
+                        return window.Swal.fire({
+                            title,
+                            icon: options.icon || 'warning',
+                            showCancelButton: true,
+                            confirmButtonText,
+                            cancelButtonText,
+                            buttonsStyling: false,
+                            customClass: {
+                                confirmButton: `btn btn-${confirmButtonType}`,
+                                cancelButton: 'btn btn-light',
+                            },
+                        }).then((result) => result.isConfirmed === true);
+                    },
+                    error: (message, title = 'Error') => {
+                        if (window.Swal) {
+                            return window.Swal.fire(title, message || 'Terjadi kesalahan', 'error');
+                        }
+                        alert(message || 'Terjadi kesalahan');
+                    },
+                };
+            }
+
             document.addEventListener('DOMContentLoaded', () => {
                 enforceModalBackdrops();
                 if (document.body && !window.__modalBackdropObserver) {

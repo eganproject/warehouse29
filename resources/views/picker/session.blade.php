@@ -293,6 +293,23 @@
             state.session = json.session;
             renderSession();
             setSaveStatus('Sesi selesai dikirim');
+            if (typeof Swal !== 'undefined') {
+                const items = state.session?.items || [];
+                const totalQty = items.reduce((sum, row) => sum + (row.qty || 0), 0);
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Sesi selesai',
+                    html: `
+                        <div style="text-align:left; font-size:14px;">
+                            Kode sesi: <strong>${state.session?.code || '-'}</strong><br>
+                            Total item: <strong>${items.length}</strong><br>
+                            Total qty: <strong>${totalQty}</strong>
+                        </div>
+                    `,
+                    confirmButtonText: 'OK',
+                    allowOutsideClick: false,
+                });
+            }
         } catch (err) {
             if (err?.insufficient) {
                 showInsufficientStock(err.insufficient);
