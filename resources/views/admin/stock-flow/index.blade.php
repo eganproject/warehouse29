@@ -3,6 +3,50 @@
 @section('title', $pageTitle)
 @section('page_title', $pageTitle)
 
+@php
+    use App\Support\Permission as Perm;
+    $permMap = [];
+    if (isset($routeMap['receipt'])) {
+        $permMap = [
+            'receipt' => [
+                'create' => Perm::can(auth()->user(), 'admin.inbound.receipts.index', 'create'),
+                'update' => Perm::can(auth()->user(), 'admin.inbound.receipts.index', 'update'),
+                'delete' => Perm::can(auth()->user(), 'admin.inbound.receipts.index', 'delete'),
+            ],
+            'return' => [
+                'create' => Perm::can(auth()->user(), 'admin.inbound.returns.index', 'create'),
+                'update' => Perm::can(auth()->user(), 'admin.inbound.returns.index', 'update'),
+                'delete' => Perm::can(auth()->user(), 'admin.inbound.returns.index', 'delete'),
+            ],
+            'manual' => [
+                'create' => Perm::can(auth()->user(), 'admin.inbound.manuals.index', 'create'),
+                'update' => Perm::can(auth()->user(), 'admin.inbound.manuals.index', 'update'),
+                'delete' => Perm::can(auth()->user(), 'admin.inbound.manuals.index', 'delete'),
+            ],
+        ];
+    } elseif (isset($routeMap['picker'])) {
+        $permMap = [
+            'picker' => [
+                'create' => Perm::can(auth()->user(), 'admin.outbound.pickers.index', 'create'),
+                'update' => Perm::can(auth()->user(), 'admin.outbound.pickers.index', 'update'),
+                'delete' => Perm::can(auth()->user(), 'admin.outbound.pickers.index', 'delete'),
+            ],
+            'manual' => [
+                'create' => Perm::can(auth()->user(), 'admin.outbound.manuals.index', 'create'),
+                'update' => Perm::can(auth()->user(), 'admin.outbound.manuals.index', 'update'),
+                'delete' => Perm::can(auth()->user(), 'admin.outbound.manuals.index', 'delete'),
+            ],
+            'return' => [
+                'create' => Perm::can(auth()->user(), 'admin.outbound.returns.index', 'create'),
+                'update' => Perm::can(auth()->user(), 'admin.outbound.returns.index', 'update'),
+                'delete' => Perm::can(auth()->user(), 'admin.outbound.returns.index', 'delete'),
+            ],
+        ];
+    }
+    $defaultType = $typeDefault ?? '';
+    $canCreateDefault = $permMap[$defaultType]['create'] ?? false;
+@endphp
+
 @section('content')
 <div class="card">
     <div class="card-header border-0 pt-6">
@@ -24,9 +68,11 @@
                 <button type="button" class="btn btn-light" id="filter_apply">Filter</button>
                 <button type="button" class="btn btn-light" id="filter_reset">Reset</button>
             </div>
-            <button type="button" class="btn btn-primary" id="btn_open_create_flow" data-bs-toggle="modal" data-bs-target="#modal_stock_flow">
-                Tambah
-            </button>
+            @if($canCreateDefault)
+                <button type="button" class="btn btn-primary" id="btn_open_create_flow" data-bs-toggle="modal" data-bs-target="#modal_stock_flow">
+                    Tambah
+                </button>
+            @endif
         </div>
     </div>
     <div class="card-body py-6">
@@ -114,6 +160,8 @@
     const csrfToken = '{{ csrf_token() }}';
     const itemOptionsHtml = `@foreach($items as $item)<option value="{{ $item->id }}">{{ $item->sku }} - {{ $item->name }}</option>@endforeach`;
     const defaultTypeFilter = '{{ $typeDefault ?? '' }}';
+    const permMap = @json($permMap ?? []);
+    const canCreateDefault = {{ $canCreateDefault ? 'true' : 'false' }};
 
     document.addEventListener('DOMContentLoaded', () => {
         const tableEl = $('#stock_flow_table');
@@ -283,7 +331,11 @@
         };
 
         addItemBtn?.addEventListener('click', () => createItemRow());
-        openCreateBtn?.addEventListener('click', resetForm);
+        if (!canCreateDefault && openCreateBtn) {
+            openCreateBtn.remove();
+        } else {
+            openCreateBtn?.addEventListener('click', resetForm);
+        }
 
         itemsContainer?.addEventListener('change', (e) => {
             if (e.target.matches('.flow-item-select')) {
@@ -335,9 +387,12 @@
                 { data: 'note' },
                 { data: 'id', orderable:false, searchable:false, className:'text-end', render: (data, type, row)=>{
                     const rowType = row?.type || defaultTypeFilter;
+                    const perms = permMap?.[rowType] || {};
                     const detailItem = `<div class="menu-item px-3"><a href="${resolveRoute(rowType, 'detail').replace(':id', data)}" class="menu-link px-3">Detail</a></div>`;
-                    const editItem = `<div class="menu-item px-3"><a href="#" class="menu-link px-3 btn-edit" data-id="${data}" data-type="${rowType}">Edit</a></div>`;
-                    const delItem = `<div class="menu-item px-3"><a href="#" class="menu-link px-3 text-danger btn-delete" data-id="${data}" data-type="${rowType}">Hapus</a></div>`;
+                    const editItem = perms.update ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 btn-edit" data-id="${data}" data-type="${rowType}">Edit</a></div>` : '';
+                    const delItem = perms.delete ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 text-danger btn-delete" data-id="${data}" data-type="${rowType}">Hapus</a></div>` : '';
+                    const actions = `${detailItem}${editItem}${delItem}`;
+                    if (!actions) return '';
                     return `
                         <div class="text-end">
                             <a href="#" class="btn btn-sm btn-light btn-active-light-primary" data-kt-menu-trigger="click" data-kt-menu-placement="bottom-end">
@@ -349,7 +404,7 @@
                                 </span>
                             </a>
                             <div class="menu menu-sub menu-sub-dropdown menu-column menu-rounded menu-gray-600 menu-state-bg-light-primary fw-bold fs-7 w-175px py-3" data-kt-menu="true">
-                                ${detailItem}${editItem}${delItem}
+                                ${actions}
                             </div>
                         </div>
                     `;

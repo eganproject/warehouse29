@@ -3,6 +3,13 @@
 @section('title', 'Categories')
 @section('page_title', 'Categories')
 
+@php
+    use App\Support\Permission as Perm;
+    $canCreate = Perm::can(auth()->user(), 'admin.masterdata.categories.index', 'create');
+    $canUpdate = Perm::can(auth()->user(), 'admin.masterdata.categories.index', 'update');
+    $canDelete = Perm::can(auth()->user(), 'admin.masterdata.categories.index', 'delete');
+@endphp
+
 @section('content')
 <div class="card">
     <div class="card-header border-0 pt-6">
@@ -49,9 +56,11 @@
                         </div>
                     </div>
                 </div>
-                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modal_category_form" id="btn_open_create">
-                    Add Category
-                </button>
+                @if($canCreate)
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modal_category_form" id="btn_open_create">
+                        Add Category
+                    </button>
+                @endif
             </div>
         </div>
     </div>
@@ -129,6 +138,8 @@
     const storeUrl  = '{{ route('admin.masterdata.categories.store') }}';
     const updateTpl = '{{ route('admin.masterdata.categories.update', ':id') }}';
     const deleteTpl = '{{ route('admin.masterdata.categories.destroy', ':id') }}';
+    const canUpdate = {{ $canUpdate ? 'true' : 'false' }};
+    const canDelete = {{ $canDelete ? 'true' : 'false' }};
 
     const ensureOption = (selectEl, id, name) => {
         if (!selectEl) return;
@@ -195,8 +206,10 @@
                 { data: 'name' },
                 { data: 'parent' },
                 { data: 'id', orderable:false, searchable:false, className:'text-end', render: (data, type, row)=>{
-                    const editItem = `<div class="menu-item px-3"><a href="#" class="menu-link px-3 btn-edit" data-id="${data}" data-name="${row.name}" data-parent="${row.parent_id}">Edit</a></div>`;
-                    const delItem = `<div class="menu-item px-3"><a href="#" class="menu-link px-3 text-danger btn-delete" data-id="${data}">Hapus</a></div>`;
+                    const editItem = canUpdate ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 btn-edit" data-id="${data}" data-name="${row.name}" data-parent="${row.parent_id}">Edit</a></div>` : '';
+                    const delItem = canDelete ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 text-danger btn-delete" data-id="${data}">Hapus</a></div>` : '';
+                    const actions = `${editItem}${delItem}`;
+                    if (!actions) return '';
                     return `
                         <div class="text-end">
                             <a href="#" class="btn btn-sm btn-light btn-active-light-primary" data-kt-menu-trigger="click" data-kt-menu-placement="bottom-end">
@@ -208,7 +221,7 @@
                                 </span>
                             </a>
                             <div class="menu menu-sub menu-sub-dropdown menu-column menu-rounded menu-gray-600 menu-state-bg-light-primary fw-bold fs-7 w-175px py-3" data-kt-menu="true">
-                                ${editItem}${delItem}
+                                ${actions}
                             </div>
                         </div>
                     `;

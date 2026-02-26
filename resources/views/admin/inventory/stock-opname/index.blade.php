@@ -3,6 +3,11 @@
 @section('title', 'Stock Opname')
 @section('page_title', 'Stock Opname')
 
+@php
+    use App\Support\Permission as Perm;
+    $canCreate = Perm::can(auth()->user(), 'admin.inventory.stock-opname.index', 'create');
+@endphp
+
 @section('content')
 <div class="card">
     <div class="card-header border-0 pt-6">
@@ -18,7 +23,9 @@
             </div>
         </div>
         <div class="card-toolbar">
-            <button type="button" class="btn btn-primary" id="btn_open_opname" data-bs-toggle="modal" data-bs-target="#modal_stock_opname">Tambah</button>
+            @if($canCreate)
+                <button type="button" class="btn btn-primary" id="btn_open_opname" data-bs-toggle="modal" data-bs-target="#modal_stock_opname">Tambah</button>
+            @endif
         </div>
     </div>
     <div class="card-body py-6">

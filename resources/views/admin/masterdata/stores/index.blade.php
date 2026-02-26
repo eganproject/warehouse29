@@ -3,6 +3,13 @@
 @section('title', 'Stores')
 @section('page_title', 'Stores')
 
+@php
+    use App\Support\Permission as Perm;
+    $canCreate = Perm::can(auth()->user(), 'admin.masterdata.stores.index', 'create');
+    $canUpdate = Perm::can(auth()->user(), 'admin.masterdata.stores.index', 'update');
+    $canDelete = Perm::can(auth()->user(), 'admin.masterdata.stores.index', 'delete');
+@endphp
+
 @section('content')
 <div class="card">
     <div class="card-header border-0 pt-6">
@@ -48,11 +55,13 @@
                         </div>
                     </div>
                 </div>
+            @if($canCreate)
                 <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modal_store_form" id="btn_open_create_store">
                     Add Store
                 </button>
-            </div>
+            @endif
         </div>
+    </div>
     </div>
     <div class="card-body py-6">
         <div class="table-responsive">
@@ -144,6 +153,8 @@
     const storeUrl  = '{{ route('admin.masterdata.stores.store') }}';
     const updateTpl = '{{ route('admin.masterdata.stores.update', ':id') }}';
     const deleteTpl = '{{ route('admin.masterdata.stores.destroy', ':id') }}';
+    const canUpdate = {{ $canUpdate ? 'true' : 'false' }};
+    const canDelete = {{ $canDelete ? 'true' : 'false' }};
     const defaultLogoUrl = "{{ asset('metronic/media/logos/logo-demo11.svg') }}";
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -200,8 +211,10 @@
                 { data: 'pic' },
                 { data: 'address' },
                 { data: 'id', orderable:false, searchable:false, className:'text-end', render: (data, type, row)=>{
-                    const editItem = `<div class="menu-item px-3"><a href="#" class="menu-link px-3 btn-edit" data-id="${data}" data-name="${row.name}" data-pic="${row.pic_id}" data-address="${row.address}" data-logo="${row.logo_url}">Edit</a></div>`;
-                    const delItem = `<div class="menu-item px-3"><a href="#" class="menu-link px-3 text-danger btn-delete" data-id="${data}">Hapus</a></div>`;
+                    const editItem = canUpdate ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 btn-edit" data-id="${data}" data-name="${row.name}" data-pic="${row.pic_id}" data-address="${row.address}" data-logo="${row.logo_url}">Edit</a></div>` : '';
+                    const delItem = canDelete ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 text-danger btn-delete" data-id="${data}">Hapus</a></div>` : '';
+                    const actions = `${editItem}${delItem}`;
+                    if (!actions) return '';
                     return `
                         <div class="text-end">
                             <a href="#" class="btn btn-sm btn-light btn-active-light-primary" data-kt-menu-trigger="click" data-kt-menu-placement="bottom-end">
@@ -213,7 +226,7 @@
                                 </span>
                             </a>
                             <div class="menu menu-sub menu-sub-dropdown menu-column menu-rounded menu-gray-600 menu-state-bg-light-primary fw-bold fs-7 w-175px py-3" data-kt-menu="true">
-                                ${editItem}${delItem}
+                                ${actions}
                             </div>
                         </div>
                     `;

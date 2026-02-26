@@ -3,6 +3,13 @@
 @section('title', 'Barang Rusak')
 @section('page_title', 'Barang Rusak')
 
+@php
+    use App\Support\Permission as Perm;
+    $canCreate = Perm::can(auth()->user(), 'admin.inventory.damaged-goods.index', 'create');
+    $canUpdate = Perm::can(auth()->user(), 'admin.inventory.damaged-goods.index', 'update');
+    $canDelete = Perm::can(auth()->user(), 'admin.inventory.damaged-goods.index', 'delete');
+@endphp
+
 @section('content')
 <div class="card">
     <div class="card-header border-0 pt-6">
@@ -18,7 +25,9 @@
             </div>
         </div>
         <div class="card-toolbar">
-            <button type="button" class="btn btn-primary" id="btn_open_damage" data-bs-toggle="modal" data-bs-target="#modal_damaged_goods">Tambah</button>
+            @if($canCreate)
+                <button type="button" class="btn btn-primary" id="btn_open_damage" data-bs-toggle="modal" data-bs-target="#modal_damaged_goods">Tambah</button>
+            @endif
         </div>
     </div>
     <div class="card-body py-6">
@@ -114,6 +123,8 @@
     const updateUrlTpl = '{{ route('admin.inventory.damaged-goods.update', ':id') }}';
     const deleteUrlTpl = '{{ route('admin.inventory.damaged-goods.destroy', ':id') }}';
     const csrfToken = '{{ csrf_token() }}';
+    const canUpdate = {{ $canUpdate ? 'true' : 'false' }};
+    const canDelete = {{ $canDelete ? 'true' : 'false' }};
     const itemOptionsHtml = `@foreach($items as $item)<option value="{{ $item->id }}">{{ $item->sku }} - {{ $item->name }}</option>@endforeach`;
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -310,8 +321,10 @@
                 { data: 'qty' },
                 { data: 'note' },
                 { data: 'id', orderable: false, searchable: false, className: 'text-end', render: (data) => {
-                    const editItem = `<div class="menu-item px-3"><a href="#" class="menu-link px-3 btn-edit" data-id="${data}">Edit</a></div>`;
-                    const delItem = `<div class="menu-item px-3"><a href="#" class="menu-link px-3 text-danger btn-delete" data-id="${data}">Hapus</a></div>`;
+                    const editItem = canUpdate ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 btn-edit" data-id="${data}">Edit</a></div>` : '';
+                    const delItem = canDelete ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 text-danger btn-delete" data-id="${data}">Hapus</a></div>` : '';
+                    const actions = `${editItem}${delItem}`;
+                    if (!actions) return '';
                     return `
                         <div class="text-end">
                             <a href="#" class="btn btn-sm btn-light btn-active-light-primary" data-kt-menu-trigger="click" data-kt-menu-placement="bottom-end">
@@ -323,7 +336,7 @@
                                 </span>
                             </a>
                             <div class="menu menu-sub menu-sub-dropdown menu-column menu-rounded menu-gray-600 menu-state-bg-light-primary fw-bold fs-7 w-175px py-3" data-kt-menu="true">
-                                ${editItem}${delItem}
+                                ${actions}
                             </div>
                         </div>
                     `;

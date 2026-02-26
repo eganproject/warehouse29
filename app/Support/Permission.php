@@ -17,7 +17,7 @@ class Permission
 
     public static function actionFromRoute(string $routeName): string
     {
-        if (preg_match('/\.(create|store)$/', $routeName)) return 'create';
+        if (preg_match('/\.(create|store|import)$/', $routeName)) return 'create';
         if (preg_match('/\.(edit|update)$/', $routeName)) return 'update';
         if (preg_match('/\.(destroy)$/', $routeName)) return 'delete';
         // index, show, data, others default to view
@@ -41,11 +41,6 @@ class Permission
                 return true;
             }
             return false;
-        }
-
-        // Always allow admin role
-        if ($user->roles()->where('slug', 'admin')->exists()) {
-            return true;
         }
 
         // If permissions table is empty (not seeded yet), allow access
@@ -75,9 +70,6 @@ class Permission
                 return Menu::pluck('id');
             }
             return collect();
-        }
-        if ($user->roles()->where('slug', 'admin')->exists()) {
-            return Menu::pluck('id');
         }
         if (!Schema::hasTable('permission_menu') || DB::table('permission_menu')->count() === 0) {
             return Menu::pluck('id');
