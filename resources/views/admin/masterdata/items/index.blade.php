@@ -57,7 +57,7 @@
                     </div>
                 </div>
                 @if($canCreate)
-                    <button type="button" class="btn btn-light-primary me-3" id="btn_import_items" data-bs-toggle="modal" data-bs-target="#modal_import_items">Import CSV</button>
+                    <button type="button" class="btn btn-light-primary me-3" id="btn_import_items" data-bs-toggle="modal" data-bs-target="#modal_import_items">Import Excel</button>
                     <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modal_item_form" id="btn_open_create_item">
                         Add Item
                     </button>
@@ -154,7 +154,7 @@
     <div class="modal-dialog modal-dialog-centered mw-650px">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 class="fw-bolder">Import Items (CSV)</h2>
+                <h2 class="fw-bolder">Import Items (Excel)</h2>
                 <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
                     <span class="svg-icon svg-icon-1">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -166,7 +166,7 @@
             </div>
             <div class="modal-body scroll-y px-10 py-10">
                 <div class="mb-7">
-                    <p class="fw-semibold mb-3">Pastikan file CSV memiliki header dan kolom berikut:</p>
+                    <p class="fw-semibold mb-3">Pastikan file Excel memiliki header dan kolom berikut:</p>
                     <ul class="ms-5 mb-4">
                         <li><strong>sku</strong> (wajib, unik)</li>
                         <li><strong>name</strong> (wajib)</li>
@@ -176,12 +176,12 @@
                         <li><strong>description</strong> (opsional)</li>
                     </ul>
                     <p class="text-muted small mb-1">Contoh header: <code>sku,name,parent_category,category,address,description</code></p>
-                    <p class="text-muted small mb-1">Gunakan format CSV standar (separator koma / comma separated).</p>
+                    <p class="text-muted small mb-1">Gunakan format Excel (.xlsx/.xls) dengan header di baris pertama.</p>
                     <p class="text-muted small mb-0">Jika kolom category dikosongkan, item otomatis dimasukkan ke kategori "Tanpa Kategori".</p>
                 </div>
                 <div class="mb-10">
-                    <label class="required fs-6 fw-bold form-label mb-2">File CSV</label>
-                    <input type="file" class="form-control form-control-solid" id="import_items_file" accept=".csv,text/csv" />
+                    <label class="required fs-6 fw-bold form-label mb-2">File Excel</label>
+                    <input type="file" class="form-control form-control-solid" id="import_items_file" accept=".xlsx,.xls" />
                     <div class="invalid-feedback d-block" id="error_import_file"></div>
                 </div>
                 <div class="text-end">
@@ -399,10 +399,10 @@
         importSubmit?.addEventListener('click', async ()=> {
             if (importError) importError.textContent = '';
             const file = importInput?.files?.[0];
-            if (!file) {
-                if (importError) importError.textContent = 'Pilih file CSV terlebih dahulu.';
-                return;
-            }
+                if (!file) {
+                    if (importError) importError.textContent = 'Pilih file Excel terlebih dahulu.';
+                    return;
+                }
             const confirmed = await confirmAction();
             if (!confirmed) {
                 return;

@@ -6,9 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Models\Item;
 use App\Models\ItemStock;
+use App\Imports\ItemsImport;
+use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class ItemController extends Controller
 {
@@ -173,78 +176,24 @@ class ItemController extends Controller
     public function import(Request $request)
     {
         $request->validate([
-            'file' => ['required', 'file', 'mimes:csv,txt', 'max:2048'],
+            'file' => ['required', 'file', 'mimes:xlsx,xls', 'max:5120'],
         ]);
 
-        $file = $request->file('file');
-        $path = $file->getRealPath();
-        $handle = fopen($path, 'r');
-        if (!$handle) {
-            return response()->json(['message' => 'Tidak dapat membaca file'], 422);
-        }
-
-        $headers = fgetcsv($handle, 0, ';');
-        if (!$headers) {
-            return response()->json(['message' => 'File kosong'], 422);
-        }
-        $headers = array_map(function ($h) {
-            $clean = ltrim($h ?? '', "\xEF\xBB\xBF");
-            return strtolower(trim($clean));
-        }, $headers);
-
-        $required = ['sku', 'name', 'parent_category', 'category', 'description'];
-        if (array_diff($required, $headers)) {
-            return response()->json(['message' => 'Header harus minimal: sku, name, parent_category, category, description (address opsional)'], 422);
-        }
-
-        $idx = array_flip($headers);
         $created = 0;
         $updated = 0;
-        $defaultCategoryId = $this->getDefaultCategoryId();
         DB::beginTransaction();
         try {
-            while (($row = fgetcsv($handle, 0, ';')) !== false) {
-                $sku = trim($row[$idx['sku']] ?? '');
-                $name = trim($row[$idx['name']] ?? '');
-                $parentCategoryName = trim($row[$idx['parent_category']] ?? '');
-                $categoryName = trim($row[$idx['category']] ?? '');
-                $hasAddress = isset($idx['address']);
-                $address = $hasAddress ? trim($row[$idx['address']] ?? '') : '';
-                $description = trim($row[$idx['description']] ?? '');
-                if ($sku === '' || $name === '') {
-                    continue;
-                }
-                $parentCategoryId = 0;
-                if ($parentCategoryName !== '') {
-                    $parentCategory = $this->findOrCreateCategory($parentCategoryName, 0);
-                    $parentCategoryId = $parentCategory?->id ?? 0;
-                }
-                $catId = $defaultCategoryId;
-                if ($categoryName !== '') {
-                    $category = $this->findOrCreateCategory($categoryName, $parentCategoryId);
-                    $catId = $category?->id ?? $defaultCategoryId;
-                }
-                $payload = [
-                    'name' => $name,
-                    'category_id' => $catId,
-                    'description' => $description,
-                ];
-                if ($hasAddress) {
-                    $payload['address'] = $address;
-                }
-                $item = Item::updateOrCreate(
-                    ['sku' => $sku],
-                    $payload
-                );
-                ItemStock::firstOrCreate(['item_id' => $item->id], ['stock' => 0]);
-                $item->wasRecentlyCreated ? $created++ : $updated++;
-            }
+            $import = new ItemsImport();
+            Excel::import($import, $request->file('file'));
+            $created = $import->created;
+            $updated = $import->updated;
             DB::commit();
+        } catch (ValidationException $e) {
+            DB::rollBack();
+            throw $e;
         } catch (\Throwable $e) {
             DB::rollBack();
             return response()->json(['message' => 'Gagal import: '.$e->getMessage()], 500);
-        } finally {
-            fclose($handle);
         }
 
         return response()->json([
