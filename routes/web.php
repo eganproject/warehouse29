@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\InboundController;
 use App\Http\Controllers\Admin\OutboundController;
 use App\Http\Controllers\Admin\StockMutationController;
 use App\Http\Controllers\Admin\StockOpnameController;
+use App\Http\Controllers\Admin\StockAdjustmentController;
 use App\Http\Controllers\Admin\DamagedGoodsController;
 use App\Http\Controllers\Admin\PickerHistoryController;
 use App\Http\Controllers\Admin\RoleController;
@@ -114,6 +115,14 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         Route::get('/stock-opname/data', [StockOpnameController::class, 'data'])->name('stock-opname.data');
         Route::post('/stock-opname', [StockOpnameController::class, 'store'])->name('stock-opname.store');
         Route::get('/stock-opname/{id}', [StockOpnameController::class, 'show'])->name('stock-opname.show');
+
+        // Stock Adjustments
+        Route::get('/stock-adjustments', [StockAdjustmentController::class, 'index'])->name('stock-adjustments.index');
+        Route::get('/stock-adjustments/data', [StockAdjustmentController::class, 'data'])->name('stock-adjustments.data');
+        Route::post('/stock-adjustments', [StockAdjustmentController::class, 'store'])->name('stock-adjustments.store');
+        Route::get('/stock-adjustments/{id}', [StockAdjustmentController::class, 'show'])->name('stock-adjustments.show');
+        Route::put('/stock-adjustments/{id}', [StockAdjustmentController::class, 'update'])->name('stock-adjustments.update');
+        Route::delete('/stock-adjustments/{id}', [StockAdjustmentController::class, 'destroy'])->name('stock-adjustments.destroy');
 
         // Damaged Goods
         Route::get('/damaged-goods', [DamagedGoodsController::class, 'index'])->name('damaged-goods.index');

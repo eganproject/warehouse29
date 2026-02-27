@@ -166,6 +166,26 @@ class StockMutationController extends Controller
                     })->values()->all();
                 }
                 break;
+            case 'adjustment':
+                $adjustment = \App\Models\StockAdjustment::with('items.item')->find($mutation->source_id);
+                if ($adjustment) {
+                    $sourceSummary = [
+                        'label' => 'Penyesuaian Stok',
+                        'code' => $adjustment->code,
+                        'ref' => '-',
+                        'date' => $adjustment->transacted_at?->format('Y-m-d H:i'),
+                        'note' => $adjustment->note ?? '-',
+                    ];
+                    $sourceItems = $adjustment->items->map(function ($row) {
+                        $dir = $row->direction === 'in' ? 'IN' : 'OUT';
+                        return [
+                            'label' => trim(($row->item?->sku ?? '').' - '.($row->item?->name ?? '')).' ('.$dir.')',
+                            'qty' => (int) $row->qty,
+                            'note' => $row->note ?? '-',
+                        ];
+                    })->values()->all();
+                }
+                break;
             case 'damaged':
                 $damage = DamagedGood::with('items.item')->find($mutation->source_id);
                 if ($damage) {
