@@ -1,0 +1,315 @@
+<?php
+
+namespace App\Http\Controllers\Mobile;
+
+use App\Http\Controllers\Controller;
+use App\Models\Item;
+use App\Models\ItemStock;
+use App\Models\StockOpname;
+use App\Models\StockOpnameItem;
+use App\Support\StockService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+
+class StockOpnameMobileController extends Controller
+{
+    public function index()
+    {
+        return view('mobile.stock-opname.index', [
+            'routes' => [
+                'batchCreate' => route('opname.batch.create'),
+                'batchShow' => route('opname.batch.show', '__CODE__'),
+                'itemsSearch' => route('opname.items.search'),
+                'itemsStore' => route('opname.items.store', '__CODE__'),
+                'itemsUpdate' => route('opname.items.update', ['__CODE__', '__ID__']),
+                'itemsDestroy' => route('opname.items.destroy', ['__CODE__', '__ID__']),
+                'logout' => route('logout'),
+            ],
+        ]);
+    }
+
+    public function createBatch(Request $request)
+    {
+        $validated = $request->validate([
+            'note' => ['nullable', 'string'],
+            'transacted_at' => ['nullable', 'date'],
+        ]);
+
+        $code = $this->generateCode('OPN');
+        $transactedAt = !empty($validated['transacted_at'])
+            ? Carbon::parse($validated['transacted_at'])
+            : now();
+
+        $opname = StockOpname::create([
+            'code' => $code,
+            'note' => $validated['note'] ?? null,
+            'transacted_at' => $transactedAt,
+            'created_by' => auth()->id(),
+        ]);
+
+        return response()->json($this->serializeBatch($opname));
+    }
+
+    public function showBatch(string $code)
+    {
+        $opname = StockOpname::where('code', $code)->first();
+        if (!$opname) {
+            return response()->json(['message' => 'Batch tidak ditemukan'], 404);
+        }
+
+        return response()->json($this->serializeBatch($opname));
+    }
+
+    public function searchItems(Request $request)
+    {
+        $q = trim((string) $request->input('q', ''));
+        if ($q === '') {
+            return response()->json(['items' => []]);
+        }
+
+        $query = Item::query()
+            ->where(function ($query) use ($q) {
+                $query->where('sku', 'like', "%{$q}%")
+                    ->orWhere('name', 'like', "%{$q}%");
+            })
+            ->orderBy('name')
+            ->limit(12);
+
+        $batchCode = trim((string) $request->input('batch_code', ''));
+        if ($batchCode !== '') {
+            $batch = StockOpname::where('code', $batchCode)->first();
+            if ($batch) {
+                $existingIds = StockOpnameItem::where('stock_opname_id', $batch->id)
+                    ->pluck('item_id');
+                if ($existingIds->isNotEmpty()) {
+                    $query->whereNotIn('id', $existingIds);
+                }
+            }
+        }
+
+        $items = $query->get(['id', 'sku', 'name']);
+
+        return response()->json([
+            'items' => $items,
+        ]);
+    }
+
+    public function storeItem(Request $request, string $code)
+    {
+        $opname = StockOpname::where('code', $code)->first();
+        if (!$opname) {
+            return response()->json(['message' => 'Batch tidak ditemukan'], 404);
+        }
+
+        $validated = $request->validate([
+            'item_id' => ['required', 'integer', 'exists:items,id'],
+            'counted_qty' => ['required', 'integer', 'min:0'],
+            'note' => ['nullable', 'string'],
+        ]);
+
+        DB::beginTransaction();
+        try {
+            $exists = StockOpnameItem::where('stock_opname_id', $opname->id)
+                ->where('item_id', $validated['item_id'])
+                ->lockForUpdate()
+                ->exists();
+            if ($exists) {
+                throw ValidationException::withMessages([
+                    'items' => 'Item sudah ada pada batch ini',
+                ]);
+            }
+
+            $stock = ItemStock::where('item_id', $validated['item_id'])->lockForUpdate()->first();
+            if (!$stock) {
+                ItemStock::create(['item_id' => $validated['item_id'], 'stock' => 0]);
+                $stock = ItemStock::where('item_id', $validated['item_id'])->lockForUpdate()->first();
+            }
+
+            $systemQty = (int) ($stock?->stock ?? 0);
+            $countedQty = (int) $validated['counted_qty'];
+            $adjustment = $countedQty - $systemQty;
+
+            StockOpnameItem::create([
+                'stock_opname_id' => $opname->id,
+                'item_id' => $validated['item_id'],
+                'system_qty' => $systemQty,
+                'counted_qty' => $countedQty,
+                'adjustment' => $adjustment,
+                'note' => $validated['note'] ?? null,
+                'created_by' => auth()->id(),
+            ]);
+
+            if ($adjustment !== 0) {
+                StockService::mutate([
+                    'item_id' => $validated['item_id'],
+                    'direction' => $adjustment > 0 ? 'in' : 'out',
+                    'qty' => abs($adjustment),
+                    'source_type' => 'opname',
+                    'source_subtype' => 'mobile',
+                    'source_id' => $opname->id,
+                    'source_code' => $opname->code,
+                    'note' => $validated['note'] ?? null,
+                    'occurred_at' => $opname->transacted_at ?? now(),
+                    'created_by' => auth()->id(),
+                ]);
+            }
+
+            DB::commit();
+        } catch (ValidationException $e) {
+            DB::rollBack();
+            throw $e;
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Gagal menyimpan item opname',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+
+        return response()->json($this->serializeBatch($opname->fresh()));
+    }
+
+    public function updateItem(Request $request, string $code, int $id)
+    {
+        $opname = StockOpname::where('code', $code)->first();
+        if (!$opname) {
+            return response()->json(['message' => 'Batch tidak ditemukan'], 404);
+        }
+
+        $validated = $request->validate([
+            'counted_qty' => ['required', 'integer', 'min:0'],
+            'note' => ['nullable', 'string'],
+        ]);
+
+        DB::beginTransaction();
+        try {
+            $item = StockOpnameItem::where('stock_opname_id', $opname->id)
+                ->where('id', $id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $newCounted = (int) $validated['counted_qty'];
+            $newAdjustment = $newCounted - (int) $item->system_qty;
+            $delta = $newAdjustment - (int) $item->adjustment;
+
+            if ($delta !== 0) {
+                StockService::mutate([
+                    'item_id' => $item->item_id,
+                    'direction' => $delta > 0 ? 'in' : 'out',
+                    'qty' => abs($delta),
+                    'source_type' => 'opname',
+                    'source_subtype' => 'mobile',
+                    'source_id' => $opname->id,
+                    'source_code' => $opname->code,
+                    'note' => $validated['note'] ?? $item->note,
+                    'occurred_at' => $opname->transacted_at ?? now(),
+                    'created_by' => auth()->id(),
+                ]);
+            }
+
+            $item->counted_qty = $newCounted;
+            $item->adjustment = $newAdjustment;
+            $item->note = $validated['note'] ?? $item->note;
+            $item->save();
+
+            DB::commit();
+        } catch (ValidationException $e) {
+            DB::rollBack();
+            throw $e;
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Gagal memperbarui item opname',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+
+        return response()->json($this->serializeBatch($opname->fresh()));
+    }
+
+    public function destroyItem(string $code, int $id)
+    {
+        $opname = StockOpname::where('code', $code)->first();
+        if (!$opname) {
+            return response()->json(['message' => 'Batch tidak ditemukan'], 404);
+        }
+
+        DB::beginTransaction();
+        try {
+            $item = StockOpnameItem::where('stock_opname_id', $opname->id)
+                ->where('id', $id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $adjustment = (int) $item->adjustment;
+            if ($adjustment !== 0) {
+                StockService::mutate([
+                    'item_id' => $item->item_id,
+                    'direction' => $adjustment > 0 ? 'out' : 'in',
+                    'qty' => abs($adjustment),
+                    'source_type' => 'opname',
+                    'source_subtype' => 'mobile',
+                    'source_id' => $opname->id,
+                    'source_code' => $opname->code,
+                    'note' => $item->note,
+                    'occurred_at' => $opname->transacted_at ?? now(),
+                    'created_by' => auth()->id(),
+                ]);
+            }
+
+            $item->delete();
+            DB::commit();
+        } catch (ValidationException $e) {
+            DB::rollBack();
+            throw $e;
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Gagal menghapus item opname',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+
+        return response()->json($this->serializeBatch($opname->fresh()));
+    }
+
+    private function serializeBatch(StockOpname $opname): array
+    {
+        $opname->load([
+            'creator:id,name',
+            'items.item:id,sku,name',
+            'items.creator:id,name',
+        ]);
+
+        return [
+            'batch' => [
+                'id' => $opname->id,
+                'code' => $opname->code,
+                'transacted_at' => $opname->transacted_at?->format('Y-m-d H:i'),
+                'note' => $opname->note,
+                'creator' => $opname->creator?->name,
+            ],
+            'items' => $opname->items->sortByDesc('id')->values()->map(function ($row) {
+                return [
+                    'id' => $row->id,
+                    'item_id' => $row->item_id,
+                    'sku' => $row->item?->sku ?? '-',
+                    'name' => $row->item?->name ?? '-',
+                    'system_qty' => (int) $row->system_qty,
+                    'counted_qty' => (int) $row->counted_qty,
+                    'adjustment' => (int) $row->adjustment,
+                    'note' => $row->note,
+                    'created_by' => $row->creator?->name ?? '-',
+                ];
+            }),
+        ];
+    }
+
+    private function generateCode(string $prefix): string
+    {
+        return $prefix.'-'.now()->format('YmdHis').'-'.Str::upper(Str::random(4));
+    }
+}

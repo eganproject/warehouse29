@@ -16,6 +16,7 @@ class StockOpnameItem extends Model
         'counted_qty',
         'adjustment',
         'note',
+        'created_by',
     ];
 
     public function opname()
@@ -26,5 +27,10 @@ class StockOpnameItem extends Model
     public function item()
     {
         return $this->belongsTo(Item::class, 'item_id');
+    }
+
+    public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by');
     }
 }

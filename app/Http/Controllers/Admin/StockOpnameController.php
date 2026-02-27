@@ -128,6 +128,7 @@ class StockOpnameController extends Controller
                     'counted_qty' => $countedQty,
                     'adjustment' => $adjustment,
                     'note' => $row['note'] ?? null,
+                    'created_by' => auth()->id(),
                 ]);
 
                 if ($adjustment !== 0) {

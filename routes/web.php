@@ -13,6 +13,7 @@ use App\Http\Controllers\Admin\PickerHistoryController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\MenuController;
 use App\Http\Controllers\Admin\PermissionController;
+use App\Http\Controllers\Mobile\StockOpnameMobileController;
 use App\Http\Controllers\Picker\PickerSessionController;
 use Illuminate\Support\Facades\Route;
 
@@ -44,6 +45,16 @@ Route::middleware('auth')->prefix('picker')->as('picker.')->group(function () {
     Route::put('/items/{id}', [PickerSessionController::class, 'updateItem'])->name('items.update');
     Route::delete('/items/{id}', [PickerSessionController::class, 'destroyItem'])->name('items.destroy');
     Route::post('/submit', [PickerSessionController::class, 'submit'])->name('submit');
+});
+
+Route::middleware('auth')->prefix('opname')->as('opname.')->group(function () {
+    Route::get('/', [StockOpnameMobileController::class, 'index'])->name('index');
+    Route::post('/batch', [StockOpnameMobileController::class, 'createBatch'])->name('batch.create');
+    Route::get('/batch/{code}', [StockOpnameMobileController::class, 'showBatch'])->name('batch.show');
+    Route::get('/items/search', [StockOpnameMobileController::class, 'searchItems'])->name('items.search');
+    Route::post('/batch/{code}/items', [StockOpnameMobileController::class, 'storeItem'])->name('items.store');
+    Route::put('/batch/{code}/items/{id}', [StockOpnameMobileController::class, 'updateItem'])->name('items.update');
+    Route::delete('/batch/{code}/items/{id}', [StockOpnameMobileController::class, 'destroyItem'])->name('items.destroy');
 });
 
 require __DIR__.'/auth.php';
