@@ -15,6 +15,8 @@ class ItemsImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
 {
     public int $created = 0;
     public int $updated = 0;
+    /** @var array<int,int> */
+    public array $initialStocks = [];
 
     private ?int $defaultCategoryId = null;
 
@@ -31,7 +33,7 @@ class ItemsImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
         $required = ['sku', 'name', 'parent_category', 'category', 'description'];
         if (array_diff($required, $headers)) {
             throw ValidationException::withMessages([
-                'file' => 'Header harus minimal: sku, name, parent_category, category, description (address opsional)',
+                'file' => 'Header harus minimal: sku, name, parent_category, category, description (address & stock opsional)',
             ]);
         }
 
@@ -42,6 +44,7 @@ class ItemsImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
             $categoryName = trim((string) ($row['category'] ?? ''));
             $description = trim((string) ($row['description'] ?? ''));
             $address = isset($row['address']) ? trim((string) ($row['address'] ?? '')) : '';
+            $stock = $this->parseStock($row);
 
             if ($sku === '' || $name === '') {
                 continue;
@@ -74,7 +77,35 @@ class ItemsImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
             );
             ItemStock::firstOrCreate(['item_id' => $item->id], ['stock' => 0]);
             $item->wasRecentlyCreated ? $this->created++ : $this->updated++;
+
+            if ($stock > 0) {
+                $this->initialStocks[$item->id] = ($this->initialStocks[$item->id] ?? 0) + $stock;
+            }
         }
+    }
+
+    protected function parseStock($row): int
+    {
+        $raw = null;
+        foreach (['stock', 'stok', 'qty'] as $key) {
+            if (is_array($row) && array_key_exists($key, $row)) {
+                $raw = $row[$key];
+                break;
+            }
+            if ($row instanceof Collection && $row->has($key)) {
+                $raw = $row->get($key);
+                break;
+            }
+            if (isset($row[$key])) {
+                $raw = $row[$key];
+                break;
+            }
+        }
+        if ($raw === null || $raw === '') {
+            return 0;
+        }
+        $value = is_numeric($raw) ? (int) $raw : (int) preg_replace('/[^0-9\-]/', '', (string) $raw);
+        return $value > 0 ? $value : 0;
     }
 
     protected function findOrCreateCategory(string $name, int $parentId = 0): ?Category

@@ -4,12 +4,16 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Category;
+use App\Models\InboundItem;
+use App\Models\InboundTransaction;
 use App\Models\Item;
 use App\Models\ItemStock;
 use App\Imports\ItemsImport;
+use App\Support\StockService;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -187,6 +191,47 @@ class ItemController extends Controller
             Excel::import($import, $request->file('file'));
             $created = $import->created;
             $updated = $import->updated;
+
+            $initialStocks = $import->initialStocks ?? [];
+            if (!empty($initialStocks)) {
+                $code = 'INB-OPN-'.now()->format('YmdHis').'-'.Str::upper(Str::random(4));
+                $transactedAt = now();
+
+                $tx = InboundTransaction::create([
+                    'code' => $code,
+                    'type' => 'opening',
+                    'ref_no' => null,
+                    'note' => 'Saldo awal dari import items',
+                    'transacted_at' => $transactedAt,
+                    'created_by' => auth()->id(),
+                ]);
+
+                foreach ($initialStocks as $itemId => $qty) {
+                    $qty = (int) $qty;
+                    if ($qty <= 0) {
+                        continue;
+                    }
+                    InboundItem::create([
+                        'inbound_transaction_id' => $tx->id,
+                        'item_id' => $itemId,
+                        'qty' => $qty,
+                        'note' => 'Saldo awal import',
+                    ]);
+
+                    StockService::mutate([
+                        'item_id' => $itemId,
+                        'direction' => 'in',
+                        'qty' => $qty,
+                        'source_type' => 'inbound',
+                        'source_subtype' => 'opening',
+                        'source_id' => $tx->id,
+                        'source_code' => $tx->code,
+                        'note' => 'Saldo awal import',
+                        'occurred_at' => $transactedAt,
+                        'created_by' => auth()->id(),
+                    ]);
+                }
+            }
             DB::commit();
         } catch (ValidationException $e) {
             DB::rollBack();

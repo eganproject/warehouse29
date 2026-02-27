@@ -501,6 +501,7 @@ class InboundController extends Controller
             'receipt' => 'Penerimaan Barang',
             'return' => 'Retur',
             'manual' => 'Manual',
+            'opening' => 'Saldo Awal',
         ];
     }
 
