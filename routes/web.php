@@ -51,6 +51,7 @@ Route::middleware('auth')->prefix('opname')->as('opname.')->group(function () {
     Route::get('/', [StockOpnameMobileController::class, 'index'])->name('index');
     Route::post('/batch', [StockOpnameMobileController::class, 'createBatch'])->name('batch.create');
     Route::get('/batch/{code}', [StockOpnameMobileController::class, 'showBatch'])->name('batch.show');
+    Route::post('/batch/{code}/complete', [StockOpnameMobileController::class, 'completeBatch'])->name('batch.complete');
     Route::get('/items/search', [StockOpnameMobileController::class, 'searchItems'])->name('items.search');
     Route::post('/batch/{code}/items', [StockOpnameMobileController::class, 'storeItem'])->name('items.store');
     Route::put('/batch/{code}/items/{id}', [StockOpnameMobileController::class, 'updateItem'])->name('items.update');
@@ -112,6 +113,7 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         Route::get('/stock-opname', [StockOpnameController::class, 'index'])->name('stock-opname.index');
         Route::get('/stock-opname/data', [StockOpnameController::class, 'data'])->name('stock-opname.data');
         Route::post('/stock-opname', [StockOpnameController::class, 'store'])->name('stock-opname.store');
+        Route::get('/stock-opname/{id}', [StockOpnameController::class, 'show'])->name('stock-opname.show');
 
         // Damaged Goods
         Route::get('/damaged-goods', [DamagedGoodsController::class, 'index'])->name('damaged-goods.index');

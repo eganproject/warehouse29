@@ -119,6 +119,7 @@
         <div style="margin-top:10px; display:grid; gap:8px;">
             <button type="button" class="primary-btn" id="btn_create_batch">Buat Batch Baru</button>
             <button type="button" class="sync-btn" id="btn_sync_batch">Sinkronkan Batch</button>
+            <button type="button" class="primary-btn" id="btn_complete_batch">Selesaikan Batch</button>
         </div>
         <div class="batch-info" id="batch_info" style="display:none;"></div>
     </div>
@@ -142,10 +143,6 @@
 <div class="bottom-bar">
     <div class="bottom-inner">
         <div>
-            <div class="summary">
-                <strong id="total_adjustment">0</strong>
-                Total adjustment batch
-            </div>
             <div class="summary-line">
                 Total qty dihitung: <strong id="total_counted">0</strong>
             </div>
@@ -169,6 +166,7 @@
         btnJoin: document.getElementById('btn_join_batch'),
         btnCreate: document.getElementById('btn_create_batch'),
         btnSync: document.getElementById('btn_sync_batch'),
+        btnComplete: document.getElementById('btn_complete_batch'),
         batchInfo: document.getElementById('batch_info'),
         batchChip: document.getElementById('batch_code_chip'),
         searchCard: document.getElementById('search_card'),
@@ -177,7 +175,6 @@
         itemsList: document.getElementById('items_list'),
         itemsEmpty: document.getElementById('items_empty'),
         totalItems: document.getElementById('total_items'),
-        totalAdjustment: document.getElementById('total_adjustment'),
         totalCounted: document.getElementById('total_counted'),
     };
 
@@ -222,6 +219,7 @@
             el.batchInfo.style.display = 'none';
             el.batchChip.textContent = 'Belum ada batch';
             el.searchCard.classList.add('disabled');
+            el.btnComplete.classList.add('disabled');
             return;
         }
         el.batchCode.value = state.batch.code || '';
@@ -234,16 +232,18 @@
             <div><strong>Dibuat oleh:</strong> ${state.batch.creator || '-'}</div>
             ${note}
         `;
-        el.searchCard.classList.remove('disabled');
+        const isCompleted = state.batch.status === 'completed';
+        el.searchCard.classList.toggle('disabled', isCompleted);
+        el.btnComplete.classList.toggle('disabled', isCompleted);
+        el.btnComplete.textContent = isCompleted ? 'Batch Selesai' : 'Selesaikan Batch';
     };
 
     const renderItems = () => {
         const items = state.items || [];
+        const isCompleted = state.batch?.status === 'completed';
         const totalCounted = items.reduce((sum, row) => sum + (row.counted_qty || 0), 0);
-        const totalAdjustment = items.reduce((sum, row) => sum + (row.adjustment || 0), 0);
         el.totalItems.textContent = `${items.length} item`;
         el.totalCounted.textContent = `${totalCounted}`;
-        el.totalAdjustment.textContent = `${totalAdjustment}`;
 
         if (!items.length) {
             el.itemsEmpty.style.display = 'block';
@@ -253,21 +253,18 @@
 
         el.itemsEmpty.style.display = 'none';
         el.itemsList.innerHTML = items.map((row) => {
-            const adjColor = row.adjustment > 0 ? '#0f766e' : (row.adjustment < 0 ? '#b91c1c' : '#64748b');
             return `
                 <div class="item-row" data-id="${row.id}">
                     <div class="item-meta">
                         <strong>${row.sku} • ${row.name}</strong>
                         <div class="item-sub">
-                            <span>System: ${row.system_qty}</span>
-                            <span style="color:${adjColor}">Adj: ${row.adjustment}</span>
                             <span>Input: ${row.created_by || '-'}</span>
                         </div>
                     </div>
                     <div class="item-actions">
-                        <input type="number" min="0" class="qty-input" value="${row.counted_qty}" />
-                        <button class="tiny-btn btn-save">Simpan</button>
-                        <button class="remove-btn" data-action="remove">×</button>
+                        <input type="number" min="0" class="qty-input" value="${row.counted_qty}" ${isCompleted ? 'disabled' : ''} />
+                        <button class="tiny-btn btn-save" ${isCompleted ? 'disabled' : ''}>Simpan</button>
+                        <button class="remove-btn" data-action="remove" ${isCompleted ? 'disabled' : ''}>×</button>
                     </div>
                 </div>
             `;
@@ -288,6 +285,32 @@
                 icon: 'success',
                 title: 'Batch dibuat',
                 text: `Kode batch: ${json.batch?.code}`,
+                confirmButtonText: 'OK',
+            });
+        }
+    };
+
+    const completeBatch = async () => {
+        if (!state.batch?.code) return;
+        const confirmed = typeof Swal !== 'undefined'
+            ? await Swal.fire({
+                icon: 'warning',
+                title: 'Selesaikan batch?',
+                text: 'Batch yang sudah selesai tidak bisa diedit lagi.',
+                showCancelButton: true,
+                confirmButtonText: 'Selesaikan',
+                cancelButtonText: 'Batal',
+            }).then(res => res.isConfirmed)
+            : confirm('Selesaikan batch?');
+        if (!confirmed) return;
+        const url = routes.batchComplete.replace('__CODE__', encodeURIComponent(state.batch.code));
+        const json = await fetchJson(url, { method: 'POST' });
+        setBatch(json);
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({
+                icon: 'success',
+                title: 'Batch selesai',
+                text: `Batch ${json.batch?.code} sudah diselesaikan`,
                 confirmButtonText: 'OK',
             });
         }
@@ -406,9 +429,18 @@
         }
     });
 
+    el.btnComplete.addEventListener('click', async () => {
+        try {
+            await completeBatch();
+        } catch (err) {
+            Swal?.fire('Error', err.message || 'Gagal menyelesaikan batch', 'error');
+        }
+    });
+
     el.itemSearch.addEventListener('input', runSearch);
 
     el.searchResults.addEventListener('click', async (e) => {
+        if (state.batch?.status === 'completed') return;
         const btn = e.target.closest('.add-btn');
         if (!btn) return;
         const itemId = btn.getAttribute('data-id');
@@ -426,6 +458,7 @@
     });
 
     el.itemsList.addEventListener('click', async (e) => {
+        if (state.batch?.status === 'completed') return;
         if (e.target.classList.contains('btn-save')) {
             const row = e.target.closest('.item-row');
             const rowId = row?.getAttribute('data-id');

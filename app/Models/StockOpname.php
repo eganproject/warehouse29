@@ -13,11 +13,15 @@ class StockOpname extends Model
         'code',
         'transacted_at',
         'note',
+        'status',
+        'completed_at',
         'created_by',
+        'completed_by',
     ];
 
     protected $casts = [
         'transacted_at' => 'datetime',
+        'completed_at' => 'datetime',
     ];
 
     public function items()
@@ -28,5 +32,10 @@ class StockOpname extends Model
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function completer()
+    {
+        return $this->belongsTo(User::class, 'completed_by');
     }
 }

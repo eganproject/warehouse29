@@ -36,34 +36,34 @@ class StockOpnameController extends Controller
 
     public function data(Request $request)
     {
-        $query = StockOpname::query()
-            ->select([
-                'stock_opnames.id',
-                'stock_opnames.code',
-                'stock_opnames.transacted_at',
-                'stock_opnames.note as opname_note',
-                'items.sku',
-                'items.name as item_name',
-                'stock_opname_items.system_qty',
-                'stock_opname_items.counted_qty',
-                'stock_opname_items.adjustment',
-                'stock_opname_items.note as item_note',
-            ])
-            ->join('stock_opname_items', 'stock_opname_items.stock_opname_id', '=', 'stock_opnames.id')
-            ->join('items', 'items.id', '=', 'stock_opname_items.item_id')
-            ->orderBy('stock_opnames.transacted_at', 'desc');
+        $baseQuery = StockOpname::query()
+            ->leftJoin('stock_opname_items', 'stock_opname_items.stock_opname_id', '=', 'stock_opnames.id')
+            ->leftJoin('items', 'items.id', '=', 'stock_opname_items.item_id');
 
         $search = trim((string) $request->input('q', ''));
         if ($search !== '') {
-            $query->where(function ($q) use ($search) {
+            $baseQuery->where(function ($q) use ($search) {
                 $q->where('stock_opnames.code', 'like', "%{$search}%")
+                    ->orWhere('stock_opnames.note', 'like', "%{$search}%")
                     ->orWhere('items.sku', 'like', "%{$search}%")
                     ->orWhere('items.name', 'like', "%{$search}%");
             });
         }
 
-        $recordsTotal = StockOpnameItem::count();
-        $recordsFiltered = (clone $query)->count();
+        $recordsTotal = StockOpname::count();
+        $recordsFiltered = (clone $baseQuery)->distinct('stock_opnames.id')->count('stock_opnames.id');
+
+        $query = (clone $baseQuery)
+            ->select([
+                'stock_opnames.id',
+                'stock_opnames.code',
+                'stock_opnames.transacted_at',
+                'stock_opnames.note',
+                DB::raw('COUNT(stock_opname_items.id) as items_count'),
+                DB::raw('COALESCE(SUM(stock_opname_items.adjustment), 0) as total_adjustment'),
+            ])
+            ->groupBy('stock_opnames.id', 'stock_opnames.code', 'stock_opnames.transacted_at', 'stock_opnames.note')
+            ->orderBy('stock_opnames.transacted_at', 'desc');
 
         $start = (int) $request->input('start', 0);
         $length = (int) $request->input('length', 10);
@@ -72,18 +72,14 @@ class StockOpnameController extends Controller
         }
 
         $data = $query->get()->map(function ($row) {
-            $itemLabel = trim(($row->sku ?? '').' - '.($row->item_name ?? ''));
             $ts = $row->transacted_at ? Carbon::parse($row->transacted_at)->format('Y-m-d H:i') : '';
-            $note = $row->item_note ?: ($row->opname_note ?? '');
             return [
                 'id' => $row->id,
                 'code' => $row->code,
                 'transacted_at' => $ts,
-                'item' => $itemLabel,
-                'system_qty' => (int) $row->system_qty,
-                'counted_qty' => (int) $row->counted_qty,
-                'adjustment' => (int) $row->adjustment,
-                'note' => $note,
+                'items_count' => (int) $row->items_count,
+                'total_adjustment' => (int) $row->total_adjustment,
+                'note' => $row->note ?? '',
             ];
         });
 
@@ -92,6 +88,36 @@ class StockOpnameController extends Controller
             'recordsTotal' => $recordsTotal,
             'recordsFiltered' => $recordsFiltered,
             'data' => $data,
+        ]);
+    }
+
+    public function show(int $id)
+    {
+        $opname = StockOpname::with(['creator:id,name', 'items.item:id,sku,name', 'items.creator:id,name'])
+            ->find($id);
+        if (!$opname) {
+            return response()->json(['message' => 'Data tidak ditemukan'], 404);
+        }
+
+        return response()->json([
+            'batch' => [
+                'id' => $opname->id,
+                'code' => $opname->code,
+                'transacted_at' => $opname->transacted_at?->format('Y-m-d H:i'),
+                'note' => $opname->note ?? '-',
+                'creator' => $opname->creator?->name ?? '-',
+            ],
+            'items' => $opname->items->map(function ($row) {
+                return [
+                    'id' => $row->id,
+                    'item' => trim(($row->item?->sku ?? '').' - '.($row->item?->name ?? '')),
+                    'system_qty' => (int) $row->system_qty,
+                    'counted_qty' => (int) $row->counted_qty,
+                    'adjustment' => (int) $row->adjustment,
+                    'note' => $row->note ?? '-',
+                    'created_by' => $row->creator?->name ?? '-',
+                ];
+            })->values(),
         ]);
     }
 
@@ -109,6 +135,9 @@ class StockOpnameController extends Controller
                 'note' => $validated['note'] ?? null,
                 'transacted_at' => $transactedAt,
                 'created_by' => auth()->id(),
+                'status' => 'completed',
+                'completed_at' => $transactedAt,
+                'completed_by' => auth()->id(),
             ]);
 
             foreach ($validated['items'] as $row) {

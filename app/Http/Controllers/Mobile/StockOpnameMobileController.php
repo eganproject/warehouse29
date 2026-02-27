@@ -22,6 +22,7 @@ class StockOpnameMobileController extends Controller
             'routes' => [
                 'batchCreate' => route('opname.batch.create'),
                 'batchShow' => route('opname.batch.show', '__CODE__'),
+                'batchComplete' => route('opname.batch.complete', '__CODE__'),
                 'itemsSearch' => route('opname.items.search'),
                 'itemsStore' => route('opname.items.store', '__CODE__'),
                 'itemsUpdate' => route('opname.items.update', ['__CODE__', '__ID__']),
@@ -48,6 +49,7 @@ class StockOpnameMobileController extends Controller
             'note' => $validated['note'] ?? null,
             'transacted_at' => $transactedAt,
             'created_by' => auth()->id(),
+            'status' => 'open',
         ]);
 
         return response()->json($this->serializeBatch($opname));
@@ -102,6 +104,11 @@ class StockOpnameMobileController extends Controller
         $opname = StockOpname::where('code', $code)->first();
         if (!$opname) {
             return response()->json(['message' => 'Batch tidak ditemukan'], 404);
+        }
+        if ($opname->status !== 'open') {
+            throw ValidationException::withMessages([
+                'batch' => 'Batch sudah diselesaikan',
+            ]);
         }
 
         $validated = $request->validate([
@@ -178,6 +185,11 @@ class StockOpnameMobileController extends Controller
         if (!$opname) {
             return response()->json(['message' => 'Batch tidak ditemukan'], 404);
         }
+        if ($opname->status !== 'open') {
+            throw ValidationException::withMessages([
+                'batch' => 'Batch sudah diselesaikan',
+            ]);
+        }
 
         $validated = $request->validate([
             'counted_qty' => ['required', 'integer', 'min:0'],
@@ -236,6 +248,11 @@ class StockOpnameMobileController extends Controller
         if (!$opname) {
             return response()->json(['message' => 'Batch tidak ditemukan'], 404);
         }
+        if ($opname->status !== 'open') {
+            throw ValidationException::withMessages([
+                'batch' => 'Batch sudah diselesaikan',
+            ]);
+        }
 
         DB::beginTransaction();
         try {
@@ -280,6 +297,7 @@ class StockOpnameMobileController extends Controller
     {
         $opname->load([
             'creator:id,name',
+            'completer:id,name',
             'items.item:id,sku,name',
             'items.creator:id,name',
         ]);
@@ -291,6 +309,9 @@ class StockOpnameMobileController extends Controller
                 'transacted_at' => $opname->transacted_at?->format('Y-m-d H:i'),
                 'note' => $opname->note,
                 'creator' => $opname->creator?->name,
+                'status' => $opname->status ?? 'open',
+                'completed_at' => $opname->completed_at?->format('Y-m-d H:i'),
+                'completed_by' => $opname->completer?->name,
             ],
             'items' => $opname->items->sortByDesc('id')->values()->map(function ($row) {
                 return [
@@ -306,6 +327,32 @@ class StockOpnameMobileController extends Controller
                 ];
             }),
         ];
+    }
+
+    public function completeBatch(string $code)
+    {
+        $opname = StockOpname::where('code', $code)->first();
+        if (!$opname) {
+            return response()->json(['message' => 'Batch tidak ditemukan'], 404);
+        }
+        if ($opname->status !== 'open') {
+            return response()->json([
+                'message' => 'Batch sudah diselesaikan',
+                'batch' => $this->serializeBatch($opname)['batch'],
+            ]);
+        }
+        if ($opname->items()->count() === 0) {
+            throw ValidationException::withMessages([
+                'items' => 'Minimal 1 item diperlukan sebelum menyelesaikan batch',
+            ]);
+        }
+
+        $opname->status = 'completed';
+        $opname->completed_at = now();
+        $opname->completed_by = auth()->id();
+        $opname->save();
+
+        return response()->json($this->serializeBatch($opname->fresh()));
     }
 
     private function generateCode(string $prefix): string

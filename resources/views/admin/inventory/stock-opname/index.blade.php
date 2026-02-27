@@ -36,11 +36,10 @@
                         <th>ID</th>
                         <th>Kode</th>
                         <th>Tanggal</th>
-                        <th>Item</th>
-                        <th>System</th>
-                        <th>Counted</th>
-                        <th>Adjust</th>
+                        <th>Total Item</th>
+                        <th>Total Adjust</th>
                         <th>Catatan</th>
+                        <th class="text-end">Aksi</th>
                     </tr>
                 </thead>
                 <tbody></tbody>
@@ -93,12 +92,67 @@
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="modal_opname_detail" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-900px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bolder">Detail Stock Opname</h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <span class="svg-icon svg-icon-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                            <rect opacity="0.5" x="6" y="17.3137" width="16" height="2" rx="1" transform="rotate(-45 6 17.3137)" fill="black" />
+                            <rect x="7.41422" y="6" width="16" height="2" rx="1" transform="rotate(45 7.41422 6)" fill="black" />
+                        </svg>
+                    </span>
+                </div>
+            </div>
+            <div class="modal-body scroll-y mx-5 mx-xl-15 my-7">
+                <div class="row mb-6">
+                    <div class="col-md-3">
+                        <div class="fw-bold text-gray-600">Kode</div>
+                        <div id="opname_detail_code">-</div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="fw-bold text-gray-600">Tanggal</div>
+                        <div id="opname_detail_date">-</div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="fw-bold text-gray-600">Input</div>
+                        <div id="opname_detail_creator">-</div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="fw-bold text-gray-600">Catatan</div>
+                        <div id="opname_detail_note">-</div>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table align-middle table-row-dashed fs-6 gy-5">
+                        <thead>
+                            <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
+                                <th>Item</th>
+                                <th>System</th>
+                                <th>Counted</th>
+                                <th>Adjust</th>
+                                <th>Catatan</th>
+                                <th>Input</th>
+                            </tr>
+                        </thead>
+                        <tbody id="opname_detail_items"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 @endsection
 
 @push('scripts')
 <script>
     const dataUrl = '{{ $dataUrl }}';
     const storeUrl = '{{ $storeUrl }}';
+    const detailUrlTpl = '{{ route('admin.inventory.stock-opname.show', ':id') }}';
     const csrfToken = '{{ csrf_token() }}';
     const itemOptionsHtml = `@foreach($items as $item)<option value="{{ $item->id }}" data-stock="{{ $item->stock }}">{{ $item->sku }} - {{ $item->name }}</option>@endforeach`;
 
@@ -304,13 +358,33 @@
                 { data: 'id' },
                 { data: 'code' },
                 { data: 'transacted_at' },
-                { data: 'item' },
-                { data: 'system_qty' },
-                { data: 'counted_qty' },
-                { data: 'adjustment' },
+                { data: 'items_count' },
+                { data: 'total_adjustment' },
                 { data: 'note' },
+                { data: 'id', orderable:false, searchable:false, className:'text-end', render: (data) => {
+                    const detailItem = `<div class="menu-item px-3"><a href="#" class="menu-link px-3 btn-detail" data-id="${data}">Detail</a></div>`;
+                    return `
+                        <div class="text-end">
+                            <a href="#" class="btn btn-sm btn-light btn-active-light-primary" data-kt-menu-trigger="click" data-kt-menu-placement="bottom-end">
+                                Actions
+                                <span class="svg-icon svg-icon-5 m-0">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                        <path d="M11.4343 12.7344L7.25 8.55005C6.83579 8.13583 6.16421 8.13584 5.75 8.55005C5.33579 8.96426 5.33579 9.63583 5.75 10.05L11.2929 15.5929C11.6834 15.9835 12.3166 15.9835 12.7071 15.5929L18.25 10.05C18.6642 9.63584 18.6642 8.96426 18.25 8.55005C17.8358 8.13584 17.1642 8.13584 16.75 8.55005L12.5657 12.7344C12.2533 13.0468 11.7467 13.0468 11.4343 12.7344Z" fill="black"></path>
+                                    </svg>
+                                </span>
+                            </a>
+                            <div class="menu menu-sub menu-sub-dropdown menu-column menu-rounded menu-gray-600 menu-state-bg-light-primary fw-bold fs-7 w-175px py-3" data-kt-menu="true">
+                                ${detailItem}
+                            </div>
+                        </div>
+                    `;
+                }},
             ]
         });
+
+        const refreshMenus = () => { if (window.KTMenu) KTMenu.createInstances(); };
+        refreshMenus();
+        dt.on('draw', refreshMenus);
 
         const reloadTable = () => dt.ajax.reload();
         searchInput?.addEventListener('keyup', reloadTable);
@@ -371,6 +445,50 @@
             } catch (err) {
                 console.error(err);
                 if (typeof Swal !== 'undefined') Swal.fire('Error', 'Gagal menyimpan', 'error');
+            }
+        });
+
+        const detailModalEl = document.getElementById('modal_opname_detail');
+        const detailModal = detailModalEl ? new bootstrap.Modal(detailModalEl) : null;
+        const setText = (id, value) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = value ?? '-';
+        };
+
+        tableEl.on('click', '.btn-detail', async function(e) {
+            e.preventDefault();
+            const id = this.getAttribute('data-id');
+            if (!id) return;
+            try {
+                const res = await fetch(detailUrlTpl.replace(':id', id), { headers: { 'Accept': 'application/json' }});
+                const json = await res.json();
+                if (!res.ok) {
+                    if (typeof Swal !== 'undefined') Swal.fire('Error', json.message || 'Gagal memuat data', 'error');
+                    return;
+                }
+                const batch = json.batch || {};
+                setText('opname_detail_code', batch.code);
+                setText('opname_detail_date', batch.transacted_at);
+                setText('opname_detail_creator', batch.creator);
+                setText('opname_detail_note', batch.note);
+
+                const items = json.items || [];
+                const rows = items.map((row) => `
+                    <tr>
+                        <td>${row.item}</td>
+                        <td>${row.system_qty}</td>
+                        <td>${row.counted_qty}</td>
+                        <td>${row.adjustment}</td>
+                        <td>${row.note || '-'}</td>
+                        <td>${row.created_by || '-'}</td>
+                    </tr>
+                `).join('');
+                const tbody = document.getElementById('opname_detail_items');
+                if (tbody) tbody.innerHTML = rows || '<tr><td colspan="6" class="text-center text-muted">Tidak ada item.</td></tr>';
+
+                detailModal?.show();
+            } catch (err) {
+                if (typeof Swal !== 'undefined') Swal.fire('Error', 'Gagal memuat data', 'error');
             }
         });
     });

@@ -3,6 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="shortcut icon" href="{{ asset('metronic/media/logos/favicon.png') }}" />
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Gudang 29 | Login</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -276,7 +277,7 @@
     <main class="card">
         <div class="brand">
             <div class="logo">
-                <img src="{{ asset('metronic/media/logos/logo-demo3.png') }}" alt="Gudang 29">
+                <img src="{{ asset('metronic/media/logos/favicon.png') }}" alt="Gudang 29">
             </div>
             <div>
                 <h1>Login ke Gudang 29</h1>
