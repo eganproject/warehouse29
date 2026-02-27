@@ -246,7 +246,7 @@ class PickerSessionController extends Controller
 
         $items = $query->orderBy('name')
             ->limit(20)
-            ->get(['id', 'sku', 'name']);
+            ->get(['id', 'sku', 'name', 'address']);
 
         return response()->json([
             'items' => $items,
@@ -291,6 +291,7 @@ class PickerSessionController extends Controller
                     'item_id' => $row->item_id,
                     'sku' => $row->item?->sku ?? '',
                     'name' => $row->item?->name ?? '',
+                    'address' => $row->item?->address ?? '',
                     'qty' => (int) $row->qty,
                     'note' => $row->note,
                 ];

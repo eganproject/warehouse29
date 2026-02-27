@@ -3,6 +3,38 @@
 @section('title', 'Picker Mobile')
 
 @section('content')
+<style>
+    .address-line {
+        display: flex;
+        align-items: flex-start;
+        gap: 6px;
+        margin-top: 4px;
+        font-size: 11px;
+        color: var(--muted);
+        line-height: 1.4;
+    }
+    .address-tag {
+        display: inline-flex;
+        align-items: center;
+        padding: 2px 6px;
+        border-radius: 999px;
+        font-size: 10px;
+        font-weight: 600;
+        background: rgba(15, 118, 110, 0.12);
+        color: var(--brand);
+        white-space: nowrap;
+    }
+    .address-text {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    .result-info .address-line {
+        margin-top: 6px;
+    }
+</style>
+
 <div class="screen">
     <div class="topbar">
         <div>
@@ -174,10 +206,15 @@
 
         el.itemsEmpty.style.display = 'none';
         el.itemsList.innerHTML = items.map((row) => {
+            const address = row.address && row.address.trim() ? row.address : 'Belum diisi';
             return `
                 <div class="item-row" data-id="${row.id}" data-qty="${row.qty}">
                     <div class="item-meta">
                         <strong>${row.sku || '-'} • ${row.name || '-'}</strong>
+                        <div class="address-line">
+                            <span class="address-tag">Lokasi</span>
+                            <span class="address-text">${address}</span>
+                        </div>
                         <span>Qty tercatat: ${row.qty}</span>
                     </div>
                     <div style="display:flex; align-items:center; gap:8px;">
@@ -199,11 +236,16 @@
             return;
         }
         el.searchResults.innerHTML = items.map(item => {
+            const address = item.address && item.address.trim() ? item.address : 'Belum diisi';
             return `
                 <div class="result-item">
                     <div class="result-info">
                         <strong>${item.sku}</strong>
                         <span>${item.name}</span>
+                        <div class="address-line">
+                            <span class="address-tag">Lokasi</span>
+                            <span class="address-text">${address}</span>
+                        </div>
                     </div>
                     <button class="add-btn" data-id="${item.id}">Tambah</button>
                 </div>
