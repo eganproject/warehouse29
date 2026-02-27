@@ -61,6 +61,11 @@ class StockOpnameMobileController extends Controller
         if (!$opname) {
             return response()->json(['message' => 'Batch tidak ditemukan'], 404);
         }
+        if ($opname->status === 'completed') {
+            return response()->json([
+                'message' => 'Batch sudah diselesaikan',
+            ], 409);
+        }
 
         return response()->json($this->serializeBatch($opname));
     }
