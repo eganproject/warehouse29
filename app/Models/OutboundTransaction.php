@@ -15,11 +15,15 @@ class OutboundTransaction extends Model
         'ref_no',
         'transacted_at',
         'note',
+        'status',
+        'approved_at',
         'created_by',
+        'approved_by',
     ];
 
     protected $casts = [
         'transacted_at' => 'datetime',
+        'approved_at' => 'datetime',
     ];
 
     public function items()
@@ -30,5 +34,10 @@ class OutboundTransaction extends Model
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function approver()
+    {
+        return $this->belongsTo(User::class, 'approved_by');
     }
 }

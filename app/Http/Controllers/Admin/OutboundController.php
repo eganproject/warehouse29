@@ -121,6 +121,21 @@ class OutboundController extends Controller
         return $this->destroy('return', $id);
     }
 
+    public function pickersApprove(int $id)
+    {
+        return $this->approve('picker', $id);
+    }
+
+    public function manualsApprove(int $id)
+    {
+        return $this->approve('manual', $id);
+    }
+
+    public function returnsApprove(int $id)
+    {
+        return $this->approve('return', $id);
+    }
+
     private function index(string $type, string $pageTitle, string $routeBase)
     {
         $items = Item::orderBy('name')->get(['id', 'sku', 'name']);
@@ -133,6 +148,7 @@ class OutboundController extends Controller
                 'update' => route('admin.outbound.pickers.update', ':id'),
                 'delete' => route('admin.outbound.pickers.destroy', ':id'),
                 'detail' => route('admin.outbound.pickers.detail', ':id'),
+                'approve' => route('admin.outbound.pickers.approve', ':id'),
             ],
             'manual' => [
                 'store' => route('admin.outbound.manuals.store'),
@@ -140,6 +156,7 @@ class OutboundController extends Controller
                 'update' => route('admin.outbound.manuals.update', ':id'),
                 'delete' => route('admin.outbound.manuals.destroy', ':id'),
                 'detail' => route('admin.outbound.manuals.detail', ':id'),
+                'approve' => route('admin.outbound.manuals.approve', ':id'),
             ],
             'return' => [
                 'store' => route('admin.outbound.returns.store'),
@@ -147,6 +164,7 @@ class OutboundController extends Controller
                 'update' => route('admin.outbound.returns.update', ':id'),
                 'delete' => route('admin.outbound.returns.destroy', ':id'),
                 'detail' => route('admin.outbound.returns.detail', ':id'),
+                'approve' => route('admin.outbound.returns.approve', ':id'),
             ],
         ];
 
@@ -187,6 +205,7 @@ class OutboundController extends Controller
                 'outbound_transactions.type',
                 'outbound_transactions.ref_no',
                 'outbound_transactions.note',
+                'outbound_transactions.status',
             ])
             ->orderBy('outbound_transactions.transacted_at', 'desc');
         if ($baseType) {
@@ -241,6 +260,7 @@ class OutboundController extends Controller
                 'qty' => $totalQty,
                 'note' => $row->note ?? '',
                 'type' => $row->type,
+                'status' => $row->status ?? 'pending',
             ];
         });
 
@@ -263,6 +283,7 @@ class OutboundController extends Controller
             'code' => $tx->code,
             'ref_no' => $tx->ref_no,
             'note' => $tx->note,
+            'status' => $tx->status ?? 'pending',
             'transacted_at' => $tx->transacted_at?->format('Y-m-d\TH:i'),
             'items' => $tx->items->map(function ($item) {
                 return [
@@ -312,6 +333,7 @@ class OutboundController extends Controller
                 'note' => $validated['note'] ?? null,
                 'transacted_at' => $transactedAt,
                 'created_by' => auth()->id(),
+                'status' => 'pending',
             ]);
 
             foreach ($validated['items'] as $row) {
@@ -360,6 +382,10 @@ class OutboundController extends Controller
         DB::beginTransaction();
         try {
             $tx = OutboundTransaction::where('type', $type)->findOrFail($id);
+            if (($tx->status ?? 'pending') === 'approved') {
+                DB::rollBack();
+                return response()->json(['message' => 'Data sudah disetujui dan tidak bisa diubah'], 422);
+            }
 
             StockService::rollbackBySource('outbound', $tx->id);
             StockMutation::where('source_type', 'outbound')->where('source_id', $tx->id)->delete();
@@ -415,6 +441,10 @@ class OutboundController extends Controller
         DB::beginTransaction();
         try {
             $tx = OutboundTransaction::where('type', $type)->findOrFail($id);
+            if (($tx->status ?? 'pending') === 'approved') {
+                DB::rollBack();
+                return response()->json(['message' => 'Data sudah disetujui dan tidak bisa dihapus'], 422);
+            }
 
             StockService::rollbackBySource('outbound', $tx->id);
             StockMutation::where('source_type', 'outbound')->where('source_id', $tx->id)->delete();
@@ -438,6 +468,20 @@ class OutboundController extends Controller
         return response()->json([
             'message' => 'Outbound berhasil dihapus',
         ]);
+    }
+
+    private function approve(string $type, int $id)
+    {
+        $tx = OutboundTransaction::where('type', $type)->findOrFail($id);
+        if (($tx->status ?? 'pending') === 'approved') {
+            return response()->json(['message' => 'Data sudah disetujui']);
+        }
+        $tx->status = 'approved';
+        $tx->approved_at = now();
+        $tx->approved_by = auth()->id();
+        $tx->save();
+
+        return response()->json(['message' => 'Outbound berhasil disetujui']);
     }
 
     private function validatePayload(Request $request): array

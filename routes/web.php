@@ -115,6 +115,7 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         Route::get('/stock-opname/data', [StockOpnameController::class, 'data'])->name('stock-opname.data');
         Route::post('/stock-opname', [StockOpnameController::class, 'store'])->name('stock-opname.store');
         Route::get('/stock-opname/{id}', [StockOpnameController::class, 'show'])->name('stock-opname.show');
+        Route::post('/stock-opname/{id}/approve', [StockOpnameController::class, 'approve'])->name('stock-opname.approve');
 
         // Stock Adjustments
         Route::get('/stock-adjustments', [StockAdjustmentController::class, 'index'])->name('stock-adjustments.index');
@@ -123,6 +124,7 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         Route::get('/stock-adjustments/{id}', [StockAdjustmentController::class, 'show'])->name('stock-adjustments.show');
         Route::put('/stock-adjustments/{id}', [StockAdjustmentController::class, 'update'])->name('stock-adjustments.update');
         Route::delete('/stock-adjustments/{id}', [StockAdjustmentController::class, 'destroy'])->name('stock-adjustments.destroy');
+        Route::post('/stock-adjustments/{id}/approve', [StockAdjustmentController::class, 'approve'])->name('stock-adjustments.approve');
 
         // Damaged Goods
         Route::get('/damaged-goods', [DamagedGoodsController::class, 'index'])->name('damaged-goods.index');
@@ -131,6 +133,7 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         Route::get('/damaged-goods/{id}', [DamagedGoodsController::class, 'show'])->name('damaged-goods.show');
         Route::put('/damaged-goods/{id}', [DamagedGoodsController::class, 'update'])->name('damaged-goods.update');
         Route::delete('/damaged-goods/{id}', [DamagedGoodsController::class, 'destroy'])->name('damaged-goods.destroy');
+        Route::post('/damaged-goods/{id}/approve', [DamagedGoodsController::class, 'approve'])->name('damaged-goods.approve');
     });
 
     Route::prefix('inbound')->as('inbound.')->group(function () {
@@ -141,6 +144,7 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         Route::put('/receipts/{id}', [InboundController::class, 'receiptsUpdate'])->name('receipts.update');
         Route::delete('/receipts/{id}', [InboundController::class, 'receiptsDestroy'])->name('receipts.destroy');
         Route::get('/receipts/{id}/detail', [InboundController::class, 'receiptsDetail'])->name('receipts.detail');
+        Route::post('/receipts/{id}/approve', [InboundController::class, 'receiptsApprove'])->name('receipts.approve');
 
         Route::get('/returns', [InboundController::class, 'returns'])->name('returns.index');
         Route::get('/returns/data', [InboundController::class, 'returnsData'])->name('returns.data');
@@ -149,6 +153,7 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         Route::put('/returns/{id}', [InboundController::class, 'returnsUpdate'])->name('returns.update');
         Route::delete('/returns/{id}', [InboundController::class, 'returnsDestroy'])->name('returns.destroy');
         Route::get('/returns/{id}/detail', [InboundController::class, 'returnsDetail'])->name('returns.detail');
+        Route::post('/returns/{id}/approve', [InboundController::class, 'returnsApprove'])->name('returns.approve');
 
         Route::get('/manuals', [InboundController::class, 'manuals'])->name('manuals.index');
         Route::get('/manuals/data', [InboundController::class, 'manualsData'])->name('manuals.data');
@@ -157,6 +162,7 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         Route::put('/manuals/{id}', [InboundController::class, 'manualsUpdate'])->name('manuals.update');
         Route::delete('/manuals/{id}', [InboundController::class, 'manualsDestroy'])->name('manuals.destroy');
         Route::get('/manuals/{id}/detail', [InboundController::class, 'manualsDetail'])->name('manuals.detail');
+        Route::post('/manuals/{id}/approve', [InboundController::class, 'manualsApprove'])->name('manuals.approve');
     });
 
     Route::prefix('outbound')->as('outbound.')->group(function () {
@@ -167,6 +173,7 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         Route::put('/pickers/{id}', [OutboundController::class, 'pickersUpdate'])->name('pickers.update');
         Route::delete('/pickers/{id}', [OutboundController::class, 'pickersDestroy'])->name('pickers.destroy');
         Route::get('/pickers/{id}/detail', [OutboundController::class, 'pickersDetail'])->name('pickers.detail');
+        Route::post('/pickers/{id}/approve', [OutboundController::class, 'pickersApprove'])->name('pickers.approve');
 
         Route::get('/manuals', [OutboundController::class, 'manuals'])->name('manuals.index');
         Route::get('/manuals/data', [OutboundController::class, 'manualsData'])->name('manuals.data');
@@ -175,6 +182,7 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         Route::put('/manuals/{id}', [OutboundController::class, 'manualsUpdate'])->name('manuals.update');
         Route::delete('/manuals/{id}', [OutboundController::class, 'manualsDestroy'])->name('manuals.destroy');
         Route::get('/manuals/{id}/detail', [OutboundController::class, 'manualsDetail'])->name('manuals.detail');
+        Route::post('/manuals/{id}/approve', [OutboundController::class, 'manualsApprove'])->name('manuals.approve');
 
         Route::get('/returns', [OutboundController::class, 'returns'])->name('returns.index');
         Route::get('/returns/data', [OutboundController::class, 'returnsData'])->name('returns.data');
@@ -183,6 +191,7 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         Route::put('/returns/{id}', [OutboundController::class, 'returnsUpdate'])->name('returns.update');
         Route::delete('/returns/{id}', [OutboundController::class, 'returnsDestroy'])->name('returns.destroy');
         Route::get('/returns/{id}/detail', [OutboundController::class, 'returnsDetail'])->name('returns.detail');
+        Route::post('/returns/{id}/approve', [OutboundController::class, 'returnsApprove'])->name('returns.approve');
 
         Route::get('/picker-sessions', [PickerHistoryController::class, 'index'])->name('picker-sessions.index');
         Route::get('/picker-sessions/data', [PickerHistoryController::class, 'data'])->name('picker-sessions.data');

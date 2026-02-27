@@ -12,7 +12,10 @@ return new class extends Migration {
             $table->string('code', 50)->unique();
             $table->timestamp('transacted_at')->useCurrent();
             $table->text('note')->nullable();
+            $table->string('status', 20)->default('pending');
+            $table->timestamp('approved_at')->nullable();
             $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignId('approved_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
         });
 

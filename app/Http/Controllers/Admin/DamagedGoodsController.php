@@ -79,6 +79,7 @@ class DamagedGoodsController extends Controller
                 'item' => $itemLabel ?: '-',
                 'qty' => $totalQty,
                 'note' => $note,
+                'status' => $row->status ?? 'pending',
             ];
         });
 
@@ -106,6 +107,7 @@ class DamagedGoodsController extends Controller
                 'note' => $validated['note'] ?? null,
                 'transacted_at' => $transactedAt,
                 'created_by' => auth()->id(),
+                'status' => 'pending',
             ]);
 
             foreach ($validated['items'] as $row) {
@@ -160,6 +162,7 @@ class DamagedGoodsController extends Controller
             'source_type' => $damage->source_type,
             'source_ref' => $damage->source_ref,
             'note' => $damage->note,
+            'status' => $damage->status ?? 'pending',
             'transacted_at' => $damage->transacted_at?->format('Y-m-d H:i'),
             'items' => $damage->items->map(function ($row) {
                 return [
@@ -178,6 +181,10 @@ class DamagedGoodsController extends Controller
         DB::beginTransaction();
         try {
             $damage = DamagedGood::findOrFail($id);
+            if (($damage->status ?? 'pending') === 'approved') {
+                DB::rollBack();
+                return response()->json(['message' => 'Data sudah disetujui dan tidak bisa diubah'], 422);
+            }
 
             StockService::rollbackBySource('damaged', $damage->id);
             StockMutation::where('source_type', 'damaged')
@@ -238,6 +245,10 @@ class DamagedGoodsController extends Controller
         DB::beginTransaction();
         try {
             $damage = DamagedGood::findOrFail($id);
+            if (($damage->status ?? 'pending') === 'approved') {
+                DB::rollBack();
+                return response()->json(['message' => 'Data sudah disetujui dan tidak bisa dihapus'], 422);
+            }
             StockService::rollbackBySource('damaged', $damage->id);
             StockMutation::where('source_type', 'damaged')
                 ->where('source_id', $damage->id)
@@ -257,6 +268,20 @@ class DamagedGoodsController extends Controller
         return response()->json([
             'message' => 'Barang rusak berhasil dihapus',
         ]);
+    }
+
+    public function approve(int $id)
+    {
+        $damage = DamagedGood::findOrFail($id);
+        if (($damage->status ?? 'pending') === 'approved') {
+            return response()->json(['message' => 'Data sudah disetujui']);
+        }
+        $damage->status = 'approved';
+        $damage->approved_at = now();
+        $damage->approved_by = auth()->id();
+        $damage->save();
+
+        return response()->json(['message' => 'Barang rusak berhasil disetujui']);
     }
 
     private function validatePayload(Request $request): array

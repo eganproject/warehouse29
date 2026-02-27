@@ -83,6 +83,7 @@
                         <th>ID</th>
                         <th>Kode</th>
                         <th>Jenis</th>
+                        <th>Status</th>
                         <th>Tanggal</th>
                         <th>Item</th>
                         <th>Qty</th>
@@ -155,6 +156,7 @@
     const updateUrlTpl = '{{ $updateUrlTpl }}';
     const deleteUrlTpl = '{{ $deleteUrlTpl }}';
     const detailUrlTpl = '{{ $detailUrlTpl }}';
+    const approveUrlTpl = '{{ $approveUrlTpl ?? '' }}';
     const routeMap = @json($routeMap ?? []);
     const typeLabelMap = @json($typeOptions ?? []);
     const csrfToken = '{{ csrf_token() }}';
@@ -195,7 +197,12 @@
         const resolveRoute = (type, key) => {
             if (routeMap && routeMap[type] && routeMap[type][key]) return routeMap[type][key];
             if (routeMap && routeMap[defaultTypeFilter] && routeMap[defaultTypeFilter][key]) return routeMap[defaultTypeFilter][key];
-            return { store: storeUrl, show: showUrlTpl, update: updateUrlTpl, delete: deleteUrlTpl, detail: detailUrlTpl }[key] || '';
+            return { store: storeUrl, show: showUrlTpl, update: updateUrlTpl, delete: deleteUrlTpl, detail: detailUrlTpl, approve: approveUrlTpl }[key] || '';
+        };
+
+        const statusLabel = (status) => {
+            if (status === 'approved') return '<span class="badge badge-light-success">Disetujui</span>';
+            return '<span class="badge badge-light-warning">Menunggu</span>';
         };
 
         const clearErrors = () => {
@@ -381,6 +388,7 @@
                 { data: 'id' },
                 { data: 'code' },
                 { data: 'type', render: (data) => typeLabelMap?.[data] || data || '-' },
+                { data: 'status', orderable:false, searchable:false, render: (data) => statusLabel(data) },
                 { data: 'transacted_at' },
                 { data: 'item' },
                 { data: 'qty' },
@@ -388,10 +396,18 @@
                 { data: 'id', orderable:false, searchable:false, className:'text-end', render: (data, type, row)=>{
                     const rowType = row?.type || defaultTypeFilter;
                     const perms = permMap?.[rowType] || {};
+                    const isApproved = row?.status === 'approved';
                     const detailItem = `<div class="menu-item px-3"><a href="${resolveRoute(rowType, 'detail').replace(':id', data)}" class="menu-link px-3">Detail</a></div>`;
-                    const editItem = perms.update ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 btn-edit" data-id="${data}" data-type="${rowType}">Edit</a></div>` : '';
-                    const delItem = perms.delete ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 text-danger btn-delete" data-id="${data}" data-type="${rowType}">Hapus</a></div>` : '';
-                    const actions = `${detailItem}${editItem}${delItem}`;
+                    const approveItem = (!isApproved && perms.update)
+                        ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 text-success btn-approve" data-id="${data}" data-type="${rowType}">Approve</a></div>`
+                        : '';
+                    const editItem = (!isApproved && perms.update)
+                        ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 btn-edit" data-id="${data}" data-type="${rowType}">Edit</a></div>`
+                        : '';
+                    const delItem = (!isApproved && perms.delete)
+                        ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 text-danger btn-delete" data-id="${data}" data-type="${rowType}">Hapus</a></div>`
+                        : '';
+                    const actions = `${detailItem}${approveItem}${editItem}${delItem}`;
                     if (!actions) return '';
                     return `
                         <div class="text-end">
@@ -503,6 +519,51 @@
             } catch (err) {
                 console.error(err);
                 if (typeof Swal !== 'undefined') Swal.fire('Error', 'Gagal menghapus', 'error');
+            }
+        });
+
+        tableEl.on('click', '.btn-approve', async function(e) {
+            e.preventDefault();
+            const id = this.getAttribute('data-id');
+            const rowType = this.getAttribute('data-type') || defaultTypeFilter;
+            if (!id) return;
+            const approveUrl = resolveRoute(rowType, 'approve')?.replace(':id', id);
+            if (!approveUrl) return;
+            let confirmed = true;
+            if (typeof Swal !== 'undefined') {
+                const res = await Swal.fire({
+                    title: 'Setujui data ini?',
+                    text: 'Setelah disetujui, data tidak bisa diubah atau dihapus.',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Approve',
+                    cancelButtonText: 'Batal',
+                    buttonsStyling: false,
+                    customClass: {
+                        confirmButton: 'btn btn-success',
+                        cancelButton: 'btn btn-light'
+                    }
+                });
+                confirmed = res.isConfirmed;
+            }
+            if (!confirmed) return;
+            try {
+                const res = await fetch(approveUrl, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json',
+                    },
+                });
+                const json = await res.json();
+                if (!res.ok) {
+                    if (typeof Swal !== 'undefined') Swal.fire('Error', json.message || 'Gagal menyetujui', 'error');
+                    return;
+                }
+                if (typeof Swal !== 'undefined') Swal.fire('Berhasil', json.message || 'Berhasil', 'success');
+                reloadTable();
+            } catch (err) {
+                if (typeof Swal !== 'undefined') Swal.fire('Error', 'Gagal menyetujui', 'error');
             }
         });
 

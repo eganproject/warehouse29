@@ -78,6 +78,7 @@ class StockAdjustmentController extends Controller
                 'qty_in' => $totalIn,
                 'qty_out' => $totalOut,
                 'note' => $row->note ?? '',
+                'status' => $row->status ?? 'pending',
             ];
         });
 
@@ -103,6 +104,7 @@ class StockAdjustmentController extends Controller
                 'note' => $validated['note'] ?? null,
                 'transacted_at' => $transactedAt,
                 'created_by' => auth()->id(),
+                'status' => 'pending',
             ]);
 
             foreach ($validated['items'] as $row) {
@@ -154,6 +156,7 @@ class StockAdjustmentController extends Controller
             'id' => $adjustment->id,
             'code' => $adjustment->code,
             'note' => $adjustment->note,
+            'status' => $adjustment->status ?? 'pending',
             'transacted_at' => $adjustment->transacted_at?->format('Y-m-d H:i'),
             'items' => $adjustment->items->map(function ($row) {
                 return [
@@ -173,6 +176,10 @@ class StockAdjustmentController extends Controller
         DB::beginTransaction();
         try {
             $adjustment = StockAdjustment::findOrFail($id);
+            if (($adjustment->status ?? 'pending') === 'approved') {
+                DB::rollBack();
+                return response()->json(['message' => 'Data sudah disetujui dan tidak bisa diubah'], 422);
+            }
 
             StockService::rollbackBySource('adjustment', $adjustment->id);
             StockMutation::where('source_type', 'adjustment')
@@ -230,6 +237,10 @@ class StockAdjustmentController extends Controller
         DB::beginTransaction();
         try {
             $adjustment = StockAdjustment::findOrFail($id);
+            if (($adjustment->status ?? 'pending') === 'approved') {
+                DB::rollBack();
+                return response()->json(['message' => 'Data sudah disetujui dan tidak bisa dihapus'], 422);
+            }
             StockService::rollbackBySource('adjustment', $adjustment->id);
             StockMutation::where('source_type', 'adjustment')
                 ->where('source_id', $adjustment->id)
@@ -249,6 +260,20 @@ class StockAdjustmentController extends Controller
         return response()->json([
             'message' => 'Penyesuaian stok berhasil dihapus',
         ]);
+    }
+
+    public function approve(int $id)
+    {
+        $adjustment = StockAdjustment::findOrFail($id);
+        if (($adjustment->status ?? 'pending') === 'approved') {
+            return response()->json(['message' => 'Data sudah disetujui']);
+        }
+        $adjustment->status = 'approved';
+        $adjustment->approved_at = now();
+        $adjustment->approved_by = auth()->id();
+        $adjustment->save();
+
+        return response()->json(['message' => 'Penyesuaian stok berhasil disetujui']);
     }
 
     private function validatePayload(Request $request): array

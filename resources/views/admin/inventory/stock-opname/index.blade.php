@@ -6,6 +6,7 @@
 @php
     use App\Support\Permission as Perm;
     $canCreate = Perm::can(auth()->user(), 'admin.inventory.stock-opname.index', 'create');
+    $canUpdate = Perm::can(auth()->user(), 'admin.inventory.stock-opname.index', 'update');
 @endphp
 
 @section('content')
@@ -35,6 +36,7 @@
                     <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
                         <th>ID</th>
                         <th>Kode</th>
+                        <th>Status</th>
                         <th>Tanggal</th>
                         <th>Total Item</th>
                         <th>Total Adjust</th>
@@ -153,7 +155,9 @@
     const dataUrl = '{{ $dataUrl }}';
     const storeUrl = '{{ $storeUrl }}';
     const detailUrlTpl = '{{ route('admin.inventory.stock-opname.show', ':id') }}';
+    const approveUrlTpl = '{{ route('admin.inventory.stock-opname.approve', ':id') }}';
     const csrfToken = '{{ csrf_token() }}';
+    const canUpdate = {{ $canUpdate ? 'true' : 'false' }};
     const itemOptionsHtml = `@foreach($items as $item)<option value="{{ $item->id }}" data-stock="{{ $item->stock }}">{{ $item->sku }} - {{ $item->name }}</option>@endforeach`;
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -176,6 +180,11 @@
         const getJakartaNow = () => {
             const jkt = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
             return formatDateTime(jkt);
+        };
+
+        const statusLabel = (status) => {
+            if (status === 'completed') return '<span class="badge badge-light-success">Selesai</span>';
+            return '<span class="badge badge-light-warning">Berjalan</span>';
         };
 
         const clearErrors = () => {
@@ -357,12 +366,17 @@
             columns: [
                 { data: 'id' },
                 { data: 'code' },
+                { data: 'status', orderable: false, searchable: false, render: (data) => statusLabel(data) },
                 { data: 'transacted_at' },
                 { data: 'items_count' },
                 { data: 'total_adjustment' },
                 { data: 'note' },
-                { data: 'id', orderable:false, searchable:false, className:'text-end', render: (data) => {
+                { data: 'id', orderable:false, searchable:false, className:'text-end', render: (data, type, row) => {
                     const detailItem = `<div class="menu-item px-3"><a href="#" class="menu-link px-3 btn-detail" data-id="${data}">Detail</a></div>`;
+                    const isCompleted = row?.status === 'completed';
+                    const approveItem = (!isCompleted && canUpdate)
+                        ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 text-success btn-approve" data-id="${data}">Selesaikan</a></div>`
+                        : '';
                     return `
                         <div class="text-end">
                             <a href="#" class="btn btn-sm btn-light btn-active-light-primary" data-kt-menu-trigger="click" data-kt-menu-placement="bottom-end">
@@ -374,7 +388,7 @@
                                 </span>
                             </a>
                             <div class="menu menu-sub menu-sub-dropdown menu-column menu-rounded menu-gray-600 menu-state-bg-light-primary fw-bold fs-7 w-175px py-3" data-kt-menu="true">
-                                ${detailItem}
+                                ${detailItem}${approveItem}
                             </div>
                         </div>
                     `;
@@ -388,6 +402,48 @@
 
         const reloadTable = () => dt.ajax.reload();
         searchInput?.addEventListener('keyup', reloadTable);
+
+        tableEl.on('click', '.btn-approve', async function(e) {
+            e.preventDefault();
+            const id = this.getAttribute('data-id');
+            if (!id) return;
+            let confirmed = true;
+            if (typeof Swal !== 'undefined') {
+                const res = await Swal.fire({
+                    title: 'Selesaikan batch ini?',
+                    text: 'Setelah selesai, batch tidak bisa diubah atau ditambah item.',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Selesaikan',
+                    cancelButtonText: 'Batal',
+                    buttonsStyling: false,
+                    customClass: {
+                        confirmButton: 'btn btn-success',
+                        cancelButton: 'btn btn-light'
+                    }
+                });
+                confirmed = res.isConfirmed;
+            }
+            if (!confirmed) return;
+            try {
+                const res = await fetch(approveUrlTpl.replace(':id', id), {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json',
+                    },
+                });
+                const json = await res.json();
+                if (!res.ok) {
+                    if (typeof Swal !== 'undefined') Swal.fire('Error', json.message || 'Gagal menyelesaikan', 'error');
+                    return;
+                }
+                if (typeof Swal !== 'undefined') Swal.fire('Berhasil', json.message || 'Berhasil', 'success');
+                reloadTable();
+            } catch (err) {
+                if (typeof Swal !== 'undefined') Swal.fire('Error', 'Gagal menyelesaikan', 'error');
+            }
+        });
 
         form?.addEventListener('submit', async (e) => {
             e.preventDefault();

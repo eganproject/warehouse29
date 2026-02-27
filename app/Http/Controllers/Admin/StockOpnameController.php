@@ -59,10 +59,11 @@ class StockOpnameController extends Controller
                 'stock_opnames.code',
                 'stock_opnames.transacted_at',
                 'stock_opnames.note',
+                'stock_opnames.status',
                 DB::raw('COUNT(stock_opname_items.id) as items_count'),
                 DB::raw('COALESCE(SUM(stock_opname_items.adjustment), 0) as total_adjustment'),
             ])
-            ->groupBy('stock_opnames.id', 'stock_opnames.code', 'stock_opnames.transacted_at', 'stock_opnames.note')
+            ->groupBy('stock_opnames.id', 'stock_opnames.code', 'stock_opnames.transacted_at', 'stock_opnames.note', 'stock_opnames.status')
             ->orderBy('stock_opnames.transacted_at', 'desc');
 
         $start = (int) $request->input('start', 0);
@@ -80,6 +81,7 @@ class StockOpnameController extends Controller
                 'items_count' => (int) $row->items_count,
                 'total_adjustment' => (int) $row->total_adjustment,
                 'note' => $row->note ?? '',
+                'status' => $row->status ?? 'open',
             ];
         });
 
@@ -106,6 +108,7 @@ class StockOpnameController extends Controller
                 'transacted_at' => $opname->transacted_at?->format('Y-m-d H:i'),
                 'note' => $opname->note ?? '-',
                 'creator' => $opname->creator?->name ?? '-',
+                'status' => $opname->status ?? 'open',
             ],
             'items' => $opname->items->map(function ($row) {
                 return [
@@ -119,6 +122,20 @@ class StockOpnameController extends Controller
                 ];
             })->values(),
         ]);
+    }
+
+    public function approve(int $id)
+    {
+        $opname = StockOpname::findOrFail($id);
+        if (($opname->status ?? 'open') === 'completed') {
+            return response()->json(['message' => 'Stock opname sudah disetujui']);
+        }
+        $opname->status = 'completed';
+        $opname->completed_at = now();
+        $opname->completed_by = auth()->id();
+        $opname->save();
+
+        return response()->json(['message' => 'Stock opname berhasil disetujui']);
     }
 
     public function store(Request $request)

@@ -38,6 +38,7 @@
                         <th>ID</th>
                         <th>Kode</th>
                         <th>Sumber</th>
+                        <th>Status</th>
                         <th>Tanggal</th>
                         <th>Item</th>
                         <th>Qty</th>
@@ -122,6 +123,7 @@
     const showUrlTpl = '{{ route('admin.inventory.damaged-goods.show', ':id') }}';
     const updateUrlTpl = '{{ route('admin.inventory.damaged-goods.update', ':id') }}';
     const deleteUrlTpl = '{{ route('admin.inventory.damaged-goods.destroy', ':id') }}';
+    const approveUrlTpl = '{{ route('admin.inventory.damaged-goods.approve', ':id') }}';
     const csrfToken = '{{ csrf_token() }}';
     const canUpdate = {{ $canUpdate ? 'true' : 'false' }};
     const canDelete = {{ $canDelete ? 'true' : 'false' }};
@@ -148,6 +150,11 @@
         const getJakartaNow = () => {
             const jkt = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
             return formatDateTime(jkt);
+        };
+
+        const statusLabel = (status) => {
+            if (status === 'approved') return '<span class="badge badge-light-success">Disetujui</span>';
+            return '<span class="badge badge-light-warning">Menunggu</span>';
         };
 
         const clearErrors = () => {
@@ -316,14 +323,19 @@
                 { data: 'id' },
                 { data: 'code' },
                 { data: 'source' },
+                { data: 'status', orderable: false, searchable: false, render: (data) => statusLabel(data) },
                 { data: 'transacted_at' },
                 { data: 'item' },
                 { data: 'qty' },
                 { data: 'note' },
-                { data: 'id', orderable: false, searchable: false, className: 'text-end', render: (data) => {
-                    const editItem = canUpdate ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 btn-edit" data-id="${data}">Edit</a></div>` : '';
-                    const delItem = canDelete ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 text-danger btn-delete" data-id="${data}">Hapus</a></div>` : '';
-                    const actions = `${editItem}${delItem}`;
+                { data: 'id', orderable: false, searchable: false, className: 'text-end', render: (data, type, row) => {
+                    const isApproved = row?.status === 'approved';
+                    const approveItem = (!isApproved && canUpdate)
+                        ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 text-success btn-approve" data-id="${data}">Approve</a></div>`
+                        : '';
+                    const editItem = (!isApproved && canUpdate) ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 btn-edit" data-id="${data}">Edit</a></div>` : '';
+                    const delItem = (!isApproved && canDelete) ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 text-danger btn-delete" data-id="${data}">Hapus</a></div>` : '';
+                    const actions = `${approveItem}${editItem}${delItem}`;
                     if (!actions) return '';
                     return `
                         <div class="text-end">
@@ -435,6 +447,48 @@
             } catch (err) {
                 console.error(err);
                 if (typeof Swal !== 'undefined') Swal.fire('Error', 'Gagal menghapus', 'error');
+            }
+        });
+
+        tableEl.on('click', '.btn-approve', async function(e) {
+            e.preventDefault();
+            const id = this.getAttribute('data-id');
+            if (!id) return;
+            let confirmed = true;
+            if (typeof Swal !== 'undefined') {
+                const res = await Swal.fire({
+                    title: 'Setujui data ini?',
+                    text: 'Setelah disetujui, data tidak bisa diubah atau dihapus.',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Approve',
+                    cancelButtonText: 'Batal',
+                    buttonsStyling: false,
+                    customClass: {
+                        confirmButton: 'btn btn-success',
+                        cancelButton: 'btn btn-light'
+                    }
+                });
+                confirmed = res.isConfirmed;
+            }
+            if (!confirmed) return;
+            try {
+                const res = await fetch(approveUrlTpl.replace(':id', id), {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json',
+                    },
+                });
+                const json = await res.json();
+                if (!res.ok) {
+                    if (typeof Swal !== 'undefined') Swal.fire('Error', json.message || 'Gagal menyetujui', 'error');
+                    return;
+                }
+                if (typeof Swal !== 'undefined') Swal.fire('Berhasil', json.message || 'Berhasil', 'success');
+                reloadTable();
+            } catch (err) {
+                if (typeof Swal !== 'undefined') Swal.fire('Error', 'Gagal menyetujui', 'error');
             }
         });
 
