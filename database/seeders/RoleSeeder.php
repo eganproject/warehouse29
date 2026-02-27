@@ -14,6 +14,7 @@ class RoleSeeder extends Seeder
             ['name' => 'Administrator', 'slug' => 'admin', 'description' => 'Full access to system'],
             ['name' => 'User', 'slug' => 'user', 'description' => 'Standard user role'],
             ['name' => 'Picker', 'slug' => 'picker', 'description' => 'Picker mobile role'],
+            ['name' => 'Packer', 'slug' => 'packer', 'description' => 'Packer mobile role'],
         ];
 
         foreach ($roles as $role) {

@@ -15,12 +15,14 @@ class RestrictPickerAccess
             return $next($request);
         }
 
-        $hasPicker = $user->roles()->where('slug', 'picker')->exists();
-        if (!$hasPicker) {
+        $roles = $user->roles()->pluck('slug');
+        $hasPicker = $roles->contains('picker');
+        $hasPacker = $roles->contains('packer');
+        if (!$hasPicker && !$hasPacker) {
             return $next($request);
         }
 
-        $hasOtherRoles = $user->roles()->where('slug', '!=', 'picker')->exists();
+        $hasOtherRoles = $roles->diff(['picker', 'packer'])->isNotEmpty();
         if ($hasOtherRoles) {
             return $next($request);
         }
@@ -31,9 +33,16 @@ class RestrictPickerAccess
         $isPickerRoute = str_starts_with($routeName, 'picker.') || str_starts_with($path, 'picker');
         $isOpnameRoute = str_starts_with($routeName, 'opname.') || str_starts_with($path, 'opname');
         $isLogoutRoute = $routeName === 'logout';
+        $isDashboardRoute = $routeName === 'picker.dashboard' || $path === 'picker/dashboard';
 
-        if ($isPickerRoute || $isOpnameRoute || $isLogoutRoute) {
-            return $next($request);
+        if ($hasPicker) {
+            if ($isPickerRoute || $isOpnameRoute || $isLogoutRoute) {
+                return $next($request);
+            }
+        } elseif ($hasPacker) {
+            if ($isDashboardRoute || $isOpnameRoute || $isLogoutRoute) {
+                return $next($request);
+            }
         }
 
         if ($request->expectsJson()) {
@@ -42,6 +51,6 @@ class RestrictPickerAccess
             ], 403);
         }
 
-        return redirect()->route('picker.index');
+        return redirect()->route('picker.dashboard');
     }
 }

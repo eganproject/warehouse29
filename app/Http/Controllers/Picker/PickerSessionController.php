@@ -23,6 +23,7 @@ class PickerSessionController extends Controller
         return view('picker/session', [
             'session' => $session ? $this->serializeSession($session) : null,
             'routes' => [
+                'dashboard' => route('picker.dashboard'),
                 'start' => route('picker.start'),
                 'current' => route('picker.current'),
                 'itemsStore' => route('picker.items.store'),

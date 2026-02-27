@@ -28,6 +28,17 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
+        $user = $request->user();
+        if ($user) {
+            $roles = $user->roles()->pluck('slug');
+            $hasPicker = $roles->contains('picker');
+            $hasPacker = $roles->contains('packer');
+            $hasOtherRoles = $roles->diff(['picker', 'packer'])->isNotEmpty();
+            if (!$hasOtherRoles && ($hasPicker || $hasPacker)) {
+                return redirect()->route('picker.dashboard');
+            }
+        }
+
         return redirect()->intended(route('dashboard', absolute: false));
     }
 

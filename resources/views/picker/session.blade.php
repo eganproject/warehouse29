@@ -33,6 +33,14 @@
     .result-info .address-line {
         margin-top: 6px;
     }
+    .topbar-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .topbar-actions form {
+        margin: 0;
+    }
 </style>
 
 <div class="screen">
@@ -41,10 +49,13 @@
             <div class="brand">Gudang 29</div>
             <div class="subtitle">Picker Mobile Input</div>
         </div>
-        <form method="POST" action="{{ route('logout') }}">
-            @csrf
-            <button type="submit" class="logout">Logout</button>
-        </form>
+        <div class="topbar-actions">
+            <a href="{{ $routes['dashboard'] }}" class="logout">Dashboard</a>
+            <form method="POST" action="{{ route('logout') }}">
+                @csrf
+                <button type="submit" class="logout">Logout</button>
+            </form>
+        </div>
     </div>
 
     <div class="card" id="session_card">
