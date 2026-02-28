@@ -95,6 +95,17 @@
     .summary-line strong {
         color: var(--text);
     }
+    .bottom-actions {
+        display: grid;
+        gap: 8px;
+        justify-items: end;
+    }
+    .bottom-actions .primary-btn {
+        width: auto;
+        padding: 10px 12px;
+        font-size: 12px;
+        border-radius: 12px;
+    }
     .topbar-actions {
         display: flex;
         align-items: center;
@@ -130,7 +141,6 @@
         <div style="margin-top:10px; display:grid; gap:8px;">
             <button type="button" class="primary-btn" id="btn_create_batch">Buat Batch Baru</button>
             <button type="button" class="sync-btn" id="btn_sync_batch">Sinkronkan Batch</button>
-            <button type="button" class="primary-btn" id="btn_complete_batch">Selesaikan Batch</button>
         </div>
         <div class="batch-info" id="batch_info" style="display:none;"></div>
     </div>
@@ -158,7 +168,10 @@
                 Total qty dihitung: <strong id="total_counted">0</strong>
             </div>
         </div>
-        <div class="chip" id="batch_code_chip">Belum ada batch</div>
+        <div class="bottom-actions">
+            <div class="chip" id="batch_code_chip">Belum ada batch</div>
+            <button type="button" class="primary-btn" id="btn_complete_batch">Selesaikan Batch</button>
+        </div>
     </div>
 </div>
 
@@ -231,6 +244,7 @@
             el.batchChip.textContent = 'Belum ada batch';
             el.searchCard.classList.add('disabled');
             el.btnComplete.classList.add('disabled');
+            if (el.btnCreate) el.btnCreate.style.display = '';
             return;
         }
         el.batchCode.value = state.batch.code || '';
@@ -247,6 +261,7 @@
         el.searchCard.classList.toggle('disabled', isCompleted);
         el.btnComplete.classList.toggle('disabled', isCompleted);
         el.btnComplete.textContent = isCompleted ? 'Batch Selesai' : 'Selesaikan Batch';
+        if (el.btnCreate) el.btnCreate.style.display = isCompleted ? '' : 'none';
     };
 
     const renderItems = () => {
