@@ -7,12 +7,14 @@ use App\Models\InboundItem;
 use App\Models\InboundTransaction;
 use App\Models\Item;
 use App\Models\StockMutation;
+use App\Imports\InboundReceiptsImport;
 use App\Support\StockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Maatwebsite\Excel\Facades\Excel;
 
 class InboundController extends Controller
 {
@@ -136,6 +138,90 @@ class InboundController extends Controller
         return $this->approve('manual', $id);
     }
 
+    public function receiptsImport(Request $request)
+    {
+        $request->validate([
+            'file' => ['required', 'file', 'mimes:xlsx,xls', 'max:5120'],
+        ]);
+
+        $import = new InboundReceiptsImport();
+        DB::beginTransaction();
+        try {
+            Excel::import($import, $request->file('file'));
+            $groups = $import->groups ?? [];
+            if (empty($groups)) {
+                throw ValidationException::withMessages([
+                    'file' => 'Tidak ada data valid untuk diimport',
+                ]);
+            }
+
+            $createdTx = 0;
+            $createdItems = 0;
+            foreach ($groups as $group) {
+                $transactedAt = now();
+                if (!empty($group['transacted_at'])) {
+                    try {
+                        $transactedAt = Carbon::parse($group['transacted_at']);
+                    } catch (\Throwable $e) {
+                        throw ValidationException::withMessages([
+                            'file' => 'Format transacted_at tidak valid: '.$group['transacted_at'],
+                        ]);
+                    }
+                }
+                $tx = InboundTransaction::create([
+                    'code' => $this->generateCode('INB-RCV'),
+                    'type' => 'receipt',
+                    'ref_no' => $group['ref_no'] ?? null,
+                    'note' => $group['note'] ?? null,
+                    'transacted_at' => $transactedAt,
+                    'created_by' => auth()->id(),
+                    'status' => 'pending',
+                ]);
+                $createdTx++;
+
+                foreach ($group['items'] as $row) {
+                    InboundItem::create([
+                        'inbound_transaction_id' => $tx->id,
+                        'item_id' => $row['item_id'],
+                        'qty' => $row['qty'],
+                        'note' => $row['note'] ?? null,
+                    ]);
+                    $createdItems++;
+
+                    StockService::mutate([
+                        'item_id' => $row['item_id'],
+                        'direction' => 'in',
+                        'qty' => $row['qty'],
+                        'source_type' => 'inbound',
+                        'source_subtype' => 'receipt',
+                        'source_id' => $tx->id,
+                        'source_code' => $tx->code,
+                        'note' => $row['note'] ?? null,
+                        'occurred_at' => $transactedAt,
+                        'created_by' => auth()->id(),
+                    ]);
+                }
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Import penerimaan barang berhasil',
+                'transactions' => $createdTx,
+                'items' => $createdItems,
+            ]);
+        } catch (ValidationException $e) {
+            DB::rollBack();
+            throw $e;
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Gagal import penerimaan barang',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
     private function index(string $type, string $pageTitle, string $routeBase)
     {
         $items = Item::orderBy('name')->get(['id', 'sku', 'name']);
@@ -180,6 +266,7 @@ class InboundController extends Controller
             'typeOptions' => $typeOptions,
             'typeDefault' => $type,
             'routeMap' => $routeMap,
+            'importUrl' => $type === 'receipt' ? route('admin.inbound.receipts.import') : null,
         ]);
     }
 

@@ -142,6 +142,7 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         Route::get('/receipts', [InboundController::class, 'receipts'])->name('receipts.index');
         Route::get('/receipts/data', [InboundController::class, 'receiptsData'])->name('receipts.data');
         Route::post('/receipts', [InboundController::class, 'receiptsStore'])->name('receipts.store');
+        Route::post('/receipts/import', [InboundController::class, 'receiptsImport'])->name('receipts.import');
         Route::get('/receipts/{id}', [InboundController::class, 'receiptsShow'])->name('receipts.show');
         Route::put('/receipts/{id}', [InboundController::class, 'receiptsUpdate'])->name('receipts.update');
         Route::delete('/receipts/{id}', [InboundController::class, 'receiptsDestroy'])->name('receipts.destroy');
