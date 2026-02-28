@@ -318,6 +318,25 @@
 
     const completeBatch = async () => {
         if (!state.batch?.code) return;
+        const rows = Array.from(el.itemsList.querySelectorAll('.item-row'));
+        const pendingUpdates = [];
+        const stateMap = new Map((state.items || []).map((row) => [String(row.id), row]));
+
+        for (const row of rows) {
+            const rowId = row.getAttribute('data-id');
+            const qtyInput = row.querySelector('.qty-input');
+            const qty = parseInt(qtyInput?.value || '0', 10);
+            if (Number.isNaN(qty) || qty < 0) {
+                Swal?.fire('Error', 'Qty tidak valid pada salah satu item.', 'error');
+                return;
+            }
+            const current = stateMap.get(String(rowId));
+            const currentQty = current ? parseInt(current.counted_qty || 0, 10) : null;
+            if (currentQty === null || qty !== currentQty) {
+                pendingUpdates.push({ id: rowId, qty });
+            }
+        }
+
         const confirmed = typeof Swal !== 'undefined'
             ? await Swal.fire({
                 icon: 'warning',
@@ -329,6 +348,16 @@
             }).then(res => res.isConfirmed)
             : confirm('Selesaikan batch?');
         if (!confirmed) return;
+
+        for (const update of pendingUpdates) {
+            try {
+                await updateItem(update.id, update.qty, true);
+            } catch (err) {
+                Swal?.fire('Error', err.message || 'Gagal menyimpan perubahan item', 'error');
+                return;
+            }
+        }
+
         const url = routes.batchComplete.replace('__CODE__', encodeURIComponent(state.batch.code));
         const json = await fetchJson(url, { method: 'POST' });
         setBatch(json);
@@ -382,7 +411,7 @@
         el.searchResults.innerHTML = '';
     };
 
-    const updateItem = async (rowId, qty) => {
+    const updateItem = async (rowId, qty, silent = false) => {
         if (!state.batch) return;
         const url = routes.itemsUpdate
             .replace('__CODE__', encodeURIComponent(state.batch.code))
@@ -392,6 +421,14 @@
         payload.append('counted_qty', qty);
         const json = await fetchJson(url, { method: 'POST', body: payload });
         setBatch(json);
+        if (!silent && typeof Swal !== 'undefined') {
+            Swal.fire({
+                icon: 'success',
+                title: 'Tersimpan',
+                text: 'Perubahan item berhasil disimpan.',
+                confirmButtonText: 'OK',
+            });
+        }
     };
 
     const removeItem = async (rowId) => {
