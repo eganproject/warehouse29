@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Divisi;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -21,7 +22,7 @@ class UserController extends Controller
 
     public function data(Request $request)
     {
-        $query = User::with('roles:id,name')->orderBy('name');
+        $query = User::with('roles:id,name', 'divisi:id,name')->orderBy('name');
 
         if ($roleId = $request->integer('role_id')) {
             $query->whereHas('roles', fn ($q) => $q->where('roles.id', $roleId));
@@ -30,7 +31,10 @@ class UserController extends Controller
         if ($search = trim((string) $request->input('q', ''))) {
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%");
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhereHas('divisi', function ($dq) use ($search) {
+                        $dq->where('name', 'like', "%{$search}%");
+                    });
             });
         }
 
@@ -40,6 +44,7 @@ class UserController extends Controller
                 'name' => $u->name,
                 'email' => $u->email,
                 'avatar_url' => $u->avatar_url,
+                'divisi' => $u->divisi?->name ?? '-',
                 'roles' => $u->roles->pluck('name')->implode(', '),
             ];
         });
@@ -50,7 +55,8 @@ class UserController extends Controller
     public function create()
     {
         $roles = Role::orderBy('name')->get();
-        return view('admin.masterdata.users.create', compact('roles'));
+        $divisis = Divisi::orderBy('name')->get(['id', 'name']);
+        return view('admin.masterdata.users.create', compact('roles', 'divisis'));
     }
 
     public function store(Request $request)
@@ -62,6 +68,7 @@ class UserController extends Controller
             'roles' => ['nullable','array'],
             'roles.*' => ['integer','exists:roles,id'],
             'avatar' => ['nullable','image','mimes:jpg,jpeg,png','max:2048'],
+            'divisi_id' => ['nullable','integer','exists:divisis,id'],
         ]);
         $avatarPath = null;
         $storedAvatar = null;
@@ -79,6 +86,7 @@ class UserController extends Controller
                 'password' => Hash::make($validated['password']),
                 'avatar' => $avatarPath ?: User::defaultAvatar(),
                 'email_verified_at' => now(),
+                'divisi_id' => $validated['divisi_id'] ?? null,
             ]);
             if (!empty($validated['roles'])) {
                 $user->roles()->sync($validated['roles']);
@@ -99,7 +107,8 @@ class UserController extends Controller
     {
         $roles = Role::orderBy('name')->get();
         $user->load('roles');
-        return view('admin.masterdata.users.edit', compact('user','roles'));
+        $divisis = Divisi::orderBy('name')->get(['id', 'name']);
+        return view('admin.masterdata.users.edit', compact('user','roles','divisis'));
     }
 
     public function update(Request $request, User $user)
@@ -111,10 +120,12 @@ class UserController extends Controller
             'roles' => ['nullable','array'],
             'roles.*' => ['integer','exists:roles,id'],
             'avatar' => ['nullable','image','mimes:jpg,jpeg,png','max:2048'],
+            'divisi_id' => ['nullable','integer','exists:divisis,id'],
         ]);
         $update = [
             'name' => $validated['name'],
             'email' => $validated['email'],
+            'divisi_id' => $validated['divisi_id'] ?? null,
         ];
         if (!empty($validated['password'])) {
             $update['password'] = Hash::make($validated['password']);

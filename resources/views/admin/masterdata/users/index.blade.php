@@ -65,6 +65,7 @@
                         <th>Avatar</th>
                         <th>Nama</th>
                         <th>Email</th>
+                        <th>Divisi</th>
                         <th>Roles</th>
                         <th class="text-end">Aksi</th>
                     </tr>
@@ -128,6 +129,7 @@
                 { data: 'avatar_url', orderable:false, searchable:false, render: (data)=>`<img src="${data}" alt="avatar" class="w-40px h-40px rounded-circle object-cover">` },
                 { data: 'name' },
                 { data: 'email' },
+                { data: 'divisi' },
                 { data: 'roles' },
                 { data: 'id', orderable:false, searchable:false, className:'text-end', render: (data)=>{
                     const editUrl = editTpl.replace(':id', data);

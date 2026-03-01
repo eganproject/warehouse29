@@ -14,6 +14,7 @@ use App\Http\Controllers\Admin\PickerHistoryController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\MenuController;
 use App\Http\Controllers\Admin\PermissionController;
+use App\Http\Controllers\Admin\DivisiController;
 use App\Http\Controllers\Mobile\StockOpnameMobileController;
 use App\Http\Controllers\Picker\PickerDashboardController;
 use App\Http\Controllers\Picker\PickerSessionController;
@@ -77,6 +78,10 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         Route::get('/roles/data', [RoleController::class, 'data'])->name('roles.data');
         // Roles CRUD
         Route::resource('roles', RoleController::class)->except(['show'])->names('roles');
+
+        // Divisi
+        Route::get('/divisi/data', [DivisiController::class, 'data'])->name('divisi.data');
+        Route::resource('divisi', DivisiController::class)->except(['create','show','edit'])->names('divisi');
 
         // Menus DataTables
         Route::get('/menus/data', [MenuController::class, 'data'])->name('menus.data');

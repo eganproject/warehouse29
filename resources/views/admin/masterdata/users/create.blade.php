@@ -45,6 +45,16 @@
                         @error('roles')<div class="invalid-feedback">{{ $message }}</div>@enderror
                     </div>
                     <div class="mb-10">
+                        <label class="form-label">Divisi</label>
+                        <select name="divisi_id" class="form-select @error('divisi_id') is-invalid @enderror form-select-solid" data-placeholder="Pilih Divisi">
+                            <option value="">- Pilih Divisi -</option>
+                            @foreach($divisis as $d)
+                                <option value="{{ $d->id }}" @selected(old('divisi_id') == $d->id)>{{ $d->name }}</option>
+                            @endforeach
+                        </select>
+                        @error('divisi_id')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                    </div>
+                    <div class="mb-10">
                         <label class="form-label">Avatar</label>
                         <input type="file" name="avatar" class="form-control @error('avatar') is-invalid @enderror form-control-solid" accept=".jpg,.jpeg,.png" />
                         @error('avatar')<div class="invalid-feedback">{{ $message }}</div>@enderror
