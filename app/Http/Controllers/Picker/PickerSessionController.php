@@ -161,6 +161,7 @@ class PickerSessionController extends Controller
             $session = PickerSession::where('user_id', auth()->id())
                 ->where('status', 'draft')
                 ->lockForUpdate()
+                ->latest('id')
                 ->first();
             if (!$session) {
                 throw ValidationException::withMessages([
