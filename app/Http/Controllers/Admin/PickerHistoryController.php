@@ -213,6 +213,48 @@ class PickerHistoryController extends Controller
         ]);
     }
 
+    public function destroy(Request $request, int $id)
+    {
+        DB::beginTransaction();
+        try {
+            $session = PickerSession::where('id', $id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $authUser = $request->user();
+            if ($authUser && $authUser->divisi_id !== null && (int) $authUser->divisi_id !== 1) {
+                $session->loadMissing('user:id,divisi_id');
+                if ((int) $session->user?->divisi_id !== (int) $authUser->divisi_id) {
+                    DB::rollBack();
+                    return response()->json(['message' => 'Tidak diizinkan'], 403);
+                }
+            }
+
+            if ($session->status !== 'draft') {
+                DB::rollBack();
+                return response()->json(['message' => 'Sesi sudah disubmit dan tidak bisa dihapus'], 422);
+            }
+
+            if ($session->items()->exists()) {
+                DB::rollBack();
+                return response()->json(['message' => 'Sesi berisi item, tidak bisa dihapus'], 422);
+            }
+
+            $session->delete();
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Gagal menghapus sesi',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+
+        return response()->json([
+            'message' => 'Sesi berhasil dihapus',
+        ]);
+    }
+
     private function applyDateFilter($query, Request $request): void
     {
         $dateFrom = $request->input('date_from');

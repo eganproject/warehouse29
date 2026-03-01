@@ -93,6 +93,7 @@
 <script>
     const dataUrl = '{{ $dataUrl }}';
     const submitUrlTpl = '{{ route('admin.outbound.picker-sessions.submit', ':id') }}';
+    const deleteUrlTpl = '{{ route('admin.outbound.picker-sessions.destroy', ':id') }}';
     const csrfToken = '{{ csrf_token() }}';
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -168,13 +169,12 @@
                     if (row?.status !== 'draft') {
                         return '-';
                     }
-                    return `
-                        <div class="text-end">
-                            <a href="#" class="btn btn-sm btn-light btn-active-light-primary btn-submit" data-id="${data}">
-                                Submit
-                            </a>
-                        </div>
-                    `;
+                    const actions = [];
+                    actions.push(`<a href="#" class="btn btn-sm btn-light btn-active-light-primary btn-submit" data-id="${data}">Submit</a>`);
+                    if (Number(row?.qty || 0) === 0) {
+                        actions.push(`<a href="#" class="btn btn-sm btn-light-danger btn-delete" data-id="${data}">Hapus</a>`);
+                    }
+                    return `<div class="text-end d-flex justify-content-end gap-2">${actions.join('')}</div>`;
                 }},
             ]
         });
@@ -282,6 +282,73 @@
                     AppSwal.error('Gagal submit sesi');
                 } else if (typeof Swal !== 'undefined') {
                     Swal.fire('Error', 'Gagal submit sesi', 'error');
+                }
+            }
+        });
+
+        tableEl.on('click', '.btn-delete', async function(e) {
+            e.preventDefault();
+            const id = this.getAttribute('data-id');
+            if (!id) return;
+            let confirmed = true;
+            if (typeof AppSwal !== 'undefined' && AppSwal.confirm) {
+                confirmed = await AppSwal.confirm('Hapus batch kosong ini?', {
+                    confirmButtonText: 'Hapus',
+                });
+            } else if (typeof Swal !== 'undefined') {
+                const res = await Swal.fire({
+                    title: 'Hapus batch?',
+                    text: 'Batch kosong akan dihapus.',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Hapus',
+                    cancelButtonText: 'Batal',
+                    buttonsStyling: false,
+                    customClass: {
+                        confirmButton: 'btn btn-danger',
+                        cancelButton: 'btn btn-light'
+                    }
+                });
+                confirmed = res.isConfirmed;
+            } else {
+                confirmed = window.confirm('Hapus batch kosong ini?');
+            }
+            if (!confirmed) return;
+            try {
+                const res = await fetch(deleteUrlTpl.replace(':id', id), {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: new URLSearchParams({ _method: 'DELETE' }),
+                });
+                const text = await res.text();
+                let json = null;
+                try { json = JSON.parse(text); } catch (err) { json = null; }
+                if (!res.ok) {
+                    const msg = json?.message || 'Gagal menghapus sesi';
+                    if (typeof AppSwal !== 'undefined' && AppSwal.error) {
+                        AppSwal.error(msg);
+                    } else if (typeof Swal !== 'undefined') {
+                        Swal.fire('Error', msg, 'error');
+                    } else {
+                        alert(msg);
+                    }
+                    return;
+                }
+                if (typeof AppSwal !== 'undefined' && AppSwal.success) {
+                    AppSwal.success(json?.message || 'Sesi berhasil dihapus');
+                } else if (typeof Swal !== 'undefined') {
+                    Swal.fire('Berhasil', json?.message || 'Sesi berhasil dihapus', 'success');
+                }
+                dt.ajax.reload(null, false);
+            } catch (err) {
+                if (typeof AppSwal !== 'undefined' && AppSwal.error) {
+                    AppSwal.error('Gagal menghapus sesi');
+                } else if (typeof Swal !== 'undefined') {
+                    Swal.fire('Error', 'Gagal menghapus sesi', 'error');
                 }
             }
         });
