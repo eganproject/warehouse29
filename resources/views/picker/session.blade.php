@@ -271,6 +271,11 @@
     };
 
     const startSession = async () => {
+        if (state.session && state.session.status === 'draft') {
+            renderSession();
+            setSaveStatus('Batch aktif digunakan');
+            return;
+        }
         try {
             setSaveStatus('Membuat sesi...', true);
             const json = await fetchJson(routes.start, { method: 'POST' });

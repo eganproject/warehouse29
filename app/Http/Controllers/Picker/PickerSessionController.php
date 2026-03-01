@@ -47,7 +47,10 @@ class PickerSessionController extends Controller
 
     public function start()
     {
-        $session = $this->ensureDraftSession();
+        $session = $this->currentDraftSession();
+        if (!$session) {
+            $session = $this->ensureDraftSession();
+        }
 
         return response()->json([
             'session' => $this->serializeSession($session),
@@ -265,17 +268,23 @@ class PickerSessionController extends Controller
 
     private function ensureDraftSession(): PickerSession
     {
-        $session = $this->currentDraftSession();
-        if ($session) {
-            return $session;
-        }
+        return DB::transaction(function () {
+            $session = PickerSession::where('user_id', auth()->id())
+                ->where('status', 'draft')
+                ->lockForUpdate()
+                ->latest('id')
+                ->first();
+            if ($session) {
+                return $session;
+            }
 
-        return PickerSession::create([
-            'code' => $this->generateCode('PKR'),
-            'user_id' => auth()->id(),
-            'status' => 'draft',
-            'started_at' => now(),
-        ]);
+            return PickerSession::create([
+                'code' => $this->generateCode('PKR'),
+                'user_id' => auth()->id(),
+                'status' => 'draft',
+                'started_at' => now(),
+            ]);
+        });
     }
 
     private function serializeSession(PickerSession $session): array
