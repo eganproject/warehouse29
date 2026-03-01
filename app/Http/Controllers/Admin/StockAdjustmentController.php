@@ -46,6 +46,8 @@ class StockAdjustmentController extends Controller
             });
         }
 
+        $this->applyDateFilter($query, $request);
+
         $recordsTotal = StockAdjustment::count();
         $recordsFiltered = (clone $query)->count();
 
@@ -325,5 +327,24 @@ class StockAdjustmentController extends Controller
     private function generateCode(string $prefix): string
     {
         return $prefix.'-'.now()->format('YmdHis').'-'.Str::upper(Str::random(4));
+    }
+
+    private function applyDateFilter($query, Request $request): void
+    {
+        $dateFrom = $request->input('date_from');
+        $dateTo = $request->input('date_to');
+
+        try {
+            if ($dateFrom) {
+                $from = Carbon::parse($dateFrom)->startOfDay();
+                $query->where('stock_adjustments.transacted_at', '>=', $from);
+            }
+            if ($dateTo) {
+                $to = Carbon::parse($dateTo)->endOfDay();
+                $query->where('stock_adjustments.transacted_at', '<=', $to);
+            }
+        } catch (\Throwable) {
+            // ignore invalid date filters
+        }
     }
 }

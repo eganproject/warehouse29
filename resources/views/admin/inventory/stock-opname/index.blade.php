@@ -24,6 +24,12 @@
             </div>
         </div>
         <div class="card-toolbar">
+            <div class="d-flex align-items-center gap-2 me-4">
+                <input type="text" class="form-control form-control-solid w-150px" id="filter_date_from" placeholder="Dari" />
+                <input type="text" class="form-control form-control-solid w-150px" id="filter_date_to" placeholder="Sampai" />
+                <button type="button" class="btn btn-light" id="filter_apply">Filter</button>
+                <button type="button" class="btn btn-light" id="filter_reset">Reset</button>
+            </div>
             @if($canCreate)
                 <button type="button" class="btn btn-primary" id="btn_open_opname" data-bs-toggle="modal" data-bs-target="#modal_stock_opname">Tambah</button>
             @endif
@@ -170,6 +176,12 @@
         const addItemBtn = document.getElementById('btn_add_opname_item');
         const openBtn = document.getElementById('btn_open_opname');
         const transactedAtEl = document.getElementById('opname_transacted_at');
+        const dateFromEl = document.getElementById('filter_date_from');
+        const dateToEl = document.getElementById('filter_date_to');
+        const filterApplyBtn = document.getElementById('filter_apply');
+        const filterResetBtn = document.getElementById('filter_reset');
+        let fpFrom = null;
+        let fpTo = null;
         let fpTransacted = null;
 
         const formatDateTime = (date) => {
@@ -238,6 +250,18 @@
                     .on('select2:opening select2:closing select2:close', function(e){ e.stopPropagation(); });
             }
         };
+
+        if (typeof flatpickr !== 'undefined') {
+            if (dateFromEl) {
+                fpFrom = flatpickr(dateFromEl, { dateFormat: 'Y-m-d', allowInput: true });
+            }
+            if (dateToEl) {
+                fpTo = flatpickr(dateToEl, { dateFormat: 'Y-m-d', allowInput: true });
+            }
+            if (transactedAtEl) {
+                fpTransacted = flatpickr(transactedAtEl, { enableTime: true, dateFormat: 'Y-m-d H:i', allowInput: true });
+            }
+        }
 
         const renumberRows = () => {
             const rows = itemsContainer.querySelectorAll('.opname-item-row');
@@ -342,10 +366,6 @@
         addItemBtn?.addEventListener('click', () => createItemRow());
         openBtn?.addEventListener('click', resetForm);
 
-        if (typeof flatpickr !== 'undefined' && transactedAtEl) {
-            fpTransacted = flatpickr(transactedAtEl, { enableTime: true, dateFormat: 'Y-m-d H:i', allowInput: true });
-        }
-
         if (!tableEl.length || !$.fn.DataTable) {
             console.error('DataTables unavailable');
             return;
@@ -361,6 +381,8 @@
                 dataSrc: 'data',
                 data: function(params) {
                     params.q = searchInput?.value || '';
+                    if (dateFromEl?.value) params.date_from = dateFromEl.value;
+                    if (dateToEl?.value) params.date_to = dateToEl.value;
                 }
             },
             columns: [
@@ -402,6 +424,12 @@
 
         const reloadTable = () => dt.ajax.reload();
         searchInput?.addEventListener('keyup', reloadTable);
+        filterApplyBtn?.addEventListener('click', reloadTable);
+        filterResetBtn?.addEventListener('click', () => {
+            if (fpFrom) fpFrom.clear(); else if (dateFromEl) dateFromEl.value = '';
+            if (fpTo) fpTo.clear(); else if (dateToEl) dateToEl.value = '';
+            reloadTable();
+        });
 
         tableEl.on('click', '.btn-approve', async function(e) {
             e.preventDefault();

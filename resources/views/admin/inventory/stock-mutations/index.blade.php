@@ -17,6 +17,14 @@
                 <input type="text" class="form-control form-control-solid w-250px ps-14" placeholder="Search" data-kt-filter="search" />
             </div>
         </div>
+        <div class="card-toolbar">
+            <div class="d-flex align-items-center gap-2">
+                <input type="text" class="form-control form-control-solid w-150px" id="filter_date_from" placeholder="Dari" />
+                <input type="text" class="form-control form-control-solid w-150px" id="filter_date_to" placeholder="Sampai" />
+                <button type="button" class="btn btn-light" id="filter_apply">Filter</button>
+                <button type="button" class="btn btn-light" id="filter_reset">Reset</button>
+            </div>
+        </div>
     </div>
     <div class="card-body py-6">
         <div class="table-responsive">
@@ -155,10 +163,25 @@
     document.addEventListener('DOMContentLoaded', () => {
         const tableEl = $('#stock_mutations_table');
         const searchInput = document.querySelector('[data-kt-filter="search"]');
+        const dateFromEl = document.getElementById('filter_date_from');
+        const dateToEl = document.getElementById('filter_date_to');
+        const filterApplyBtn = document.getElementById('filter_apply');
+        const filterResetBtn = document.getElementById('filter_reset');
+        let fpFrom = null;
+        let fpTo = null;
 
         if (!tableEl.length || !$.fn.DataTable) {
             console.error('DataTables unavailable');
             return;
+        }
+
+        if (typeof flatpickr !== 'undefined') {
+            if (dateFromEl) {
+                fpFrom = flatpickr(dateFromEl, { dateFormat: 'Y-m-d', allowInput: true });
+            }
+            if (dateToEl) {
+                fpTo = flatpickr(dateToEl, { dateFormat: 'Y-m-d', allowInput: true });
+            }
         }
 
         const dt = tableEl.DataTable({
@@ -171,6 +194,8 @@
                 dataSrc: 'data',
                 data: function(params) {
                     params.q = searchInput?.value || '';
+                    if (dateFromEl?.value) params.date_from = dateFromEl.value;
+                    if (dateToEl?.value) params.date_to = dateToEl.value;
                 }
             },
             columns: [
@@ -210,6 +235,12 @@
 
         const reloadTable = () => dt.ajax.reload();
         searchInput?.addEventListener('keyup', reloadTable);
+        filterApplyBtn?.addEventListener('click', reloadTable);
+        filterResetBtn?.addEventListener('click', () => {
+            if (fpFrom) fpFrom.clear(); else if (dateFromEl) dateFromEl.value = '';
+            if (fpTo) fpTo.clear(); else if (dateToEl) dateToEl.value = '';
+            reloadTable();
+        });
 
         const modalEl = document.getElementById('modal_mutation_detail');
         const modal = modalEl ? new bootstrap.Modal(modalEl) : null;

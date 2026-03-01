@@ -42,6 +42,8 @@ class StockMutationController extends Controller
             });
         }
 
+        $this->applyDateFilter($query, $request);
+
         $recordsTotal = StockMutation::count();
         $recordsFiltered = (clone $query)->count();
 
@@ -75,6 +77,25 @@ class StockMutationController extends Controller
             'recordsFiltered' => $recordsFiltered,
             'data' => $data,
         ]);
+    }
+
+    private function applyDateFilter($query, Request $request): void
+    {
+        $dateFrom = $request->input('date_from');
+        $dateTo = $request->input('date_to');
+
+        try {
+            if ($dateFrom) {
+                $from = Carbon::parse($dateFrom)->startOfDay();
+                $query->where('occurred_at', '>=', $from);
+            }
+            if ($dateTo) {
+                $to = Carbon::parse($dateTo)->endOfDay();
+                $query->where('occurred_at', '<=', $to);
+            }
+        } catch (\Throwable) {
+            // ignore invalid date filters
+        }
     }
 
     public function show(int $id)

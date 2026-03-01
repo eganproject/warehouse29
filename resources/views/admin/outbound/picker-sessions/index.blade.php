@@ -17,6 +17,45 @@
                 <input type="text" class="form-control form-control-solid w-250px ps-14" placeholder="Search" data-kt-filter="search" />
             </div>
         </div>
+        <div class="card-toolbar">
+            <div class="d-flex align-items-center gap-2 me-4">
+                <input type="text" class="form-control form-control-solid w-150px" id="filter_date_from" placeholder="Dari" />
+                <input type="text" class="form-control form-control-solid w-150px" id="filter_date_to" placeholder="Sampai" />
+                <button type="button" class="btn btn-light" id="filter_date_apply">Filter</button>
+                <button type="button" class="btn btn-light" id="filter_date_reset">Reset</button>
+            </div>
+            <div class="d-flex justify-content-end" data-kt-user-table-toolbar="base">
+                <button type="button" class="btn btn-light-primary me-3" data-kt-menu-trigger="click" data-kt-menu-placement="bottom-end">
+                    <span class="svg-icon svg-icon-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                            <path d="M19.0759 3H4.72777C3.95892 3 3.47768 3.83148 3.86067 4.49814L8.56967 12.6949C9.17923 13.7559 9.5 14.9582 9.5 16.1819V19.5072C9.5 20.2189 10.2223 20.7028 10.8805 20.432L13.8805 19.1977C14.2553 19.0435 14.5 18.6783 14.5 18.273V13.8372C14.5 12.8089 14.8171 11.8056 15.408 10.964L19.8943 4.57465C20.3596 3.912 19.8856 3 19.0759 3Z" fill="black" />
+                        </svg>
+                    </span>
+                    Filter
+                </button>
+                <div class="menu menu-sub menu-sub-dropdown w-300px w-md-325px" data-kt-menu="true">
+                    <div class="px-7 py-5">
+                        <div class="fs-5 text-dark fw-bolder">Filter Options</div>
+                    </div>
+                    <div class="separator border-gray-200"></div>
+                    <div class="px-7 py-5">
+                        <div class="mb-10">
+                            <label class="form-label fs-6 fw-bold">User:</label>
+                            <select id="filter_picker_user" class="form-select form-select-solid fw-bolder" data-placeholder="Select option" data-allow-clear="true">
+                                <option value="">Semua</option>
+                                @foreach($users as $u)
+                                    <option value="{{ $u->id }}">{{ $u->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="d-flex justify-content-end">
+                            <button type="button" class="btn btn-light btn-active-light-primary me-2" id="filter_picker_reset">Reset</button>
+                            <button type="button" class="btn btn-primary" id="filter_picker_apply">Apply</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
     <div class="card-body py-6">
         <div class="table-responsive">
@@ -48,10 +87,28 @@
     document.addEventListener('DOMContentLoaded', () => {
         const tableEl = $('#picker_sessions_table');
         const searchInput = document.querySelector('[data-kt-filter="search"]');
+        const applyBtn = document.getElementById('filter_picker_apply');
+        const resetBtn = document.getElementById('filter_picker_reset');
+        const userSelect = document.getElementById('filter_picker_user');
+        const dateFromEl = document.getElementById('filter_date_from');
+        const dateToEl = document.getElementById('filter_date_to');
+        const dateApplyBtn = document.getElementById('filter_date_apply');
+        const dateResetBtn = document.getElementById('filter_date_reset');
+        let fpFrom = null;
+        let fpTo = null;
 
         if (!tableEl.length || !$.fn.DataTable) {
             console.error('DataTables unavailable');
             return;
+        }
+
+        if (typeof flatpickr !== 'undefined') {
+            if (dateFromEl) {
+                fpFrom = flatpickr(dateFromEl, { dateFormat: 'Y-m-d', allowInput: true });
+            }
+            if (dateToEl) {
+                fpTo = flatpickr(dateToEl, { dateFormat: 'Y-m-d', allowInput: true });
+            }
         }
 
         const dt = tableEl.DataTable({
@@ -64,6 +121,9 @@
                 dataSrc: 'data',
                 data: function(params) {
                     params.q = searchInput?.value || '';
+                    params.user_id = userSelect?.value || '';
+                    if (dateFromEl?.value) params.date_from = dateFromEl.value;
+                    if (dateToEl?.value) params.date_to = dateToEl.value;
                 }
             },
             columns: [
@@ -86,6 +146,17 @@
 
         const reloadTable = () => dt.ajax.reload();
         searchInput?.addEventListener('keyup', reloadTable);
+        applyBtn?.addEventListener('click', reloadTable);
+        resetBtn?.addEventListener('click', () => {
+            if (userSelect) userSelect.value = '';
+            reloadTable();
+        });
+        dateApplyBtn?.addEventListener('click', reloadTable);
+        dateResetBtn?.addEventListener('click', () => {
+            if (fpFrom) fpFrom.clear(); else if (dateFromEl) dateFromEl.value = '';
+            if (fpTo) fpTo.clear(); else if (dateToEl) dateToEl.value = '';
+            reloadTable();
+        });
     });
 </script>
 @endpush
