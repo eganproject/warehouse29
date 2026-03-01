@@ -41,11 +41,19 @@
                     <div class="px-7 py-5">
                         <div class="mb-10">
                             <label class="form-label fs-6 fw-bold">User:</label>
-                            <select id="filter_picker_user" class="form-select form-select-solid fw-bolder" data-placeholder="Select option" data-allow-clear="true">
+                            <select id="filter_picker_user" class="form-select form-select-solid fw-bolder" data-control="select2" data-placeholder="Select option" data-allow-clear="true">
                                 <option value="">Semua</option>
                                 @foreach($users as $u)
                                     <option value="{{ $u->id }}">{{ $u->name }}</option>
                                 @endforeach
+                            </select>
+                        </div>
+                        <div class="mb-10">
+                            <label class="form-label fs-6 fw-bold">Status:</label>
+                            <select id="filter_picker_status" class="form-select form-select-solid fw-bolder" data-control="select2" data-placeholder="Select option" data-allow-clear="true">
+                                <option value="">Semua</option>
+                                <option value="draft">Draft</option>
+                                <option value="submitted">Submitted</option>
                             </select>
                         </div>
                         <div class="d-flex justify-content-end">
@@ -90,12 +98,23 @@
         const applyBtn = document.getElementById('filter_picker_apply');
         const resetBtn = document.getElementById('filter_picker_reset');
         const userSelect = document.getElementById('filter_picker_user');
+        const statusSelect = document.getElementById('filter_picker_status');
         const dateFromEl = document.getElementById('filter_date_from');
         const dateToEl = document.getElementById('filter_date_to');
         const dateApplyBtn = document.getElementById('filter_date_apply');
         const dateResetBtn = document.getElementById('filter_date_reset');
         let fpFrom = null;
         let fpTo = null;
+
+        const select2Safe = (el, placeholder) => {
+            if (el && typeof $ !== 'undefined' && $.fn.select2) {
+                $(el).select2({ placeholder, allowClear: true, width: '100%' })
+                    .on('select2:opening select2:closing select2:close', function(e){ e.stopPropagation(); });
+            }
+        };
+
+        select2Safe(userSelect, 'Semua');
+        select2Safe(statusSelect, 'Semua');
 
         if (!tableEl.length || !$.fn.DataTable) {
             console.error('DataTables unavailable');
@@ -122,6 +141,7 @@
                 data: function(params) {
                     params.q = searchInput?.value || '';
                     params.user_id = userSelect?.value || '';
+                    params.status = statusSelect?.value || '';
                     if (dateFromEl?.value) params.date_from = dateFromEl.value;
                     if (dateToEl?.value) params.date_to = dateToEl.value;
                 }
@@ -149,6 +169,13 @@
         applyBtn?.addEventListener('click', reloadTable);
         resetBtn?.addEventListener('click', () => {
             if (userSelect) userSelect.value = '';
+            if (statusSelect) statusSelect.value = '';
+            if (typeof $ !== 'undefined' && $(userSelect).data('select2')) {
+                $(userSelect).val('').trigger('change.select2');
+            }
+            if (typeof $ !== 'undefined' && $(statusSelect).data('select2')) {
+                $(statusSelect).val('').trigger('change.select2');
+            }
             reloadTable();
         });
         dateApplyBtn?.addEventListener('click', reloadTable);

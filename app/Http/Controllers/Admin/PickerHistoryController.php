@@ -66,6 +66,11 @@ class PickerHistoryController extends Controller
             $query->where('user_id', $userId);
         }
 
+        $status = $request->input('status');
+        if (in_array($status, ['draft', 'submitted'], true)) {
+            $query->where('status', $status);
+        }
+
         $this->applyDateFilter($query, $request);
 
         $recordsTotal = (clone $baseQuery)->count();
