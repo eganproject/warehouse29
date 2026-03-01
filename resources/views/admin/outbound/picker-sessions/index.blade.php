@@ -79,6 +79,7 @@
                         <th>Item</th>
                         <th>Qty</th>
                         <th>Catatan</th>
+                        <th class="text-end">Aksi</th>
                     </tr>
                 </thead>
                 <tbody></tbody>
@@ -91,6 +92,8 @@
 @push('scripts')
 <script>
     const dataUrl = '{{ $dataUrl }}';
+    const submitUrlTpl = '{{ route('admin.outbound.picker-sessions.submit', ':id') }}';
+    const csrfToken = '{{ csrf_token() }}';
 
     document.addEventListener('DOMContentLoaded', () => {
         const tableEl = $('#picker_sessions_table');
@@ -161,6 +164,18 @@
                 { data: 'item' },
                 { data: 'qty' },
                 { data: 'note' },
+                { data: 'id', orderable:false, searchable:false, className:'text-end', render: (data, type, row) => {
+                    if (row?.status !== 'draft') {
+                        return '-';
+                    }
+                    return `
+                        <div class="text-end">
+                            <a href="#" class="btn btn-sm btn-light btn-active-light-primary btn-submit" data-id="${data}">
+                                Submit
+                            </a>
+                        </div>
+                    `;
+                }},
             ]
         });
 
@@ -183,6 +198,92 @@
             if (fpFrom) fpFrom.clear(); else if (dateFromEl) dateFromEl.value = '';
             if (fpTo) fpTo.clear(); else if (dateToEl) dateToEl.value = '';
             reloadTable();
+        });
+
+        const showInsufficientStock = (details) => {
+            if (!Array.isArray(details) || !details.length) return;
+            if (typeof Swal === 'undefined') return;
+            const list = details.map((row) => {
+                const sku = row.sku || '-';
+                const name = row.name ? ` • ${row.name}` : '';
+                const available = typeof row.available !== 'undefined' ? row.available : '-';
+                const required = typeof row.required !== 'undefined' ? row.required : '-';
+                return `<li style="margin-bottom:6px;"><strong>${sku}</strong>${name}<br><span style="color:#64748b;">Tersedia ${available}, butuh ${required}</span></li>`;
+            }).join('');
+            Swal.fire({
+                icon: 'error',
+                title: 'Stok tidak mencukupi',
+                html: `<div style="text-align:left; font-size:14px;">Item berikut stoknya kurang:</div><ul style="text-align:left; padding-left:18px; margin-top:8px;">${list}</ul>`,
+            });
+        };
+
+        tableEl.on('click', '.btn-submit', async function(e) {
+            e.preventDefault();
+            const id = this.getAttribute('data-id');
+            if (!id) return;
+            let confirmed = true;
+            if (typeof AppSwal !== 'undefined' && AppSwal.confirm) {
+                confirmed = await AppSwal.confirm('Submit batch picker ini?', {
+                    confirmButtonText: 'Submit',
+                });
+            } else if (typeof Swal !== 'undefined') {
+                const res = await Swal.fire({
+                    title: 'Submit batch?',
+                    text: 'Batch akan dikunci dan stok akan berkurang.',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Submit',
+                    cancelButtonText: 'Batal',
+                    buttonsStyling: false,
+                    customClass: {
+                        confirmButton: 'btn btn-primary',
+                        cancelButton: 'btn btn-light'
+                    }
+                });
+                confirmed = res.isConfirmed;
+            } else {
+                confirmed = window.confirm('Submit batch picker ini?');
+            }
+            if (!confirmed) return;
+            try {
+                const res = await fetch(submitUrlTpl.replace(':id', id), {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json',
+                    },
+                });
+                const text = await res.text();
+                let json = null;
+                try { json = JSON.parse(text); } catch (err) { json = null; }
+                if (!res.ok) {
+                    if (json?.insufficient) {
+                        showInsufficientStock(json.insufficient);
+                        return;
+                    }
+                    const msg = json?.message || 'Gagal submit sesi';
+                    if (typeof AppSwal !== 'undefined' && AppSwal.error) {
+                        AppSwal.error(msg);
+                    } else if (typeof Swal !== 'undefined') {
+                        Swal.fire('Error', msg, 'error');
+                    } else {
+                        alert(msg);
+                    }
+                    return;
+                }
+                if (typeof AppSwal !== 'undefined' && AppSwal.success) {
+                    AppSwal.success(json?.message || 'Sesi berhasil disubmit');
+                } else if (typeof Swal !== 'undefined') {
+                    Swal.fire('Berhasil', json?.message || 'Sesi berhasil disubmit', 'success');
+                }
+                dt.ajax.reload(null, false);
+            } catch (err) {
+                if (typeof AppSwal !== 'undefined' && AppSwal.error) {
+                    AppSwal.error('Gagal submit sesi');
+                } else if (typeof Swal !== 'undefined') {
+                    Swal.fire('Error', 'Gagal submit sesi', 'error');
+                }
+            }
         });
     });
 </script>
