@@ -62,6 +62,7 @@ class PickerReportController extends Controller
                 'sku_count' => (int) $row->sku_count,
                 'qty' => (int) $row->total_qty,
                 'range' => $range,
+                'avg_duration' => $this->formatDuration((int) round($row->avg_seconds ?? 0)),
             ];
         });
 
@@ -132,10 +133,12 @@ class PickerReportController extends Controller
             ->selectRaw('COUNT(DISTINCT picker_sessions.id) as batch_count')
             ->selectRaw('COUNT(DISTINCT psi.item_id) as sku_count')
             ->selectRaw('SUM(psi.qty) as total_qty')
+            ->selectRaw('AVG(TIMESTAMPDIFF(SECOND, picker_sessions.started_at, picker_sessions.submitted_at)) as avg_seconds')
             ->selectRaw('MIN(picker_sessions.submitted_at) as first_submitted_at')
             ->selectRaw('MAX(picker_sessions.submitted_at) as last_submitted_at')
             ->where('picker_sessions.status', 'submitted')
             ->whereNotNull('picker_sessions.submitted_at')
+            ->whereNotNull('picker_sessions.started_at')
             ->groupByRaw('DATE(picker_sessions.submitted_at)')
             ->groupBy('picker_sessions.user_id', 'users.name')
             ->orderByRaw('DATE(picker_sessions.submitted_at) desc')
@@ -195,5 +198,18 @@ class PickerReportController extends Controller
         } catch (\Throwable) {
             // ignore invalid date filters
         }
+    }
+
+    private function formatDuration(int $seconds): string
+    {
+        if ($seconds <= 0) {
+            return '-';
+        }
+        $hours = intdiv($seconds, 3600);
+        $minutes = intdiv($seconds % 3600, 60);
+        if ($hours > 0) {
+            return sprintf('%dj %dm', $hours, $minutes);
+        }
+        return sprintf('%dm', $minutes);
     }
 }

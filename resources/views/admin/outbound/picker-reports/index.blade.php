@@ -218,6 +218,7 @@
                         <th>SKU</th>
                         <th>Qty</th>
                         <th>Jam</th>
+                        <th>Rata-rata Durasi</th>
                         <th class="text-end">Aksi</th>
                     </tr>
                 </thead>
@@ -365,6 +366,7 @@
                 { data: 'sku_count' },
                 { data: 'qty' },
                 { data: 'range' },
+                { data: 'avg_duration' },
                 { data: null, orderable: false, searchable: false, className: 'text-end', render: (data, type, row) => {
                     return `<button type="button" class="btn btn-sm btn-light-primary btn-detail" data-date="${row.date}" data-user="${row.user_id}">Detail</button>`;
                 }},
