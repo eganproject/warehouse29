@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Divisi;
 use App\Models\PickerSession;
 use App\Models\PickerSessionItem;
 use App\Models\User;
@@ -14,8 +15,16 @@ class PickerReportController extends Controller
 {
     public function index()
     {
+        $authUser = request()->user();
+        $divisiQuery = Divisi::orderBy('name');
+        if ($authUser && $authUser->divisi_id !== null && (int) $authUser->divisi_id !== 1) {
+            $divisiQuery->where('id', $authUser->divisi_id);
+        }
+        $divisis = $divisiQuery->get(['id', 'name']);
+
         return view('admin.outbound.picker-reports.index', [
             'dataUrl' => route('admin.outbound.picker-reports.data'),
+            'divisis' => $divisis,
         ]);
     }
 
@@ -144,6 +153,11 @@ class PickerReportController extends Controller
             if ($search !== '') {
                 $query->where('users.name', 'like', "%{$search}%");
             }
+            $divisiId = $request->integer('divisi_id');
+            if ($divisiId) {
+                $query->where('users.divisi_id', $divisiId);
+            }
+
             $this->applyDateFilter($query, $request);
         }
 
