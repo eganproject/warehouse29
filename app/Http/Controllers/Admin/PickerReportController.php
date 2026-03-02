@@ -46,23 +46,35 @@ class PickerReportController extends Controller
         $rows = $query->get();
 
         $data = $rows->map(function ($row) {
-            $first = $row->first_submitted_at
-                ? Carbon::parse($row->first_submitted_at)->format('H:i')
+            $firstStarted = $row->first_started_at
+                ? Carbon::parse($row->first_started_at)->format('H:i')
                 : '';
-            $last = $row->last_submitted_at
+            $lastSubmitted = $row->last_submitted_at
                 ? Carbon::parse($row->last_submitted_at)->format('H:i')
                 : '';
-            $range = ($first !== '' && $last !== '') ? "{$first} - {$last}" : '-';
+            $range = ($firstStarted !== '' && $lastSubmitted !== '') ? "{$firstStarted} - {$lastSubmitted}" : '-';
+
+            $batchCount = (int) $row->batch_count;
+            $skuCount = (int) $row->sku_count;
+            $totalQty = (int) $row->total_qty;
+            $avgQty = $batchCount > 0 ? round($totalQty / $batchCount, 1) : 0;
+            $avgSku = $batchCount > 0 ? round($skuCount / $batchCount, 1) : 0;
+            $totalSeconds = (int) round($row->total_seconds ?? 0);
+            $qtyPerHour = $totalSeconds > 0 ? round($totalQty / ($totalSeconds / 3600), 1) : 0;
 
             return [
                 'date' => $row->report_date,
                 'user_id' => (int) $row->user_id,
                 'picker' => $row->picker ?? '-',
-                'batch_count' => (int) $row->batch_count,
-                'sku_count' => (int) $row->sku_count,
-                'qty' => (int) $row->total_qty,
-                'range' => $range,
+                'batch_count' => $batchCount,
+                'sku_count' => $skuCount,
+                'qty' => $totalQty,
+                'avg_qty' => $avgQty,
+                'avg_sku' => $avgSku,
                 'avg_duration' => $this->formatDuration((int) round($row->avg_seconds ?? 0)),
+                'total_duration' => $this->formatDuration($totalSeconds),
+                'productivity' => $qtyPerHour > 0 ? "{$qtyPerHour} qty/jam" : '-',
+                'range' => $range,
             ];
         });
 
@@ -104,9 +116,25 @@ class PickerReportController extends Controller
             ->whereDate('submitted_at', $date)
             ->where('user_id', $userId);
 
-        $batchCount = (int) $batchQuery->count();
-        $first = $batchQuery->min('submitted_at');
-        $last = $batchQuery->max('submitted_at');
+        $batchStats = (clone $batchQuery)
+            ->selectRaw('COUNT(*) as batch_count')
+            ->selectRaw('AVG(TIMESTAMPDIFF(SECOND, started_at, submitted_at)) as avg_seconds')
+            ->selectRaw('SUM(TIMESTAMPDIFF(SECOND, started_at, submitted_at)) as total_seconds')
+            ->selectRaw('MIN(started_at) as first_started_at')
+            ->selectRaw('MIN(submitted_at) as first_submitted_at')
+            ->selectRaw('MAX(submitted_at) as last_submitted_at')
+            ->whereNotNull('started_at')
+            ->first();
+
+        $batchCount = (int) ($batchStats->batch_count ?? 0);
+        $first = $batchStats?->first_submitted_at ?? null;
+        $last = $batchStats?->last_submitted_at ?? null;
+        $firstStarted = $batchStats?->first_started_at ?? null;
+        $avgSeconds = (int) round($batchStats?->avg_seconds ?? 0);
+        $totalSeconds = (int) round($batchStats?->total_seconds ?? 0);
+        $avgQty = $batchCount > 0 ? round($totalQty / $batchCount, 1) : 0;
+        $avgSku = $batchCount > 0 ? round($skuCount / $batchCount, 1) : 0;
+        $productivity = $totalSeconds > 0 ? round($totalQty / ($totalSeconds / 3600), 1) : 0;
 
         $pickerName = User::where('id', $userId)->value('name') ?? '-';
 
@@ -116,6 +144,12 @@ class PickerReportController extends Controller
             'batch_count' => $batchCount,
             'sku_count' => $skuCount,
             'qty' => $totalQty,
+            'avg_qty' => $avgQty,
+            'avg_sku' => $avgSku,
+            'avg_duration' => $this->formatDuration($avgSeconds),
+            'total_duration' => $this->formatDuration($totalSeconds),
+            'productivity' => $productivity > 0 ? "{$productivity} qty/jam" : '-',
+            'first_started_at' => $firstStarted ? Carbon::parse($firstStarted)->format('H:i') : '-',
             'first_submitted_at' => $first ? Carbon::parse($first)->format('H:i') : '-',
             'last_submitted_at' => $last ? Carbon::parse($last)->format('H:i') : '-',
             'items' => $items,
@@ -129,6 +163,8 @@ class PickerReportController extends Controller
             ->selectRaw('picker_sessions.user_id')
             ->selectRaw('COUNT(*) as batch_count')
             ->selectRaw('AVG(TIMESTAMPDIFF(SECOND, picker_sessions.started_at, picker_sessions.submitted_at)) as avg_seconds')
+            ->selectRaw('SUM(TIMESTAMPDIFF(SECOND, picker_sessions.started_at, picker_sessions.submitted_at)) as total_seconds')
+            ->selectRaw('MIN(picker_sessions.started_at) as first_started_at')
             ->selectRaw('MIN(picker_sessions.submitted_at) as first_submitted_at')
             ->selectRaw('MAX(picker_sessions.submitted_at) as last_submitted_at')
             ->where('picker_sessions.status', 'submitted')
@@ -158,7 +194,7 @@ class PickerReportController extends Controller
             ->selectRaw('s.report_date, s.user_id, users.name as picker, s.batch_count')
             ->selectRaw('COALESCE(i.sku_count, 0) as sku_count')
             ->selectRaw('COALESCE(i.total_qty, 0) as total_qty')
-            ->selectRaw('s.avg_seconds, s.first_submitted_at, s.last_submitted_at')
+            ->selectRaw('s.avg_seconds, s.total_seconds, s.first_started_at, s.first_submitted_at, s.last_submitted_at')
             ->orderByRaw('s.report_date desc')
             ->orderBy('users.name');
 

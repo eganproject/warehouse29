@@ -217,8 +217,12 @@
                         <th>Batch</th>
                         <th>SKU</th>
                         <th>Qty</th>
-                        <th>Jam</th>
+                        <th>Rata-rata Qty/Batch</th>
+                        <th>Rata-rata SKU/Batch</th>
                         <th>Rata-rata Durasi</th>
+                        <th>Total Durasi</th>
+                        <th>Produktivitas</th>
+                        <th>Jam Kerja</th>
                         <th class="text-end">Aksi</th>
                     </tr>
                 </thead>
@@ -278,7 +282,27 @@
                         <strong id="detail_qty">-</strong>
                     </div>
                     <div class="detail-card">
-                        <span>Jam Submit</span>
+                        <span>Rata-rata Qty/Batch</span>
+                        <strong id="detail_avg_qty">-</strong>
+                    </div>
+                    <div class="detail-card">
+                        <span>Rata-rata SKU/Batch</span>
+                        <strong id="detail_avg_sku">-</strong>
+                    </div>
+                    <div class="detail-card">
+                        <span>Rata-rata Durasi</span>
+                        <strong id="detail_avg_duration">-</strong>
+                    </div>
+                    <div class="detail-card">
+                        <span>Total Durasi</span>
+                        <strong id="detail_total_duration">-</strong>
+                    </div>
+                    <div class="detail-card">
+                        <span>Produktivitas</span>
+                        <strong id="detail_productivity">-</strong>
+                    </div>
+                    <div class="detail-card">
+                        <span>Jam Kerja</span>
                         <strong id="detail_range">-</strong>
                     </div>
                 </div>
@@ -365,8 +389,12 @@
                 { data: 'batch_count' },
                 { data: 'sku_count' },
                 { data: 'qty' },
-                { data: 'range' },
+                { data: 'avg_qty' },
+                { data: 'avg_sku' },
                 { data: 'avg_duration' },
+                { data: 'total_duration' },
+                { data: 'productivity' },
+                { data: 'range' },
                 { data: null, orderable: false, searchable: false, className: 'text-end', render: (data, type, row) => {
                     return `<button type="button" class="btn btn-sm btn-light-primary btn-detail" data-date="${row.date}" data-user="${row.user_id}">Detail</button>`;
                 }},
@@ -440,7 +468,12 @@
                 setText('detail_batch', json.batch_count);
                 setText('detail_sku', json.sku_count);
                 setText('detail_qty', json.qty);
-                const range = `${json.first_submitted_at} - ${json.last_submitted_at}`;
+                setText('detail_avg_qty', json.avg_qty ?? '-');
+                setText('detail_avg_sku', json.avg_sku ?? '-');
+                setText('detail_avg_duration', json.avg_duration ?? '-');
+                setText('detail_total_duration', json.total_duration ?? '-');
+                setText('detail_productivity', json.productivity ?? '-');
+                const range = `${json.first_started_at || '-'} - ${json.last_submitted_at || '-'}`;
                 setText('detail_range', range);
 
                 const items = json.items || [];
