@@ -212,18 +212,18 @@
             <table class="table align-middle table-row-dashed fs-6 gy-5 report-table" id="picker_reports_table">
                 <thead>
                     <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
-                        <th>Tanggal</th>
-                        <th>Picker</th>
-                        <th>Batch</th>
-                        <th>SKU</th>
-                        <th>Qty</th>
-                        <th>Rata-rata Qty/Batch</th>
-                        <th>Rata-rata SKU/Batch</th>
-                        <th>Rata-rata Durasi</th>
-                        <th>Total Durasi</th>
-                        <th>Produktivitas</th>
-                        <th>Jam Kerja</th>
-                        <th class="text-end">Aksi</th>
+                        <th data-bs-toggle="tooltip" data-bs-placement="top" title="Tanggal laporan berdasarkan waktu submit batch.">Tanggal</th>
+                        <th data-bs-toggle="tooltip" data-bs-placement="top" title="Nama picker yang melakukan picking.">Picker</th>
+                        <th data-bs-toggle="tooltip" data-bs-placement="top" title="Jumlah batch yang disubmit pada tanggal tersebut.">Batch</th>
+                        <th data-bs-toggle="tooltip" data-bs-placement="top" title="Jumlah SKU unik yang dipick pada tanggal tersebut.">SKU</th>
+                        <th data-bs-toggle="tooltip" data-bs-placement="top" title="Total qty semua item yang dipick.">Qty</th>
+                        <th data-bs-toggle="tooltip" data-bs-placement="top" title="Total qty dibagi jumlah batch.">Rata-rata Qty/Batch</th>
+                        <th data-bs-toggle="tooltip" data-bs-placement="top" title="Total SKU unik dibagi jumlah batch.">Rata-rata SKU/Batch</th>
+                        <th data-bs-toggle="tooltip" data-bs-placement="top" title="Rata-rata durasi per batch (started hingga submitted).">Rata-rata Durasi</th>
+                        <th data-bs-toggle="tooltip" data-bs-placement="top" title="Akumulasi durasi seluruh batch pada tanggal tersebut.">Total Durasi</th>
+                        <th data-bs-toggle="tooltip" data-bs-placement="top" title="Produktivitas = total qty / total durasi (qty/jam).">Produktivitas</th>
+                        <th data-bs-toggle="tooltip" data-bs-placement="top" title="Rentang waktu kerja: mulai batch pertama hingga submit terakhir.">Jam Kerja</th>
+                        <th class="text-end" data-bs-toggle="tooltip" data-bs-placement="top" title="Lihat detail item per picker per tanggal.">Aksi</th>
                     </tr>
                 </thead>
                 <tbody></tbody>
@@ -352,6 +352,12 @@
         if (divisiSelect && typeof $ !== 'undefined' && $.fn.select2) {
             $(divisiSelect).select2({ placeholder: 'Semua Divisi', allowClear: true, width: '100%' })
                 .on('select2:opening select2:closing select2:close', function(e){ e.stopPropagation(); });
+        }
+
+        if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {
+            document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((el) => {
+                new bootstrap.Tooltip(el);
+            });
         }
 
         if (typeof flatpickr !== 'undefined') {
