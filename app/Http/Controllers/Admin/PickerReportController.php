@@ -124,15 +124,10 @@ class PickerReportController extends Controller
 
     private function buildReportQuery(Request $request, $authUser, bool $applyFilters)
     {
-        $query = PickerSession::query()
-            ->join('picker_session_items as psi', 'picker_sessions.id', '=', 'psi.picker_session_id')
-            ->join('users', 'users.id', '=', 'picker_sessions.user_id')
+        $sessionAgg = PickerSession::query()
             ->selectRaw('DATE(picker_sessions.submitted_at) as report_date')
             ->selectRaw('picker_sessions.user_id')
-            ->selectRaw('users.name as picker')
-            ->selectRaw('COUNT(DISTINCT picker_sessions.id) as batch_count')
-            ->selectRaw('COUNT(DISTINCT psi.item_id) as sku_count')
-            ->selectRaw('SUM(psi.qty) as total_qty')
+            ->selectRaw('COUNT(*) as batch_count')
             ->selectRaw('AVG(TIMESTAMPDIFF(SECOND, picker_sessions.started_at, picker_sessions.submitted_at)) as avg_seconds')
             ->selectRaw('MIN(picker_sessions.submitted_at) as first_submitted_at')
             ->selectRaw('MAX(picker_sessions.submitted_at) as last_submitted_at')
@@ -140,8 +135,31 @@ class PickerReportController extends Controller
             ->whereNotNull('picker_sessions.submitted_at')
             ->whereNotNull('picker_sessions.started_at')
             ->groupByRaw('DATE(picker_sessions.submitted_at)')
-            ->groupBy('picker_sessions.user_id', 'users.name')
-            ->orderByRaw('DATE(picker_sessions.submitted_at) desc')
+            ->groupBy('picker_sessions.user_id');
+
+        $itemsAgg = PickerSessionItem::query()
+            ->join('picker_sessions', 'picker_sessions.id', '=', 'picker_session_items.picker_session_id')
+            ->selectRaw('DATE(picker_sessions.submitted_at) as report_date')
+            ->selectRaw('picker_sessions.user_id as user_id')
+            ->selectRaw('COUNT(DISTINCT picker_session_items.item_id) as sku_count')
+            ->selectRaw('SUM(picker_session_items.qty) as total_qty')
+            ->where('picker_sessions.status', 'submitted')
+            ->whereNotNull('picker_sessions.submitted_at')
+            ->groupByRaw('DATE(picker_sessions.submitted_at)')
+            ->groupBy('picker_sessions.user_id');
+
+        $query = DB::query()
+            ->fromSub($sessionAgg, 's')
+            ->join('users', 'users.id', '=', 's.user_id')
+            ->leftJoinSub($itemsAgg, 'i', function ($join) {
+                $join->on('i.report_date', '=', 's.report_date')
+                    ->on('i.user_id', '=', 's.user_id');
+            })
+            ->selectRaw('s.report_date, s.user_id, users.name as picker, s.batch_count')
+            ->selectRaw('COALESCE(i.sku_count, 0) as sku_count')
+            ->selectRaw('COALESCE(i.total_qty, 0) as total_qty')
+            ->selectRaw('s.avg_seconds, s.first_submitted_at, s.last_submitted_at')
+            ->orderByRaw('s.report_date desc')
             ->orderBy('users.name');
 
         if ($authUser) {
@@ -161,7 +179,7 @@ class PickerReportController extends Controller
                 $query->where('users.divisi_id', $divisiId);
             }
 
-            $this->applyDateFilter($query, $request);
+            $this->applyDateFilter($query, $request, 's.report_date', true);
         }
 
         return $query;
@@ -181,19 +199,19 @@ class PickerReportController extends Controller
             ->get();
     }
 
-    private function applyDateFilter($query, Request $request): void
+    private function applyDateFilter($query, Request $request, string $column = 'picker_sessions.submitted_at', bool $dateOnly = false): void
     {
         $dateFrom = $request->input('date_from');
         $dateTo = $request->input('date_to');
 
         try {
             if ($dateFrom) {
-                $from = Carbon::parse($dateFrom)->startOfDay();
-                $query->where('picker_sessions.submitted_at', '>=', $from);
+                $from = Carbon::parse($dateFrom);
+                $query->where($column, '>=', $dateOnly ? $from->toDateString() : $from->startOfDay());
             }
             if ($dateTo) {
-                $to = Carbon::parse($dateTo)->endOfDay();
-                $query->where('picker_sessions.submitted_at', '<=', $to);
+                $to = Carbon::parse($dateTo);
+                $query->where($column, '<=', $dateOnly ? $to->toDateString() : $to->endOfDay());
             }
         } catch (\Throwable) {
             // ignore invalid date filters
