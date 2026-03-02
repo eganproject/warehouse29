@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\PickerSession;
 use App\Models\PickerSessionItem;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -36,16 +37,6 @@ class PickerReportController extends Controller
         $rows = $query->get();
 
         $data = $rows->map(function ($row) {
-            $items = $this->fetchItems($row->report_date, (int) $row->user_id);
-            $itemLabels = $items->map(function ($it) {
-                $sku = trim((string) ($it->sku ?? ''));
-                if ($sku === '') {
-                    return '';
-                }
-                $qty = (int) ($it->qty ?? 0);
-                return sprintf('%s (%d)', $sku, $qty);
-            })->filter()->values();
-
             $first = $row->first_submitted_at
                 ? Carbon::parse($row->first_submitted_at)->format('H:i')
                 : '';
@@ -56,12 +47,12 @@ class PickerReportController extends Controller
 
             return [
                 'date' => $row->report_date,
+                'user_id' => (int) $row->user_id,
                 'picker' => $row->picker ?? '-',
                 'batch_count' => (int) $row->batch_count,
                 'sku_count' => (int) $row->sku_count,
                 'qty' => (int) $row->total_qty,
                 'range' => $range,
-                'items' => $itemLabels->implode(', ') ?: '-',
             ];
         });
 
@@ -70,6 +61,54 @@ class PickerReportController extends Controller
             'recordsTotal' => $recordsTotal,
             'recordsFiltered' => $recordsFiltered,
             'data' => $data,
+        ]);
+    }
+
+    public function detail(Request $request)
+    {
+        $validated = $request->validate([
+            'date' => ['required', 'date'],
+            'user_id' => ['required', 'integer', 'exists:users,id'],
+        ]);
+
+        $date = Carbon::parse($validated['date'])->toDateString();
+        $userId = (int) $validated['user_id'];
+
+        $authUser = $request->user();
+        if ($authUser) {
+            $divisiId = $authUser->divisi_id;
+            if ($divisiId !== null && (int) $divisiId !== 1) {
+                $targetUser = User::find($userId);
+                if (!$targetUser || (int) $targetUser->divisi_id !== (int) $divisiId) {
+                    return response()->json(['message' => 'Tidak diizinkan'], 403);
+                }
+            }
+        }
+
+        $items = $this->fetchItems($date, $userId);
+        $totalQty = (int) $items->sum('qty');
+        $skuCount = (int) $items->count();
+
+        $batchQuery = PickerSession::query()
+            ->where('status', 'submitted')
+            ->whereDate('submitted_at', $date)
+            ->where('user_id', $userId);
+
+        $batchCount = (int) $batchQuery->count();
+        $first = $batchQuery->min('submitted_at');
+        $last = $batchQuery->max('submitted_at');
+
+        $pickerName = User::where('id', $userId)->value('name') ?? '-';
+
+        return response()->json([
+            'date' => $date,
+            'picker' => $pickerName,
+            'batch_count' => $batchCount,
+            'sku_count' => $skuCount,
+            'qty' => $totalQty,
+            'first_submitted_at' => $first ? Carbon::parse($first)->format('H:i') : '-',
+            'last_submitted_at' => $last ? Carbon::parse($last)->format('H:i') : '-',
+            'items' => $items,
         ]);
     }
 
