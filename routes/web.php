@@ -11,6 +11,7 @@ use App\Http\Controllers\Admin\StockOpnameController;
 use App\Http\Controllers\Admin\StockAdjustmentController;
 use App\Http\Controllers\Admin\DamagedGoodsController;
 use App\Http\Controllers\Admin\PickerHistoryController;
+use App\Http\Controllers\Admin\PickerReportController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\MenuController;
 use App\Http\Controllers\Admin\PermissionController;
@@ -205,5 +206,8 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         Route::get('/picker-sessions/data', [PickerHistoryController::class, 'data'])->name('picker-sessions.data');
         Route::post('/picker-sessions/{id}/submit', [PickerHistoryController::class, 'submit'])->name('picker-sessions.submit');
         Route::delete('/picker-sessions/{id}', [PickerHistoryController::class, 'destroy'])->name('picker-sessions.destroy');
+
+        Route::get('/picker-reports', [PickerReportController::class, 'index'])->name('picker-reports.index');
+        Route::get('/picker-reports/data', [PickerReportController::class, 'data'])->name('picker-reports.data');
     });
 });

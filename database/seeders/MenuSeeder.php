@@ -35,6 +35,7 @@ class MenuSeeder extends Seeder
             ['name' => 'Manual', 'slug' => 'outbound-manual', 'route' => 'admin.outbound.manuals.index', 'icon' => 'fa-solid fa-pen-to-square', 'parent_slug' => 'outbound', 'sort_order' => 11],
             ['name' => 'Retur', 'slug' => 'outbound-return', 'route' => 'admin.outbound.returns.index', 'icon' => 'fa-solid fa-rotate-left', 'parent_slug' => 'outbound', 'sort_order' => 12],
             ['name' => 'History Picker', 'slug' => 'outbound-picker-history', 'route' => 'admin.outbound.picker-sessions.index', 'icon' => 'fa-solid fa-clipboard-list', 'parent_slug' => 'outbound', 'sort_order' => 13],
+            ['name' => 'Laporan Picker', 'slug' => 'outbound-picker-report', 'route' => 'admin.outbound.picker-reports.index', 'icon' => 'fa-solid fa-file-lines', 'parent_slug' => 'outbound', 'sort_order' => 14],
         ];
 
         foreach ($menuRows as $menu) {
