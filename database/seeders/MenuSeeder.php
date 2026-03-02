@@ -15,6 +15,7 @@ class MenuSeeder extends Seeder
             ['name' => 'Inventory', 'slug' => 'inventory', 'route' => null, 'icon' => 'fa-solid fa-warehouse', 'parent_slug' => null, 'sort_order' => 12],
             ['name' => 'Inbound', 'slug' => 'inbound', 'route' => null, 'icon' => 'fa-solid fa-arrow-down', 'parent_slug' => null, 'sort_order' => 13],
             ['name' => 'Outbound', 'slug' => 'outbound', 'route' => null, 'icon' => 'fa-solid fa-arrow-up', 'parent_slug' => null, 'sort_order' => 14],
+            ['name' => 'Laporan', 'slug' => 'reports', 'route' => null, 'icon' => 'fa-solid fa-chart-line', 'parent_slug' => null, 'sort_order' => 15],
             ['name' => 'Users', 'slug' => 'users', 'route' => 'admin.masterdata.users.index', 'icon' => 'fa-solid fa-users', 'parent_slug' => 'master-data', 'sort_order' => 20],
             ['name' => 'Roles', 'slug' => 'roles', 'route' => 'admin.masterdata.roles.index', 'icon' => 'fa-solid fa-user-shield', 'parent_slug' => 'master-data', 'sort_order' => 21],
             ['name' => 'Divisi', 'slug' => 'divisi', 'route' => 'admin.masterdata.divisi.index', 'icon' => 'fa-solid fa-people-group', 'parent_slug' => 'master-data', 'sort_order' => 21.4],
@@ -35,7 +36,7 @@ class MenuSeeder extends Seeder
             ['name' => 'Manual', 'slug' => 'outbound-manual', 'route' => 'admin.outbound.manuals.index', 'icon' => 'fa-solid fa-pen-to-square', 'parent_slug' => 'outbound', 'sort_order' => 11],
             ['name' => 'Retur', 'slug' => 'outbound-return', 'route' => 'admin.outbound.returns.index', 'icon' => 'fa-solid fa-rotate-left', 'parent_slug' => 'outbound', 'sort_order' => 12],
             ['name' => 'History Picker', 'slug' => 'outbound-picker-history', 'route' => 'admin.outbound.picker-sessions.index', 'icon' => 'fa-solid fa-clipboard-list', 'parent_slug' => 'outbound', 'sort_order' => 13],
-            ['name' => 'Laporan Picker', 'slug' => 'outbound-picker-report', 'route' => 'admin.outbound.picker-reports.index', 'icon' => 'fa-solid fa-file-lines', 'parent_slug' => 'outbound', 'sort_order' => 14],
+            ['name' => 'Laporan Picker', 'slug' => 'outbound-picker-report', 'route' => 'admin.outbound.picker-reports.index', 'icon' => 'fa-solid fa-file-lines', 'parent_slug' => 'reports', 'sort_order' => 1],
         ];
 
         foreach ($menuRows as $menu) {
