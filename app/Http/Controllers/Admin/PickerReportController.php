@@ -156,6 +156,46 @@ class PickerReportController extends Controller
         ]);
     }
 
+    public function skuSummary(Request $request)
+    {
+        $authUser = $request->user();
+        $baseQuery = $this->buildSkuSummaryQuery($request, $authUser, false);
+        $query = $this->buildSkuSummaryQuery($request, $authUser, true);
+
+        $recordsTotal = DB::query()->fromSub($baseQuery, 't')->count();
+        $recordsFiltered = DB::query()->fromSub($query, 't')->count();
+
+        $start = (int) $request->input('start', 0);
+        $length = (int) $request->input('length', 10);
+        if ($length > 0) {
+            $query->skip($start)->take($length);
+        }
+
+        $rows = $query->get();
+
+        $data = $rows->map(function ($row) {
+            $totalQty = (int) $row->total_qty;
+            $batchCount = (int) $row->batch_count;
+            $avgQty = $batchCount > 0 ? round($totalQty / $batchCount, 1) : 0;
+
+            return [
+                'sku' => $row->sku ?? '-',
+                'name' => $row->name ?? '-',
+                'total_qty' => $totalQty,
+                'batch_count' => $batchCount,
+                'picker_count' => (int) $row->picker_count,
+                'avg_qty' => $avgQty,
+            ];
+        });
+
+        return response()->json([
+            'draw' => (int) $request->input('draw'),
+            'recordsTotal' => $recordsTotal,
+            'recordsFiltered' => $recordsFiltered,
+            'data' => $data,
+        ]);
+    }
+
     private function buildReportQuery(Request $request, $authUser, bool $applyFilters)
     {
         $sessionAgg = PickerSession::query()
@@ -216,6 +256,47 @@ class PickerReportController extends Controller
             }
 
             $this->applyDateFilter($query, $request, 's.report_date', true);
+        }
+
+        return $query;
+    }
+
+    private function buildSkuSummaryQuery(Request $request, $authUser, bool $applyFilters)
+    {
+        $query = PickerSessionItem::query()
+            ->join('picker_sessions', 'picker_sessions.id', '=', 'picker_session_items.picker_session_id')
+            ->join('items', 'items.id', '=', 'picker_session_items.item_id')
+            ->join('users', 'users.id', '=', 'picker_sessions.user_id')
+            ->selectRaw('items.sku, items.name')
+            ->selectRaw('SUM(picker_session_items.qty) as total_qty')
+            ->selectRaw('COUNT(DISTINCT picker_sessions.id) as batch_count')
+            ->selectRaw('COUNT(DISTINCT picker_sessions.user_id) as picker_count')
+            ->where('picker_sessions.status', 'submitted')
+            ->whereNotNull('picker_sessions.submitted_at')
+            ->groupBy('items.id', 'items.sku', 'items.name')
+            ->orderBy('items.sku');
+
+        if ($authUser) {
+            $divisiId = $authUser->divisi_id;
+            if ($divisiId !== null && (int) $divisiId !== 1) {
+                $query->where('users.divisi_id', $divisiId);
+            }
+        }
+
+        if ($applyFilters) {
+            $search = trim((string) $request->input('q', ''));
+            if ($search !== '') {
+                $query->where(function ($q) use ($search) {
+                    $q->where('items.sku', 'like', "%{$search}%")
+                        ->orWhere('items.name', 'like', "%{$search}%");
+                });
+            }
+            $divisiId = $request->integer('divisi_id');
+            if ($divisiId) {
+                $query->where('users.divisi_id', $divisiId);
+            }
+
+            $this->applyDateFilter($query, $request);
         }
 
         return $query;

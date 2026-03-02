@@ -192,7 +192,7 @@
                             <path d="M11 19C6.55556 19 3 15.4444 3 11C3 6.55556 6.55556 3 11 3C15.4444 3 19 6.55556 19 11C19 15.4444 15.4444 19 11 19ZM11 5C7.53333 5 5 7.53333 5 11C5 14.4667 7.53333 17 11 17C14.4667 17 17 14.4667 17 11C17 7.53333 14.4667 5 11 5Z" fill="black" />
                         </svg>
                     </span>
-                    <input type="text" class="form-control form-control-solid w-200px ps-14" placeholder="Cari picker" data-kt-filter="search" />
+                    <input type="text" class="form-control form-control-solid w-200px ps-14" placeholder="Cari picker / SKU" data-kt-filter="search" />
                 </div>
                 <select id="filter_divisi" class="form-select form-select-solid w-180px" data-control="select2" data-placeholder="Semua divisi">
                     <option value="">Semua Divisi</option>
@@ -208,26 +208,55 @@
         </div>
     </div>
     <div class="card-body py-6">
-        <div class="table-responsive">
-            <table class="table align-middle table-row-dashed fs-6 gy-5 report-table" id="picker_reports_table">
-                <thead>
-                    <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
-                        <th data-bs-toggle="tooltip" data-bs-placement="top" title="Tanggal laporan berdasarkan waktu submit batch.">Tanggal</th>
-                        <th data-bs-toggle="tooltip" data-bs-placement="top" title="Nama picker yang melakukan picking.">Picker</th>
-                        <th data-bs-toggle="tooltip" data-bs-placement="top" title="Jumlah batch yang disubmit pada tanggal tersebut.">Batch</th>
-                        <th data-bs-toggle="tooltip" data-bs-placement="top" title="Jumlah SKU unik yang dipick pada tanggal tersebut.">SKU</th>
-                        <th data-bs-toggle="tooltip" data-bs-placement="top" title="Total qty semua item yang dipick.">Qty</th>
-                        <th data-bs-toggle="tooltip" data-bs-placement="top" title="Total qty dibagi jumlah batch.">Rata-rata Qty/Batch</th>
-                        <th data-bs-toggle="tooltip" data-bs-placement="top" title="Total SKU unik dibagi jumlah batch.">Rata-rata SKU/Batch</th>
-                        <th data-bs-toggle="tooltip" data-bs-placement="top" title="Rata-rata durasi per batch (started hingga submitted).">Rata-rata Durasi</th>
-                        <th data-bs-toggle="tooltip" data-bs-placement="top" title="Akumulasi durasi seluruh batch pada tanggal tersebut.">Total Durasi</th>
-                        <th data-bs-toggle="tooltip" data-bs-placement="top" title="Produktivitas = total qty / total durasi (qty/jam).">Produktivitas</th>
-                        <th data-bs-toggle="tooltip" data-bs-placement="top" title="Rentang waktu kerja: mulai batch pertama hingga submit terakhir.">Jam Kerja</th>
-                        <th class="text-end" data-bs-toggle="tooltip" data-bs-placement="top" title="Lihat detail item per picker per tanggal.">Aksi</th>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
+        <ul class="nav nav-tabs nav-line-tabs mb-6" role="tablist">
+            <li class="nav-item" role="presentation">
+                <a class="nav-link active" data-bs-toggle="tab" href="#tab_report_picker" role="tab">Ringkasan Picker</a>
+            </li>
+            <li class="nav-item" role="presentation">
+                <a class="nav-link" data-bs-toggle="tab" href="#tab_report_sku" role="tab">Ringkasan SKU</a>
+            </li>
+        </ul>
+        <div class="tab-content">
+            <div class="tab-pane fade show active" id="tab_report_picker" role="tabpanel">
+                <div class="table-responsive">
+                    <table class="table align-middle table-row-dashed fs-6 gy-5 report-table" id="picker_reports_table">
+                        <thead>
+                            <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
+                                <th data-bs-toggle="tooltip" data-bs-placement="top" title="Tanggal laporan berdasarkan waktu submit batch.">Tanggal</th>
+                                <th data-bs-toggle="tooltip" data-bs-placement="top" title="Nama picker yang melakukan picking.">Picker</th>
+                                <th data-bs-toggle="tooltip" data-bs-placement="top" title="Jumlah batch yang disubmit pada tanggal tersebut.">Batch</th>
+                                <th data-bs-toggle="tooltip" data-bs-placement="top" title="Jumlah SKU unik yang dipick pada tanggal tersebut.">SKU</th>
+                                <th data-bs-toggle="tooltip" data-bs-placement="top" title="Total qty semua item yang dipick.">Qty</th>
+                                <th data-bs-toggle="tooltip" data-bs-placement="top" title="Total qty dibagi jumlah batch.">Rata-rata Qty/Batch</th>
+                                <th data-bs-toggle="tooltip" data-bs-placement="top" title="Total SKU unik dibagi jumlah batch.">Rata-rata SKU/Batch</th>
+                                <th data-bs-toggle="tooltip" data-bs-placement="top" title="Rata-rata durasi per batch (started hingga submitted).">Rata-rata Durasi</th>
+                                <th data-bs-toggle="tooltip" data-bs-placement="top" title="Akumulasi durasi seluruh batch pada tanggal tersebut.">Total Durasi</th>
+                                <th data-bs-toggle="tooltip" data-bs-placement="top" title="Produktivitas = total qty / total durasi (qty/jam).">Produktivitas</th>
+                                <th data-bs-toggle="tooltip" data-bs-placement="top" title="Rentang waktu kerja: mulai batch pertama hingga submit terakhir.">Jam Kerja</th>
+                                <th class="text-end" data-bs-toggle="tooltip" data-bs-placement="top" title="Lihat detail item per picker per tanggal.">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="tab-pane fade" id="tab_report_sku" role="tabpanel">
+                <div class="table-responsive">
+                    <table class="table align-middle table-row-dashed fs-6 gy-5 report-table" id="picker_sku_table">
+                        <thead>
+                            <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
+                                <th data-bs-toggle="tooltip" data-bs-placement="top" title="Kode SKU yang dipick.">SKU</th>
+                                <th data-bs-toggle="tooltip" data-bs-placement="top" title="Nama item/produk.">Nama</th>
+                                <th data-bs-toggle="tooltip" data-bs-placement="top" title="Total qty dari SKU tersebut.">Total Qty</th>
+                                <th data-bs-toggle="tooltip" data-bs-placement="top" title="Jumlah batch yang mengandung SKU tersebut.">Jumlah Batch</th>
+                                <th data-bs-toggle="tooltip" data-bs-placement="top" title="Jumlah picker unik yang mengambil SKU ini.">Jumlah Picker</th>
+                                <th data-bs-toggle="tooltip" data-bs-placement="top" title="Total qty dibagi jumlah batch.">Rata-rata Qty/Batch</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
     <div class="report-footer">
@@ -327,10 +356,12 @@
 @push('scripts')
 <script>
     const dataUrl = '{{ $dataUrl }}';
+    const skuUrl = '{{ route('admin.outbound.picker-reports.sku') }}';
     const detailUrl = '{{ route('admin.outbound.picker-reports.detail') }}';
 
     document.addEventListener('DOMContentLoaded', () => {
         const tableEl = $('#picker_reports_table');
+        const skuTableEl = $('#picker_sku_table');
         const searchInput = document.querySelector('[data-kt-filter="search"]');
         const dateFromEl = document.getElementById('filter_date_from');
         const dateToEl = document.getElementById('filter_date_to');
@@ -346,6 +377,7 @@
             const el = document.getElementById(id);
             if (el) el.textContent = value ?? '-';
         };
+        let hasFilterApplied = false;
         let fpFrom = null;
         let fpTo = null;
 
@@ -374,20 +406,39 @@
             return;
         }
 
+        const makeAjax = (url) => (data, callback) => {
+            if (!hasFilterApplied) {
+                callback({ draw: data.draw, recordsTotal: 0, recordsFiltered: 0, data: [] });
+                return;
+            }
+            data.q = searchInput?.value || '';
+            data.divisi_id = divisiSelect?.value || '';
+            if (dateFromEl?.value) data.date_from = dateFromEl.value;
+            if (dateToEl?.value) data.date_to = dateToEl.value;
+
+            if (typeof $ !== 'undefined') {
+                $.ajax({
+                    url,
+                    data,
+                    dataType: 'json',
+                    success: (res) => callback(res),
+                    error: () => callback({ draw: data.draw, recordsTotal: 0, recordsFiltered: 0, data: [] }),
+                });
+            } else {
+                callback({ draw: data.draw, recordsTotal: 0, recordsFiltered: 0, data: [] });
+            }
+        };
+
         const dt = tableEl.DataTable({
             processing: true,
             serverSide: true,
             dom: 'rtip',
             order: [[0, 'desc']],
-            ajax: {
-                url: dataUrl,
-                dataSrc: 'data',
-                data: function(params) {
-                    params.q = searchInput?.value || '';
-                    params.divisi_id = divisiSelect?.value || '';
-                    if (dateFromEl?.value) params.date_from = dateFromEl.value;
-                    if (dateToEl?.value) params.date_to = dateToEl.value;
-                }
+            deferLoading: 0,
+            ajax: makeAjax(dataUrl),
+            language: {
+                emptyTable: 'Silakan gunakan filter untuk menampilkan data.',
+                zeroRecords: 'Data tidak ditemukan.',
             },
             columns: [
                 { data: 'date' },
@@ -407,9 +458,47 @@
             ]
         });
 
+        const dtSku = skuTableEl.DataTable({
+            processing: true,
+            serverSide: true,
+            dom: 'rtip',
+            order: [[0, 'asc']],
+            deferLoading: 0,
+            ajax: makeAjax(skuUrl),
+            language: {
+                emptyTable: 'Silakan gunakan filter untuk menampilkan data.',
+                zeroRecords: 'Data tidak ditemukan.',
+            },
+            columns: [
+                { data: 'sku' },
+                { data: 'name' },
+                { data: 'total_qty' },
+                { data: 'batch_count' },
+                { data: 'picker_count' },
+                { data: 'avg_qty' },
+            ]
+        });
+
+        document.querySelectorAll('a[data-bs-toggle="tab"]').forEach((tab) => {
+            tab.addEventListener('shown.bs.tab', () => {
+                dt.columns.adjust();
+                dtSku.columns.adjust();
+            });
+        });
+
         const reloadTable = () => dt.ajax.reload();
-        searchInput?.addEventListener('keyup', reloadTable);
-        dateApplyBtn?.addEventListener('click', reloadTable);
+        const reloadSkuTable = () => dtSku.ajax.reload();
+        searchInput?.addEventListener('keyup', () => {
+            if (!hasFilterApplied) return;
+            reloadTable();
+            reloadSkuTable();
+        });
+        dateApplyBtn?.addEventListener('click', () => {
+            hasFilterApplied = true;
+            updateMeta();
+            reloadTable();
+            reloadSkuTable();
+        });
         dateResetBtn?.addEventListener('click', () => {
             if (fpFrom) fpFrom.clear(); else if (dateFromEl) dateFromEl.value = '';
             if (fpTo) fpTo.clear(); else if (dateToEl) dateToEl.value = '';
@@ -419,13 +508,17 @@
                     $(divisiSelect).val('').trigger('change.select2');
                 }
             }
-            reloadTable();
+            if (searchInput) searchInput.value = '';
+            hasFilterApplied = false;
+            updateMeta();
+            dt.clear().draw();
+            dtSku.clear().draw();
         });
 
         const updateMeta = () => {
             const from = dateFromEl?.value || '';
             const to = dateToEl?.value || '';
-            let period = 'Semua';
+            let period = hasFilterApplied ? 'Semua' : 'Belum difilter';
             if (from && to) {
                 period = `${from} s/d ${to}`;
             } else if (from) {
