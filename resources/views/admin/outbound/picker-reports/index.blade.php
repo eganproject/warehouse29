@@ -251,6 +251,7 @@
                                 <th data-bs-toggle="tooltip" data-bs-placement="top" title="Jumlah batch yang mengandung SKU tersebut.">Jumlah Batch</th>
                                 <th data-bs-toggle="tooltip" data-bs-placement="top" title="Jumlah picker unik yang mengambil SKU ini.">Jumlah Picker</th>
                                 <th data-bs-toggle="tooltip" data-bs-placement="top" title="Total qty dibagi jumlah batch.">Rata-rata Qty/Batch</th>
+                                <th data-bs-toggle="tooltip" data-bs-placement="top" title="Daftar picker yang mengambil SKU ini beserta qtynya.">Picker (Qty)</th>
                             </tr>
                         </thead>
                         <tbody></tbody>
@@ -476,6 +477,7 @@
                 { data: 'batch_count' },
                 { data: 'picker_count' },
                 { data: 'avg_qty' },
+                { data: 'picker_list' },
             ]
         });
 

@@ -185,6 +185,7 @@ class PickerReportController extends Controller
                 'batch_count' => $batchCount,
                 'picker_count' => (int) $row->picker_count,
                 'avg_qty' => $avgQty,
+                'picker_list' => $row->picker_list ?? '-',
             ];
         });
 
@@ -263,14 +264,59 @@ class PickerReportController extends Controller
 
     private function buildSkuSummaryQuery(Request $request, $authUser, bool $applyFilters)
     {
+        $userAgg = PickerSessionItem::query()
+            ->join('picker_sessions', 'picker_sessions.id', '=', 'picker_session_items.picker_session_id')
+            ->join('items', 'items.id', '=', 'picker_session_items.item_id')
+            ->join('users', 'users.id', '=', 'picker_sessions.user_id')
+            ->selectRaw('picker_session_items.item_id as item_id')
+            ->selectRaw('users.id as user_id')
+            ->selectRaw('users.name as picker')
+            ->selectRaw('SUM(picker_session_items.qty) as qty')
+            ->where('picker_sessions.status', 'submitted')
+            ->whereNotNull('picker_sessions.submitted_at')
+            ->groupBy('picker_session_items.item_id', 'users.id', 'users.name');
+
+        if ($authUser) {
+            $divisiId = $authUser->divisi_id;
+            if ($divisiId !== null && (int) $divisiId !== 1) {
+                $userAgg->where('users.divisi_id', $divisiId);
+            }
+        }
+
+        if ($applyFilters) {
+            $search = trim((string) $request->input('q', ''));
+            if ($search !== '') {
+                $userAgg->where(function ($q) use ($search) {
+                    $q->where('items.sku', 'like', "%{$search}%")
+                        ->orWhere('items.name', 'like', "%{$search}%");
+                });
+            }
+            $divisiId = $request->integer('divisi_id');
+            if ($divisiId) {
+                $userAgg->where('users.divisi_id', $divisiId);
+            }
+
+            $this->applyDateFilter($userAgg, $request);
+        }
+
+        $pickerListAgg = DB::query()
+            ->fromSub($userAgg, 'u')
+            ->selectRaw('u.item_id')
+            ->selectRaw('GROUP_CONCAT(CONCAT(u.picker, " (", u.qty, ")") ORDER BY u.picker SEPARATOR ", ") as picker_list')
+            ->groupBy('u.item_id');
+
         $query = PickerSessionItem::query()
             ->join('picker_sessions', 'picker_sessions.id', '=', 'picker_session_items.picker_session_id')
             ->join('items', 'items.id', '=', 'picker_session_items.item_id')
             ->join('users', 'users.id', '=', 'picker_sessions.user_id')
+            ->leftJoinSub($pickerListAgg, 'p', function ($join) {
+                $join->on('p.item_id', '=', 'items.id');
+            })
             ->selectRaw('items.sku, items.name')
             ->selectRaw('SUM(picker_session_items.qty) as total_qty')
             ->selectRaw('COUNT(DISTINCT picker_sessions.id) as batch_count')
             ->selectRaw('COUNT(DISTINCT picker_sessions.user_id) as picker_count')
+            ->selectRaw('COALESCE(MAX(p.picker_list), "-") as picker_list')
             ->where('picker_sessions.status', 'submitted')
             ->whereNotNull('picker_sessions.submitted_at')
             ->groupBy('items.id', 'items.sku', 'items.name')
