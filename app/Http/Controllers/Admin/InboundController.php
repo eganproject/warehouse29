@@ -267,6 +267,7 @@ class InboundController extends Controller
             'typeDefault' => $type,
             'routeMap' => $routeMap,
             'importUrl' => $type === 'receipt' ? route('admin.inbound.receipts.import') : null,
+            'importTitle' => $type === 'receipt' ? 'Import Penerimaan Barang' : null,
         ]);
     }
 
