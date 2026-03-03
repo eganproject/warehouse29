@@ -34,7 +34,7 @@
                         <th>ID</th>
                         <th>Tanggal</th>
                         <th>Item</th>
-                        <th>User</th>
+                        <th>Submit By</th>
                         <th>Arah</th>
                         <th>Qty</th>
                         <th>Sumber</th>

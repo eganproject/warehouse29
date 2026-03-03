@@ -40,6 +40,7 @@
                         <th>Sumber</th>
                         <th>Status</th>
                         <th>Tanggal</th>
+                        <th>Submit By</th>
                         <th>Item</th>
                         <th>Qty</th>
                         <th>Catatan</th>
@@ -325,6 +326,7 @@
                 { data: 'source' },
                 { data: 'status', orderable: false, searchable: false, render: (data) => statusLabel(data) },
                 { data: 'transacted_at' },
+                { data: 'submit_by' },
                 { data: 'item' },
                 { data: 'qty' },
                 { data: 'note' },

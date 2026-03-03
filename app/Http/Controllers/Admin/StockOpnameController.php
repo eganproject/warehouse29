@@ -38,7 +38,8 @@ class StockOpnameController extends Controller
     {
         $baseQuery = StockOpname::query()
             ->leftJoin('stock_opname_items', 'stock_opname_items.stock_opname_id', '=', 'stock_opnames.id')
-            ->leftJoin('items', 'items.id', '=', 'stock_opname_items.item_id');
+            ->leftJoin('items', 'items.id', '=', 'stock_opname_items.item_id')
+            ->leftJoin('users as creators', 'creators.id', '=', 'stock_opnames.created_by');
 
         $search = trim((string) $request->input('q', ''));
         if ($search !== '') {
@@ -62,10 +63,11 @@ class StockOpnameController extends Controller
                 'stock_opnames.transacted_at',
                 'stock_opnames.note',
                 'stock_opnames.status',
+                DB::raw('creators.name as submit_by'),
                 DB::raw('COUNT(stock_opname_items.id) as items_count'),
                 DB::raw('COALESCE(SUM(stock_opname_items.adjustment), 0) as total_adjustment'),
             ])
-            ->groupBy('stock_opnames.id', 'stock_opnames.code', 'stock_opnames.transacted_at', 'stock_opnames.note', 'stock_opnames.status')
+            ->groupBy('stock_opnames.id', 'stock_opnames.code', 'stock_opnames.transacted_at', 'stock_opnames.note', 'stock_opnames.status', 'creators.name')
             ->orderBy('stock_opnames.transacted_at', 'desc');
 
         $start = (int) $request->input('start', 0);
@@ -80,6 +82,7 @@ class StockOpnameController extends Controller
                 'id' => $row->id,
                 'code' => $row->code,
                 'transacted_at' => $ts,
+                'submit_by' => $row->submit_by ?? '-',
                 'items_count' => (int) $row->items_count,
                 'total_adjustment' => (int) $row->total_adjustment,
                 'note' => $row->note ?? '',

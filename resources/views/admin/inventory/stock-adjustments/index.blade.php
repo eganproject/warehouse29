@@ -51,6 +51,7 @@
                         <th>Kode</th>
                         <th>Status</th>
                         <th>Tanggal</th>
+                        <th>Submit By</th>
                         <th>Item</th>
                         <th>Qty In</th>
                         <th>Qty Out</th>
@@ -389,6 +390,7 @@
                 { data: 'code' },
                 { data: 'status', orderable: false, searchable: false, render: (data) => statusLabel(data) },
                 { data: 'transacted_at' },
+                { data: 'submit_by' },
                 { data: 'item' },
                 { data: 'qty_in' },
                 { data: 'qty_out' },

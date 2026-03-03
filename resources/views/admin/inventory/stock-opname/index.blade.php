@@ -44,6 +44,7 @@
                         <th>Kode</th>
                         <th>Status</th>
                         <th>Tanggal</th>
+                        <th>Submit By</th>
                         <th>Total Item</th>
                         <th>Total Adjust</th>
                         <th>Catatan</th>
@@ -390,6 +391,7 @@
                 { data: 'code' },
                 { data: 'status', orderable: false, searchable: false, render: (data) => statusLabel(data) },
                 { data: 'transacted_at' },
+                { data: 'submit_by' },
                 { data: 'items_count' },
                 { data: 'total_adjustment' },
                 { data: 'note' },

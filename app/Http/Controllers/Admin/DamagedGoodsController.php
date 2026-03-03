@@ -31,7 +31,7 @@ class DamagedGoodsController extends Controller
     public function data(Request $request)
     {
         $query = DamagedGood::query()
-            ->with(['items.item'])
+            ->with(['items.item', 'creator'])
             ->orderBy('transacted_at', 'desc');
 
         $search = trim((string) $request->input('q', ''));
@@ -76,6 +76,7 @@ class DamagedGoodsController extends Controller
                 'source' => $sourceLabels[$row->source_type] ?? $row->source_type,
                 'source_ref' => $row->source_ref ?? '',
                 'transacted_at' => $ts,
+                'submit_by' => $row->creator?->name ?? '-',
                 'item' => $itemLabel ?: '-',
                 'qty' => $totalQty,
                 'note' => $note,

@@ -34,7 +34,7 @@ class StockAdjustmentController extends Controller
     public function data(Request $request)
     {
         $query = StockAdjustment::query()
-            ->with(['items.item'])
+            ->with(['items.item', 'creator'])
             ->orderBy('transacted_at', 'desc');
 
         $search = trim((string) $request->input('q', ''));
@@ -79,6 +79,7 @@ class StockAdjustmentController extends Controller
                 'id' => $row->id,
                 'code' => $row->code,
                 'transacted_at' => $ts,
+                'submit_by' => $row->creator?->name ?? '-',
                 'item' => $itemLabel ?: '-',
                 'qty_in' => $totalIn,
                 'qty_out' => $totalOut,

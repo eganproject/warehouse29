@@ -374,7 +374,7 @@ class InboundController extends Controller
         }
 
         $query = InboundTransaction::query()
-            ->with(['items.item'])
+            ->with(['items.item', 'creator'])
             ->select([
                 'inbound_transactions.id',
                 'inbound_transactions.code',
@@ -383,6 +383,7 @@ class InboundController extends Controller
                 'inbound_transactions.ref_no',
                 'inbound_transactions.note',
                 'inbound_transactions.status',
+                'inbound_transactions.created_by',
             ])
             ->orderBy('inbound_transactions.transacted_at', 'desc');
         if ($baseType) {
@@ -433,6 +434,7 @@ class InboundController extends Controller
                 'id' => $row->id,
                 'code' => $row->code,
                 'transacted_at' => $ts,
+                'submit_by' => $row->creator?->name ?? '-',
                 'item' => $itemLabel ?: '-',
                 'qty' => $totalQty,
                 'note' => $row->note ?? '',

@@ -286,7 +286,7 @@ class OutboundController extends Controller
         }
 
         $query = OutboundTransaction::query()
-            ->with(['items.item'])
+            ->with(['items.item', 'creator'])
             ->select([
                 'outbound_transactions.id',
                 'outbound_transactions.code',
@@ -295,6 +295,7 @@ class OutboundController extends Controller
                 'outbound_transactions.ref_no',
                 'outbound_transactions.note',
                 'outbound_transactions.status',
+                'outbound_transactions.created_by',
             ])
             ->orderBy('outbound_transactions.transacted_at', 'desc');
         if ($baseType) {
@@ -345,6 +346,7 @@ class OutboundController extends Controller
                 'id' => $row->id,
                 'code' => $row->code,
                 'transacted_at' => $ts,
+                'submit_by' => $row->creator?->name ?? '-',
                 'item' => $itemLabel ?: '-',
                 'qty' => $totalQty,
                 'note' => $row->note ?? '',
