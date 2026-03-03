@@ -16,11 +16,13 @@ return Application::configure(basePath: dirname(__DIR__))
     ])
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
+            'activity.log' => \App\Http\Middleware\LogUserActivity::class,
             'menu.permission' => \App\Http\Middleware\AuthorizeMenuPermission::class,
             'restrict.picker' => \App\Http\Middleware\RestrictPickerAccess::class,
         ]);
 
         $middleware->appendToGroup('web', 'restrict.picker');
+        $middleware->appendToGroup('web', 'activity.log');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
