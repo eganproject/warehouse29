@@ -243,14 +243,10 @@ class PickerSessionController extends Controller
         $search = trim((string) $request->input('q', ''));
         $query = Item::query();
         if ($search !== '') {
-            $query->where(function ($q) use ($search) {
-                $q->where('sku', 'like', "%{$search}%")
-                    ->orWhere('name', 'like', "%{$search}%");
-            });
+            $query->where('sku', 'like', "%{$search}%");
         }
 
-        $items = $query->orderBy('name')
-            ->limit(20)
+        $items = $query->orderBy('sku')
             ->get(['id', 'sku', 'name', 'address']);
 
         return response()->json([
