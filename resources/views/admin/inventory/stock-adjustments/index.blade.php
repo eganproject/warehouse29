@@ -8,6 +8,7 @@
     $canCreate = Perm::can(auth()->user(), 'admin.inventory.stock-adjustments.index', 'create');
     $canUpdate = Perm::can(auth()->user(), 'admin.inventory.stock-adjustments.index', 'update');
     $canDelete = Perm::can(auth()->user(), 'admin.inventory.stock-adjustments.index', 'delete');
+    $canImport = $canCreate && !empty($importUrl ?? null);
 @endphp
 
 @section('content')
@@ -31,6 +32,11 @@
                 <button type="button" class="btn btn-light" id="filter_apply">Filter</button>
                 <button type="button" class="btn btn-light" id="filter_reset">Reset</button>
             </div>
+            @if($canImport)
+                <button type="button" class="btn btn-light-primary me-3" id="btn_import_adjustment" data-bs-toggle="modal" data-bs-target="#modal_import_adjustment">
+                    Import Excel
+                </button>
+            @endif
             @if($canCreate)
                 <button type="button" class="btn btn-primary" id="btn_open_adjustment" data-bs-toggle="modal" data-bs-target="#modal_stock_adjustment">Tambah</button>
             @endif
@@ -103,6 +109,43 @@
         </div>
     </div>
 </div>
+
+@if($canImport)
+    <div class="modal fade" id="modal_import_adjustment" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered mw-650px">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="fw-bolder">Import Penyesuaian Stok</h2>
+                    <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                        <span class="svg-icon svg-icon-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                <rect opacity="0.5" x="6" y="17.3137" width="16" height="2" rx="1" transform="rotate(-45 6 17.3137)" fill="black" />
+                                <rect x="7.41422" y="6" width="16" height="2" rx="1" transform="rotate(45 7.41422 6)" fill="black" />
+                            </svg>
+                        </span>
+                    </div>
+                </div>
+                <div class="modal-body scroll-y mx-5 mx-xl-15 my-7">
+                    <div class="mb-6">
+                        <div class="text-muted fs-7">
+                            Header minimal: <strong>sku</strong>, <strong>qty</strong>, <strong>direction/arah</strong> (in/out atau tambah/kurangi).<br>
+                            Opsional: <strong>note</strong>, <strong>item_note</strong>, <strong>transacted_at</strong>.
+                        </div>
+                    </div>
+                    <div class="fv-row mb-6">
+                        <label class="required fs-6 fw-bold form-label mb-2">File Excel</label>
+                        <input type="file" class="form-control form-control-solid" id="import_adjustment_file" accept=".xlsx,.xls" />
+                        <div class="invalid-feedback d-block" id="error_import_adjustment_file"></div>
+                    </div>
+                    <div class="text-end">
+                        <button type="button" class="btn btn-light me-3" data-bs-dismiss="modal">Batal</button>
+                        <button type="button" class="btn btn-primary" id="btn_import_adjustment_submit">Import</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+@endif
 @endsection
 
 @push('scripts')
@@ -114,6 +157,7 @@
     const deleteUrlTpl = '{{ route('admin.inventory.stock-adjustments.destroy', ':id') }}';
     const approveUrlTpl = '{{ route('admin.inventory.stock-adjustments.approve', ':id') }}';
     const csrfToken = '{{ csrf_token() }}';
+    const importUrl = '{{ $importUrl ?? '' }}';
     const canUpdate = {{ $canUpdate ? 'true' : 'false' }};
     const canDelete = {{ $canDelete ? 'true' : 'false' }};
     const itemOptionsHtml = `@foreach($items as $item)<option value="{{ $item->id }}">{{ $item->sku }} - {{ $item->name }}</option>@endforeach`;
@@ -133,6 +177,12 @@
         const dateToEl = document.getElementById('filter_date_to');
         const filterApplyBtn = document.getElementById('filter_apply');
         const filterResetBtn = document.getElementById('filter_reset');
+        const importBtn = document.getElementById('btn_import_adjustment');
+        const importModalEl = document.getElementById('modal_import_adjustment');
+        const importModal = importModalEl ? new bootstrap.Modal(importModalEl) : null;
+        const importInput = document.getElementById('import_adjustment_file');
+        const importError = document.getElementById('error_import_adjustment_file');
+        const importSubmit = document.getElementById('btn_import_adjustment_submit');
         let fpFrom = null;
         let fpTo = null;
         let fpTransacted = null;
@@ -382,6 +432,56 @@
             if (fpFrom) fpFrom.clear(); else if (dateFromEl) dateFromEl.value = '';
             if (fpTo) fpTo.clear(); else if (dateToEl) dateToEl.value = '';
             reloadTable();
+        });
+
+        importBtn?.addEventListener('click', () => {
+            if (importInput) importInput.value = '';
+            if (importError) importError.textContent = '';
+        });
+
+        importSubmit?.addEventListener('click', async () => {
+            if (!importUrl) return;
+            if (importError) importError.textContent = '';
+            const file = importInput?.files?.[0];
+            if (!file) {
+                if (importError) importError.textContent = 'Pilih file Excel terlebih dahulu.';
+                return;
+            }
+            const formData = new FormData();
+            formData.append('file', file);
+            try {
+                const res = await fetch(importUrl, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json',
+                    },
+                    body: formData,
+                });
+                const text = await res.text();
+                let json;
+                try { json = JSON.parse(text); } catch (err) {
+                    if (typeof Swal !== 'undefined') Swal.fire('Error', 'Respons server tidak valid', 'error');
+                    return;
+                }
+                if (!res.ok) {
+                    const msg = json?.errors?.file?.[0] || json?.message;
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire('Error', msg || 'Gagal import', 'error');
+                    } else if (importError) {
+                        importError.textContent = msg || 'Gagal import';
+                    }
+                    return;
+                }
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire('Berhasil', json.message || 'Import berhasil', 'success');
+                }
+                if (importInput) importInput.value = '';
+                importModal?.hide();
+                reloadTable();
+            } catch (err) {
+                if (typeof Swal !== 'undefined') Swal.fire('Error', 'Gagal import', 'error');
+            }
         });
 
         tableEl.on('click', '.btn-edit', async function(e) {
