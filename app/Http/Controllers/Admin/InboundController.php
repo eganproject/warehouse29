@@ -139,6 +139,91 @@ class InboundController extends Controller
         return $this->approve('manual', $id);
     }
 
+    public function manualsImport(Request $request)
+    {
+        $request->validate([
+            'file' => ['required', 'file', 'mimes:xlsx,xls', 'max:5120'],
+        ]);
+
+        $import = new InboundReceiptsImport();
+        DB::beginTransaction();
+        try {
+            Excel::import($import, $request->file('file'));
+            $groups = $import->groups ?? [];
+            if (empty($groups)) {
+                throw ValidationException::withMessages([
+                    'file' => 'Tidak ada data valid untuk diimport',
+                ]);
+            }
+
+            $createdTx = 0;
+            $createdItems = 0;
+            foreach ($groups as $group) {
+                $transactedAt = now();
+                if (!empty($group['transacted_at'])) {
+                    try {
+                        $transactedAt = Carbon::parse($group['transacted_at']);
+                    } catch (\Throwable $e) {
+                        throw ValidationException::withMessages([
+                            'file' => 'Format transacted_at tidak valid: '.$group['transacted_at'],
+                        ]);
+                    }
+                }
+
+                $tx = InboundTransaction::create([
+                    'code' => $this->generateCode('INB-MNL'),
+                    'type' => 'manual',
+                    'ref_no' => $group['ref_no'] ?? null,
+                    'note' => $group['note'] ?? null,
+                    'transacted_at' => $transactedAt,
+                    'created_by' => auth()->id(),
+                    'status' => 'pending',
+                ]);
+                $createdTx++;
+
+                foreach ($group['items'] as $row) {
+                    InboundItem::create([
+                        'inbound_transaction_id' => $tx->id,
+                        'item_id' => $row['item_id'],
+                        'qty' => $row['qty'],
+                        'note' => $row['note'] ?? null,
+                    ]);
+                    $createdItems++;
+
+                    StockService::mutate([
+                        'item_id' => $row['item_id'],
+                        'direction' => 'in',
+                        'qty' => $row['qty'],
+                        'source_type' => 'inbound',
+                        'source_subtype' => 'manual',
+                        'source_id' => $tx->id,
+                        'source_code' => $tx->code,
+                        'note' => $row['note'] ?? null,
+                        'occurred_at' => $transactedAt,
+                        'created_by' => auth()->id(),
+                    ]);
+                }
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Import inbound manual berhasil',
+                'transactions' => $createdTx,
+                'items' => $createdItems,
+            ]);
+        } catch (ValidationException $e) {
+            DB::rollBack();
+            throw $e;
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Gagal import inbound manual',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
     public function returnsImport(Request $request)
     {
         $request->validate([
@@ -351,12 +436,18 @@ class InboundController extends Controller
             'typeOptions' => $typeOptions,
             'typeDefault' => $type,
             'routeMap' => $routeMap,
-            'importUrl' => $type === 'receipt'
-                ? route('admin.inbound.receipts.import')
-                : ($type === 'return' ? route('admin.inbound.returns.import') : null),
-            'importTitle' => $type === 'receipt'
-                ? 'Import Penerimaan Barang'
-                : ($type === 'return' ? 'Import Retur Inbound' : null),
+            'importUrl' => match ($type) {
+                'receipt' => route('admin.inbound.receipts.import'),
+                'return' => route('admin.inbound.returns.import'),
+                'manual' => route('admin.inbound.manuals.import'),
+                default => null,
+            },
+            'importTitle' => match ($type) {
+                'receipt' => 'Import Penerimaan Barang',
+                'return' => 'Import Retur Inbound',
+                'manual' => 'Import Manual Inbound',
+                default => null,
+            },
         ]);
     }
 

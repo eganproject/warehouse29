@@ -170,6 +170,7 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         Route::get('/manuals', [InboundController::class, 'manuals'])->name('manuals.index');
         Route::get('/manuals/data', [InboundController::class, 'manualsData'])->name('manuals.data');
         Route::post('/manuals', [InboundController::class, 'manualsStore'])->name('manuals.store');
+        Route::post('/manuals/import', [InboundController::class, 'manualsImport'])->name('manuals.import');
         Route::get('/manuals/{id}', [InboundController::class, 'manualsShow'])->name('manuals.show');
         Route::put('/manuals/{id}', [InboundController::class, 'manualsUpdate'])->name('manuals.update');
         Route::delete('/manuals/{id}', [InboundController::class, 'manualsDestroy'])->name('manuals.destroy');
@@ -190,6 +191,7 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         Route::get('/manuals', [OutboundController::class, 'manuals'])->name('manuals.index');
         Route::get('/manuals/data', [OutboundController::class, 'manualsData'])->name('manuals.data');
         Route::post('/manuals', [OutboundController::class, 'manualsStore'])->name('manuals.store');
+        Route::post('/manuals/import', [OutboundController::class, 'manualsImport'])->name('manuals.import');
         Route::get('/manuals/{id}', [OutboundController::class, 'manualsShow'])->name('manuals.show');
         Route::put('/manuals/{id}', [OutboundController::class, 'manualsUpdate'])->name('manuals.update');
         Route::delete('/manuals/{id}', [OutboundController::class, 'manualsDestroy'])->name('manuals.destroy');
