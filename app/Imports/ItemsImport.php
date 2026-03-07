@@ -33,7 +33,7 @@ class ItemsImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
         $required = ['sku', 'name', 'parent_category', 'category', 'description'];
         if (array_diff($required, $headers)) {
             throw ValidationException::withMessages([
-                'file' => 'Header harus minimal: sku, name, parent_category, category, description (address & stock opsional)',
+                'file' => 'Header harus minimal: sku, name, parent_category, category, description (address, stock, safety_stock opsional)',
             ]);
         }
 
@@ -45,6 +45,7 @@ class ItemsImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
             $description = trim((string) ($row['description'] ?? ''));
             $address = isset($row['address']) ? trim((string) ($row['address'] ?? '')) : '';
             $stock = $this->parseStock($row);
+            $safetyStock = $this->parseSafetyStock($row);
 
             if ($sku === '' || $name === '') {
                 continue;
@@ -69,6 +70,9 @@ class ItemsImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
             ];
             if (isset($row['address'])) {
                 $payload['address'] = $address;
+            }
+            if ($safetyStock !== null) {
+                $payload['safety_stock'] = $safetyStock;
             }
 
             $item = Item::updateOrCreate(
@@ -100,6 +104,37 @@ class ItemsImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
                 $raw = $row[$key];
                 break;
             }
+        }
+        if ($raw === null || $raw === '') {
+            return 0;
+        }
+        $value = is_numeric($raw) ? (int) $raw : (int) preg_replace('/[^0-9\-]/', '', (string) $raw);
+        return $value > 0 ? $value : 0;
+    }
+
+    protected function parseSafetyStock($row): ?int
+    {
+        $raw = null;
+        $hasKey = false;
+        foreach (['safety_stock', 'stok_pengaman', 'stock_pengaman', 'min_stock', 'minimum_stock'] as $key) {
+            if (is_array($row) && array_key_exists($key, $row)) {
+                $raw = $row[$key];
+                $hasKey = true;
+                break;
+            }
+            if ($row instanceof Collection && $row->has($key)) {
+                $raw = $row->get($key);
+                $hasKey = true;
+                break;
+            }
+            if (isset($row[$key])) {
+                $raw = $row[$key];
+                $hasKey = true;
+                break;
+            }
+        }
+        if (!$hasKey) {
+            return null;
         }
         if ($raw === null || $raw === '') {
             return 0;

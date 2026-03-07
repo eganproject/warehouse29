@@ -76,6 +76,7 @@
                         <th>Kategori</th>
                         <th>Alamat</th>
                         <th>Deskripsi</th>
+                        <th class="text-end">Stok Pengaman</th>
                         <th class="text-end">Aksi</th>
                     </tr>
                 </thead>
@@ -134,6 +135,11 @@
                         <textarea class="form-control form-control-solid" name="description" id="item_description" rows="3"></textarea>
                         <div class="invalid-feedback" id="error_description"></div>
                     </div>
+                    <div class="fv-row mb-7">
+                        <label class="fs-6 fw-bold form-label mb-2">Jumlah Stok Pengaman</label>
+                        <input type="number" min="0" class="form-control form-control-solid" name="safety_stock" id="item_safety_stock" value="0" />
+                        <div class="invalid-feedback" id="error_safety_stock"></div>
+                    </div>
                     <div class="text-end pt-3">
                         <button type="button" class="btn btn-light me-3" data-bs-dismiss="modal">Batal</button>
                         <button type="submit" class="btn btn-primary">
@@ -173,10 +179,11 @@
                         <li><strong>parent_category</strong> (opsional, parent kategori; akan dibuat jika belum ada)</li>
                         <li><strong>category</strong> (opsional, anak kategori; jika kosong akan dimasukkan ke kategori default "Tanpa Kategori")</li>
                         <li><strong>stock</strong> / <strong>stok</strong> / <strong>qty</strong> (opsional, stok awal; akan dicatat sebagai inbound saldo awal)</li>
+                        <li><strong>safety_stock</strong> / <strong>stok_pengaman</strong> (opsional, jumlah stok pengaman)</li>
                         <li><strong>address</strong> (opsional)</li>
                         <li><strong>description</strong> (opsional)</li>
                     </ul>
-                    <p class="text-muted small mb-1">Contoh header: <code>sku,name,parent_category,category,stock,address,description</code></p>
+                    <p class="text-muted small mb-1">Contoh header: <code>sku,name,parent_category,category,stock,safety_stock,address,description</code></p>
                     <p class="text-muted small mb-1">Gunakan format Excel (.xlsx/.xls) dengan header di baris pertama.</p>
                     <p class="text-muted small mb-0">Jika kolom category dikosongkan, item otomatis dimasukkan ke kategori "Tanpa Kategori".</p>
                 </div>
@@ -237,6 +244,7 @@
         const formId = document.getElementById('item_id');
         const formAddress = document.getElementById('item_address');
         const formDescription = document.getElementById('item_description');
+        const formSafetyStock = document.getElementById('item_safety_stock');
         const titleEl = document.getElementById('modal_item_title');
         const importBtn = document.getElementById('btn_import_items');
         const importModalEl = document.getElementById('modal_import_items');
@@ -334,8 +342,9 @@
                 { data: 'category' },
                 { data: 'address' },
                 { data: 'description' },
+                { data: 'safety_stock', className:'text-end', render: (data)=> data ?? 0 },
                 { data: 'id', orderable:false, searchable:false, className:'text-end', render: (data, type, row)=>{
-                    const editItem = canUpdate ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 btn-edit" data-id="${data}" data-sku="${row.sku}" data-name="${row.name}" data-category="${row.category_id}" data-address="${row.address ?? ''}" data-description="${row.description}">Edit</a></div>` : '';
+                    const editItem = canUpdate ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 btn-edit" data-id="${data}" data-sku="${row.sku}" data-name="${row.name}" data-category="${row.category_id}" data-address="${row.address ?? ''}" data-description="${row.description}" data-safety-stock="${row.safety_stock ?? 0}">Edit</a></div>` : '';
                     const delItem = canDelete ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 text-danger btn-delete" data-id="${data}">Hapus</a></div>` : '';
                     const actions = `${editItem}${delItem}`;
                     if (!actions) return '';
@@ -376,7 +385,7 @@
         });
 
         const clearErrors = () => {
-            ['error_sku','error_name','error_category_id','error_address','error_description'].forEach(id => {
+            ['error_sku','error_name','error_category_id','error_address','error_description','error_safety_stock'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.textContent = '';
             });
@@ -387,6 +396,7 @@
             form.reset();
             formId.value = '';
             if (formSku) formSku.value = '';
+            if (formSafetyStock) formSafetyStock.value = 0;
             setCategoryValue('0');
             clearErrors();
             if (titleEl) titleEl.textContent = 'Add Item';
@@ -500,12 +510,14 @@
             const categoryId = this.getAttribute('data-category');
             const address = this.getAttribute('data-address') || '';
             const description = this.getAttribute('data-description') || '';
+            const safetyStock = this.getAttribute('data-safety-stock');
             if (!form) return;
             formId.value = id;
             if (formSku) formSku.value = sku || '';
             formName.value = name;
             if (formAddress) formAddress.value = address;
             formDescription.value = description;
+            if (formSafetyStock) formSafetyStock.value = safetyStock ?? 0;
             setCategoryValue(categoryId || '0');
             clearErrors();
             if (titleEl) titleEl.textContent = 'Edit Item';

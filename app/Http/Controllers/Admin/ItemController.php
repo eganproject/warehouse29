@@ -67,6 +67,7 @@ class ItemController extends Controller
                 'category_id' => $i->category_id,
                 'address' => $i->address ?? '',
                 'description' => $i->description ?? '',
+                'safety_stock' => (int) ($i->safety_stock ?? 0),
             ];
         });
 
@@ -91,10 +92,14 @@ class ItemController extends Controller
             }],
             'address' => ['nullable', 'string'],
             'description' => ['nullable', 'string'],
+            'safety_stock' => ['nullable', 'integer', 'min:0'],
         ]);
 
         $catId = $request->input('category_id');
         $validated['category_id'] = ($catId === null || (int)$catId === 0) ? 0 : $catId;
+        if (array_key_exists('safety_stock', $validated)) {
+            $validated['safety_stock'] = max(0, (int) $validated['safety_stock']);
+        }
 
         DB::beginTransaction();
         try {
@@ -133,10 +138,14 @@ class ItemController extends Controller
             }],
             'address' => ['nullable', 'string'],
             'description' => ['nullable', 'string'],
+            'safety_stock' => ['nullable', 'integer', 'min:0'],
         ]);
 
         $catId = $request->input('category_id');
         $validated['category_id'] = ($catId === null || (int)$catId === 0) ? 0 : $catId;
+        if (array_key_exists('safety_stock', $validated)) {
+            $validated['safety_stock'] = max(0, (int) $validated['safety_stock']);
+        }
 
         DB::beginTransaction();
         try {

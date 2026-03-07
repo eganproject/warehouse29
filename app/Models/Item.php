@@ -15,6 +15,11 @@ class Item extends Model
         'category_id',
         'address',
         'description',
+        'safety_stock',
+    ];
+
+    protected $casts = [
+        'safety_stock' => 'integer',
     ];
 
     public function category()
