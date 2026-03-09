@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Exports\StockOpnameDetailExport;
 use App\Models\Item;
 use App\Models\ItemStock;
 use App\Models\StockOpname;
@@ -14,6 +15,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Maatwebsite\Excel\Facades\Excel;
 
 class StockOpnameController extends Controller
 {
@@ -142,6 +144,15 @@ class StockOpnameController extends Controller
         $opname->save();
 
         return response()->json(['message' => 'Stock opname berhasil disetujui']);
+    }
+
+    public function export(int $id)
+    {
+        $opname = StockOpname::findOrFail($id);
+        $code = $opname->code ?: 'stock-opname';
+        $filename = sprintf('stock-opname-%s-%s.xlsx', $code, now()->format('YmdHis'));
+
+        return Excel::download(new StockOpnameDetailExport($opname), $filename);
     }
 
     public function destroy(int $id)
