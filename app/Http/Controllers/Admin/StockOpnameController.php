@@ -157,9 +157,7 @@ class StockOpnameController extends Controller
                 'note' => $validated['note'] ?? null,
                 'transacted_at' => $transactedAt,
                 'created_by' => auth()->id(),
-                'status' => 'completed',
-                'completed_at' => $transactedAt,
-                'completed_by' => auth()->id(),
+                'status' => 'open',
             ]);
 
             foreach ($validated['items'] as $row) {
