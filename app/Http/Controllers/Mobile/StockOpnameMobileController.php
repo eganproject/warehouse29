@@ -35,25 +35,9 @@ class StockOpnameMobileController extends Controller
 
     public function createBatch(Request $request)
     {
-        $validated = $request->validate([
-            'note' => ['nullable', 'string'],
-            'transacted_at' => ['nullable', 'date'],
-        ]);
-
-        $code = $this->generateCode('OPN');
-        $transactedAt = !empty($validated['transacted_at'])
-            ? Carbon::parse($validated['transacted_at'])
-            : now();
-
-        $opname = StockOpname::create([
-            'code' => $code,
-            'note' => $validated['note'] ?? null,
-            'transacted_at' => $transactedAt,
-            'created_by' => auth()->id(),
-            'status' => 'open',
-        ]);
-
-        return response()->json($this->serializeBatch($opname));
+        return response()->json([
+            'message' => 'Fitur membuat batch baru dinonaktifkan. Silakan gabung batch yang sudah ada.',
+        ], 403);
     }
 
     public function showBatch(string $code)
@@ -337,28 +321,9 @@ class StockOpnameMobileController extends Controller
 
     public function completeBatch(string $code)
     {
-        $opname = StockOpname::where('code', $code)->first();
-        if (!$opname) {
-            return response()->json(['message' => 'Batch tidak ditemukan'], 404);
-        }
-        if ($opname->status !== 'open') {
-            return response()->json([
-                'message' => 'Batch sudah diselesaikan',
-                'batch' => $this->serializeBatch($opname)['batch'],
-            ]);
-        }
-        if ($opname->items()->count() === 0) {
-            throw ValidationException::withMessages([
-                'items' => 'Minimal 1 item diperlukan sebelum menyelesaikan batch',
-            ]);
-        }
-
-        $opname->status = 'completed';
-        $opname->completed_at = now();
-        $opname->completed_by = auth()->id();
-        $opname->save();
-
-        return response()->json($this->serializeBatch($opname->fresh()));
+        return response()->json([
+            'message' => 'Fitur menyelesaikan batch dinonaktifkan. Hubungi admin untuk menyelesaikan batch.',
+        ], 403);
     }
 
     private function generateCode(string $prefix): string

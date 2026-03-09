@@ -139,7 +139,6 @@
             <button type="button" class="small-btn" id="btn_join_batch">Gabung</button>
         </div>
         <div style="margin-top:10px; display:grid; gap:8px;">
-            <button type="button" class="primary-btn" id="btn_create_batch">Buat Batch Baru</button>
             <button type="button" class="sync-btn" id="btn_sync_batch">Sinkronkan Batch</button>
         </div>
         <div class="batch-info" id="batch_info" style="display:none;"></div>
@@ -170,7 +169,6 @@
         </div>
         <div class="bottom-actions">
             <div class="chip" id="batch_code_chip">Belum ada batch</div>
-            <button type="button" class="primary-btn" id="btn_complete_batch">Selesaikan Batch</button>
         </div>
     </div>
 </div>
@@ -188,9 +186,7 @@
     const el = {
         batchCode: document.getElementById('batch_code'),
         btnJoin: document.getElementById('btn_join_batch'),
-        btnCreate: document.getElementById('btn_create_batch'),
         btnSync: document.getElementById('btn_sync_batch'),
-        btnComplete: document.getElementById('btn_complete_batch'),
         batchInfo: document.getElementById('batch_info'),
         batchChip: document.getElementById('batch_code_chip'),
         searchCard: document.getElementById('search_card'),
@@ -243,8 +239,6 @@
             el.batchInfo.style.display = 'none';
             el.batchChip.textContent = 'Belum ada batch';
             el.searchCard.classList.add('disabled');
-            el.btnComplete.classList.add('disabled');
-            if (el.btnCreate) el.btnCreate.style.display = '';
             return;
         }
         el.batchCode.value = state.batch.code || '';
@@ -259,9 +253,6 @@
         `;
         const isCompleted = state.batch.status === 'completed';
         el.searchCard.classList.toggle('disabled', isCompleted);
-        el.btnComplete.classList.toggle('disabled', isCompleted);
-        el.btnComplete.textContent = isCompleted ? 'Batch Selesai' : 'Selesaikan Batch';
-        if (el.btnCreate) el.btnCreate.style.display = isCompleted ? '' : 'none';
     };
 
     const renderItems = () => {
@@ -301,74 +292,6 @@
         const url = routes.batchShow.replace('__CODE__', encodeURIComponent(code));
         const json = await fetchJson(url);
         setBatch(json);
-    };
-
-    const createBatch = async () => {
-        const json = await fetchJson(routes.batchCreate, { method: 'POST' });
-        setBatch(json);
-        if (typeof Swal !== 'undefined') {
-            Swal.fire({
-                icon: 'success',
-                title: 'Batch dibuat',
-                text: `Kode batch: ${json.batch?.code}`,
-                confirmButtonText: 'OK',
-            });
-        }
-    };
-
-    const completeBatch = async () => {
-        if (!state.batch?.code) return;
-        const rows = Array.from(el.itemsList.querySelectorAll('.item-row'));
-        const pendingUpdates = [];
-        const stateMap = new Map((state.items || []).map((row) => [String(row.id), row]));
-
-        for (const row of rows) {
-            const rowId = row.getAttribute('data-id');
-            const qtyInput = row.querySelector('.qty-input');
-            const qty = parseInt(qtyInput?.value || '0', 10);
-            if (Number.isNaN(qty) || qty < 0) {
-                Swal?.fire('Error', 'Qty tidak valid pada salah satu item.', 'error');
-                return;
-            }
-            const current = stateMap.get(String(rowId));
-            const currentQty = current ? parseInt(current.counted_qty || 0, 10) : null;
-            if (currentQty === null || qty !== currentQty) {
-                pendingUpdates.push({ id: rowId, qty });
-            }
-        }
-
-        const confirmed = typeof Swal !== 'undefined'
-            ? await Swal.fire({
-                icon: 'warning',
-                title: 'Selesaikan batch?',
-                text: 'Batch yang sudah selesai tidak bisa diedit lagi.',
-                showCancelButton: true,
-                confirmButtonText: 'Selesaikan',
-                cancelButtonText: 'Batal',
-            }).then(res => res.isConfirmed)
-            : confirm('Selesaikan batch?');
-        if (!confirmed) return;
-
-        for (const update of pendingUpdates) {
-            try {
-                await updateItem(update.id, update.qty, true);
-            } catch (err) {
-                Swal?.fire('Error', err.message || 'Gagal menyimpan perubahan item', 'error');
-                return;
-            }
-        }
-
-        const url = routes.batchComplete.replace('__CODE__', encodeURIComponent(state.batch.code));
-        const json = await fetchJson(url, { method: 'POST' });
-        setBatch(json);
-        if (typeof Swal !== 'undefined') {
-            Swal.fire({
-                icon: 'success',
-                title: 'Batch selesai',
-                text: `Batch ${json.batch?.code} sudah diselesaikan`,
-                confirmButtonText: 'OK',
-            });
-        }
     };
 
     const searchItems = async (q) => {
@@ -475,28 +398,12 @@
         }
     });
 
-    el.btnCreate.addEventListener('click', async () => {
-        try {
-            await createBatch();
-        } catch (err) {
-            Swal?.fire('Error', err.message || 'Gagal membuat batch', 'error');
-        }
-    });
-
     el.btnSync.addEventListener('click', async () => {
         if (!state.batch?.code) return;
         try {
             await loadBatch(state.batch.code);
         } catch (err) {
             Swal?.fire('Error', err.message || 'Gagal sinkron', 'error');
-        }
-    });
-
-    el.btnComplete.addEventListener('click', async () => {
-        try {
-            await completeBatch();
-        } catch (err) {
-            Swal?.fire('Error', err.message || 'Gagal menyelesaikan batch', 'error');
         }
     });
 
