@@ -7,6 +7,7 @@
     use App\Support\Permission as Perm;
     $canCreate = Perm::can(auth()->user(), 'admin.inventory.stock-opname.index', 'create');
     $canUpdate = Perm::can(auth()->user(), 'admin.inventory.stock-opname.index', 'update');
+    $canDelete = Perm::can(auth()->user(), 'admin.inventory.stock-opname.index', 'delete');
 @endphp
 
 @section('content')
@@ -163,8 +164,10 @@
     const storeUrl = '{{ $storeUrl }}';
     const detailUrlTpl = '{{ route('admin.inventory.stock-opname.show', ':id') }}';
     const approveUrlTpl = '{{ route('admin.inventory.stock-opname.approve', ':id') }}';
+    const deleteUrlTpl = '{{ route('admin.inventory.stock-opname.destroy', ':id') }}';
     const csrfToken = '{{ csrf_token() }}';
     const canUpdate = {{ $canUpdate ? 'true' : 'false' }};
+    const canDelete = {{ $canDelete ? 'true' : 'false' }};
     const itemOptionsHtml = `@foreach($items as $item)<option value="{{ $item->id }}" data-stock="{{ $item->stock }}">{{ $item->sku }} - {{ $item->name }}</option>@endforeach`;
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -401,6 +404,9 @@
                     const approveItem = (!isCompleted && canUpdate)
                         ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 text-success btn-approve" data-id="${data}">Selesaikan</a></div>`
                         : '';
+                    const delItem = (!isCompleted && canDelete)
+                        ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 text-danger btn-delete" data-id="${data}">Hapus</a></div>`
+                        : '';
                     return `
                         <div class="text-end">
                             <a href="#" class="btn btn-sm btn-light btn-active-light-primary" data-kt-menu-trigger="click" data-kt-menu-placement="bottom-end">
@@ -412,7 +418,7 @@
                                 </span>
                             </a>
                             <div class="menu menu-sub menu-sub-dropdown menu-column menu-rounded menu-gray-600 menu-state-bg-light-primary fw-bold fs-7 w-175px py-3" data-kt-menu="true">
-                                ${detailItem}${approveItem}
+                                ${detailItem}${approveItem}${delItem}
                             </div>
                         </div>
                     `;
@@ -472,6 +478,50 @@
                 reloadTable();
             } catch (err) {
                 if (typeof Swal !== 'undefined') Swal.fire('Error', 'Gagal menyelesaikan', 'error');
+            }
+        });
+
+        tableEl.on('click', '.btn-delete', async function(e) {
+            e.preventDefault();
+            const id = this.getAttribute('data-id');
+            if (!id) return;
+            let confirmed = true;
+            if (typeof Swal !== 'undefined') {
+                const res = await Swal.fire({
+                    title: 'Apakah Anda yakin?',
+                    text: 'Stock opname akan dihapus',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Hapus',
+                    cancelButtonText: 'Batal',
+                    buttonsStyling: false,
+                    customClass: {
+                        confirmButton: 'btn btn-danger',
+                        cancelButton: 'btn btn-light'
+                    }
+                });
+                confirmed = res.isConfirmed;
+            }
+            if (!confirmed) return;
+            try {
+                const res = await fetch(deleteUrlTpl.replace(':id', id), {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'Accept': 'application/json',
+                    },
+                    body: new URLSearchParams({ _method: 'DELETE' }),
+                });
+                const json = await res.json();
+                if (!res.ok) {
+                    if (typeof Swal !== 'undefined') Swal.fire('Error', json.message || 'Gagal menghapus', 'error');
+                    return;
+                }
+                if (typeof Swal !== 'undefined') Swal.fire('Berhasil', json.message || 'Berhasil', 'success');
+                reloadTable();
+            } catch (err) {
+                if (typeof Swal !== 'undefined') Swal.fire('Error', 'Gagal menghapus', 'error');
             }
         });
 

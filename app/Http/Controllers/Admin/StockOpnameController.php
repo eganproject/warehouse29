@@ -7,6 +7,7 @@ use App\Models\Item;
 use App\Models\ItemStock;
 use App\Models\StockOpname;
 use App\Models\StockOpnameItem;
+use App\Models\StockMutation;
 use App\Support\StockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -141,6 +142,37 @@ class StockOpnameController extends Controller
         $opname->save();
 
         return response()->json(['message' => 'Stock opname berhasil disetujui']);
+    }
+
+    public function destroy(int $id)
+    {
+        DB::beginTransaction();
+        try {
+            $opname = StockOpname::findOrFail($id);
+            if (($opname->status ?? 'open') === 'completed') {
+                DB::rollBack();
+                return response()->json(['message' => 'Stock opname sudah diselesaikan dan tidak bisa dihapus'], 422);
+            }
+
+            StockService::rollbackBySource('opname', $opname->id);
+            StockMutation::where('source_type', 'opname')
+                ->where('source_id', $opname->id)
+                ->delete();
+            StockOpnameItem::where('stock_opname_id', $opname->id)->delete();
+            $opname->delete();
+
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Gagal menghapus stock opname',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+
+        return response()->json([
+            'message' => 'Stock opname berhasil dihapus',
+        ]);
     }
 
     public function store(Request $request)
