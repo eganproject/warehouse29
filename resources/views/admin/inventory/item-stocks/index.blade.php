@@ -17,6 +17,9 @@
                 <input type="text" class="form-control form-control-solid w-250px ps-14" placeholder="Search items" data-kt-filter="search" />
             </div>
         </div>
+        <div class="card-toolbar">
+            <button type="button" class="btn btn-light-primary" id="btn_export_item_stocks">Export Excel</button>
+        </div>
     </div>
     <div class="card-body py-6">
         <div class="table-responsive">
@@ -39,10 +42,12 @@
 @push('scripts')
 <script>
     const dataUrl = '{{ route('admin.inventory.item-stocks.data') }}';
+    const exportUrl = '{{ route('admin.inventory.item-stocks.export') }}';
 
     document.addEventListener('DOMContentLoaded', () => {
         const tableEl = $('#item_stocks_table');
         const searchInput = document.querySelector('[data-kt-filter="search"]');
+        const exportBtn = document.getElementById('btn_export_item_stocks');
 
         if (!tableEl.length || !$.fn.DataTable) {
             console.error('DataTables unavailable');
@@ -71,6 +76,11 @@
 
         const reloadTable = () => dt.ajax.reload();
         searchInput?.addEventListener('keyup', reloadTable);
+        exportBtn?.addEventListener('click', () => {
+            const q = searchInput?.value?.trim() || '';
+            const url = q ? `${exportUrl}?q=${encodeURIComponent(q)}` : exportUrl;
+            window.location.href = url;
+        });
     });
 </script>
 @endpush

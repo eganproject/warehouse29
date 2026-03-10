@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Exports\ItemStocksExport;
 use App\Models\Item;
 use Illuminate\Http\Request;
+use Maatwebsite\Excel\Facades\Excel;
 
 class ItemStockController extends Controller
 {
@@ -51,5 +53,13 @@ class ItemStockController extends Controller
             'recordsFiltered' => $recordsFiltered,
             'data' => $data,
         ]);
+    }
+
+    public function export(Request $request)
+    {
+        $search = trim((string) $request->input('q', ''));
+        $filename = 'item-stocks-'.now()->format('YmdHis').'.xlsx';
+
+        return Excel::download(new ItemStocksExport($search), $filename);
     }
 }

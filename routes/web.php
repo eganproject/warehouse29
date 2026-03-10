@@ -113,6 +113,7 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         // Item Stocks
         Route::get('/item-stocks', [ItemStockController::class, 'index'])->name('item-stocks.index');
         Route::get('/item-stocks/data', [ItemStockController::class, 'data'])->name('item-stocks.data');
+        Route::get('/item-stocks/export', [ItemStockController::class, 'export'])->name('item-stocks.export');
 
         // Stock Mutations
         Route::get('/stock-mutations', [StockMutationController::class, 'index'])->name('stock-mutations.index');
