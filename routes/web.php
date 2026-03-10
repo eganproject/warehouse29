@@ -13,6 +13,7 @@ use App\Http\Controllers\Admin\DamagedGoodsController;
 use App\Http\Controllers\Admin\PickerHistoryController;
 use App\Http\Controllers\Admin\PickerReportController;
 use App\Http\Controllers\Admin\ActivityLogController;
+use App\Http\Controllers\Admin\StockOpnameReportController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\MenuController;
 use App\Http\Controllers\Admin\PermissionController;
@@ -226,5 +227,7 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         Route::get('/activity-logs', [ActivityLogController::class, 'index'])->name('activity-logs.index');
         Route::get('/activity-logs/data', [ActivityLogController::class, 'data'])->name('activity-logs.data');
         Route::get('/activity-logs/{id}', [ActivityLogController::class, 'show'])->name('activity-logs.show');
+        Route::get('/stock-opname', [StockOpnameReportController::class, 'index'])->name('stock-opname.index');
+        Route::get('/stock-opname/data', [StockOpnameReportController::class, 'data'])->name('stock-opname.data');
     });
 });
