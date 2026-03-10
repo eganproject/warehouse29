@@ -15,7 +15,10 @@
             </div>
         </div>
         <div class="card-toolbar">
-            <span class="text-muted small">Akurasi dihitung dari jumlah SKU vs SKU selisih.</span>
+            <div class="d-flex align-items-center gap-2">
+                <span class="text-muted small">Akurasi dihitung dari jumlah SKU vs SKU selisih.</span>
+                <button type="button" class="btn btn-light-primary btn-sm" id="btn_export_report">Export Excel</button>
+            </div>
         </div>
     </div>
     <div class="card-body pt-2">
@@ -151,6 +154,7 @@
 <script>
     const dataUrl = '{{ $dataUrl }}';
     const diffUrl = '{{ route('admin.reports.stock-opname.diff-sku') }}';
+    const exportUrl = '{{ route('admin.reports.stock-opname.export') }}';
 
     document.addEventListener('DOMContentLoaded', () => {
         const tableEl = $('#stock_opname_report_table');
@@ -161,6 +165,7 @@
         const dateToEl = document.getElementById('filter_date_to');
         const applyBtn = document.getElementById('filter_apply');
         const resetBtn = document.getElementById('filter_reset');
+        const exportBtn = document.getElementById('btn_export_report');
 
         const elSummary = {
             totalDays: document.getElementById('report_total_days'),
@@ -269,6 +274,16 @@
             if (fpFrom) fpFrom.clear(); else if (dateFromEl) dateFromEl.value = '';
             if (fpTo) fpTo.clear(); else if (dateToEl) dateToEl.value = '';
             reloadAll();
+        });
+
+        exportBtn?.addEventListener('click', () => {
+            const params = new URLSearchParams();
+            const q = searchInput?.value?.trim();
+            if (q) params.set('q', q);
+            if (dateFromEl?.value) params.set('date_from', dateFromEl.value);
+            if (dateToEl?.value) params.set('date_to', dateToEl.value);
+            const url = params.toString() ? `${exportUrl}?${params.toString()}` : exportUrl;
+            window.location.href = url;
         });
     });
 </script>

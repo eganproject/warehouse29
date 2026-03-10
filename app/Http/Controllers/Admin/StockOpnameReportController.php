@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Exports\StockOpnameReportExport;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Maatwebsite\Excel\Facades\Excel;
 
 class StockOpnameReportController extends Controller
 {
@@ -156,6 +158,18 @@ class StockOpnameReportController extends Controller
             'recordsFiltered' => $recordsFiltered,
             'data' => $data,
         ]);
+    }
+
+    public function export(Request $request)
+    {
+        $filters = [
+            'q' => trim((string) $request->input('q', '')),
+            'date_from' => $request->input('date_from'),
+            'date_to' => $request->input('date_to'),
+        ];
+        $filename = 'laporan-stock-opname-'.now()->format('YmdHis').'.xlsx';
+
+        return Excel::download(new StockOpnameReportExport($filters), $filename);
     }
 
     private function applyDateFilter($query, Request $request): void
