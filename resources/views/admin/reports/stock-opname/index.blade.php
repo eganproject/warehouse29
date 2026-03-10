@@ -65,6 +65,55 @@
     </div>
 </div>
 
+<div class="row g-4 mb-6">
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header border-0 pt-6">
+                <div class="card-title">
+                    <h3 class="card-label fw-bolder">SKU Selisih Lebih</h3>
+                </div>
+            </div>
+            <div class="card-body pt-0">
+                <div class="table-responsive">
+                    <table class="table align-middle table-row-dashed fs-6 gy-5" id="diff_plus_table">
+                        <thead>
+                            <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
+                                <th>SKU</th>
+                                <th>Nama</th>
+                                <th class="text-end">Jumlah Selisih</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header border-0 pt-6">
+                <div class="card-title">
+                    <h3 class="card-label fw-bolder">SKU Selisih Kurang</h3>
+                </div>
+            </div>
+            <div class="card-body pt-0">
+                <div class="table-responsive">
+                    <table class="table align-middle table-row-dashed fs-6 gy-5" id="diff_minus_table">
+                        <thead>
+                            <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
+                                <th>SKU</th>
+                                <th>Nama</th>
+                                <th class="text-end">Jumlah Selisih</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="card">
     <div class="card-header border-0 pt-6">
         <div class="card-title">
@@ -75,7 +124,7 @@
                         <path d="M11 19C6.55556 19 3 15.4444 3 11C3 6.55556 6.55556 3 11 3C15.4444 3 19 6.55556 19 11C19 15.4444 15.4444 19 11 19ZM11 5C7.53333 5 5 7.53333 5 11C5 14.4667 7.53333 17 11 17C14.4667 17 17 14.4667 17 11C17 7.53333 14.4667 5 11 5Z" fill="black" />
                     </svg>
                 </span>
-                <input type="text" class="form-control form-control-solid w-250px ps-14" placeholder="Cari tanggal (YYYY-MM-DD)" id="report_search" />
+                <input type="text" class="form-control form-control-solid w-250px ps-14" placeholder="Cari tanggal / SKU" id="report_search" />
             </div>
         </div>
     </div>
@@ -101,9 +150,12 @@
 @push('scripts')
 <script>
     const dataUrl = '{{ $dataUrl }}';
+    const diffUrl = '{{ route('admin.reports.stock-opname.diff-sku') }}';
 
     document.addEventListener('DOMContentLoaded', () => {
         const tableEl = $('#stock_opname_report_table');
+        const diffPlusEl = $('#diff_plus_table');
+        const diffMinusEl = $('#diff_minus_table');
         const searchInput = document.getElementById('report_search');
         const dateFromEl = document.getElementById('filter_date_from');
         const dateToEl = document.getElementById('filter_date_to');
@@ -177,13 +229,46 @@
             ]
         });
 
-        const reloadTable = () => dt.ajax.reload();
-        searchInput?.addEventListener('keyup', reloadTable);
-        applyBtn?.addEventListener('click', reloadTable);
+        const initDiffTable = (el, type) => {
+            if (!el.length) return null;
+            return el.DataTable({
+                processing: true,
+                serverSide: true,
+                dom: 'rtip',
+                ordering: false,
+                ajax: {
+                    url: diffUrl,
+                    dataSrc: 'data',
+                    data: function(params) {
+                        params.type = type;
+                        params.q = searchInput?.value || '';
+                        if (dateFromEl?.value) params.date_from = dateFromEl.value;
+                        if (dateToEl?.value) params.date_to = dateToEl.value;
+                    }
+                },
+                columns: [
+                    { data: 'sku' },
+                    { data: 'name' },
+                    { data: 'qty', className: 'text-end' },
+                ]
+            });
+        };
+
+        const diffPlusTable = initDiffTable(diffPlusEl, 'plus');
+        const diffMinusTable = initDiffTable(diffMinusEl, 'minus');
+
+        const reloadAll = () => {
+            dt.ajax.reload();
+            diffPlusTable?.ajax.reload();
+            diffMinusTable?.ajax.reload();
+        };
+
+        searchInput?.addEventListener('keyup', reloadAll);
+        applyBtn?.addEventListener('click', reloadAll);
         resetBtn?.addEventListener('click', () => {
             if (fpFrom) fpFrom.clear(); else if (dateFromEl) dateFromEl.value = '';
             if (fpTo) fpTo.clear(); else if (dateToEl) dateToEl.value = '';
-            reloadTable();
+            reloadAll();
         });
     });
 </script>

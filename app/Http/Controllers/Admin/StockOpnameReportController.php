@@ -92,6 +92,72 @@ class StockOpnameReportController extends Controller
         ]);
     }
 
+    public function diffSku(Request $request)
+    {
+        $type = $request->input('type', 'plus');
+        $isMinus = $type === 'minus';
+
+        $baseQuery = DB::table('stock_opname_items as soi')
+            ->join('stock_opnames as so', 'so.id', '=', 'soi.stock_opname_id')
+            ->join('items as i', 'i.id', '=', 'soi.item_id')
+            ->where('so.status', 'completed');
+
+        if ($isMinus) {
+            $baseQuery->where('soi.adjustment', '<', 0);
+        } else {
+            $baseQuery->where('soi.adjustment', '>', 0);
+        }
+
+        $search = trim((string) $request->input('q', ''));
+        if ($search !== '') {
+            $baseQuery->where(function ($q) use ($search) {
+                $q->where('i.sku', 'like', "%{$search}%")
+                    ->orWhere('i.name', 'like', "%{$search}%");
+            });
+        }
+
+        $this->applyDateFilter($baseQuery, $request);
+
+        $recordsTotal = DB::table('stock_opname_items as soi')
+            ->join('stock_opnames as so', 'so.id', '=', 'soi.stock_opname_id')
+            ->where('so.status', 'completed')
+            ->when($isMinus, fn ($q) => $q->where('soi.adjustment', '<', 0), fn ($q) => $q->where('soi.adjustment', '>', 0))
+            ->selectRaw('COUNT(DISTINCT soi.item_id) as total_sku')
+            ->value('total_sku') ?? 0;
+
+        $recordsFiltered = (clone $baseQuery)
+            ->selectRaw('COUNT(DISTINCT soi.item_id) as total_sku')
+            ->value('total_sku') ?? 0;
+
+        $query = (clone $baseQuery)
+            ->select('i.sku', 'i.name')
+            ->selectRaw('SUM(soi.adjustment) as total_adjustment')
+            ->groupBy('i.id', 'i.sku', 'i.name')
+            ->orderByRaw('ABS(SUM(soi.adjustment)) DESC');
+
+        $start = (int) $request->input('start', 0);
+        $length = (int) $request->input('length', 10);
+        if ($length > 0) {
+            $query->skip($start)->take($length);
+        }
+
+        $data = $query->get()->map(function ($row) use ($isMinus) {
+            $qty = (int) $row->total_adjustment;
+            return [
+                'sku' => $row->sku ?? '-',
+                'name' => $row->name ?? '-',
+                'qty' => $isMinus ? abs($qty) : $qty,
+            ];
+        });
+
+        return response()->json([
+            'draw' => (int) $request->input('draw'),
+            'recordsTotal' => $recordsTotal,
+            'recordsFiltered' => $recordsFiltered,
+            'data' => $data,
+        ]);
+    }
+
     private function applyDateFilter($query, Request $request): void
     {
         $dateFrom = $request->input('date_from');
