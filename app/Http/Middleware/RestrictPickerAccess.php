@@ -30,17 +30,22 @@ class RestrictPickerAccess
         $routeName = $request->route()?->getName() ?? '';
         $path = trim($request->path(), '/');
 
-        $isPickerRoute = str_starts_with($routeName, 'picker.') || str_starts_with($path, 'picker');
+        $isDashboardRoute = $routeName === 'picker.dashboard' || $path === 'picker/dashboard';
+        $isPackerRoute = str_starts_with($routeName, 'picker.packer') || str_starts_with($path, 'picker/packer');
+        $isPickerRoute = (str_starts_with($routeName, 'picker.') || str_starts_with($path, 'picker'))
+            && !$isPackerRoute
+            && !$isDashboardRoute;
         $isOpnameRoute = str_starts_with($routeName, 'opname.') || str_starts_with($path, 'opname');
         $isLogoutRoute = $routeName === 'logout';
-        $isDashboardRoute = $routeName === 'picker.dashboard' || $path === 'picker/dashboard';
 
         if ($hasPicker) {
-            if ($isPickerRoute || $isOpnameRoute || $isLogoutRoute) {
+            if ($isPickerRoute || $isOpnameRoute || $isLogoutRoute || $isDashboardRoute) {
                 return $next($request);
             }
-        } elseif ($hasPacker) {
-            if ($isDashboardRoute || $isOpnameRoute || $isLogoutRoute) {
+        }
+
+        if ($hasPacker) {
+            if ($isPackerRoute || $isOpnameRoute || $isLogoutRoute || $isDashboardRoute) {
                 return $next($request);
             }
         }

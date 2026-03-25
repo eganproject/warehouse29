@@ -17,9 +17,11 @@ class PickerDashboardController extends Controller
             'routes' => [
                 'opname' => route('opname.index'),
                 'picker' => route('picker.index'),
+                'packer' => route('picker.packer.index'),
                 'logout' => route('logout'),
             ],
-            'showPicking' => $hasPicker && !$hasPacker,
+            'showPicking' => $hasPicker,
+            'showPacking' => $hasPacker,
         ]);
     }
 }
