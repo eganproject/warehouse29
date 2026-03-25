@@ -19,8 +19,7 @@
         </div>
         <div class="card-toolbar">
             <div class="d-flex align-items-center gap-2">
-                <input type="text" class="form-control form-control-solid w-150px" id="filter_date_from" placeholder="Dari" />
-                <input type="text" class="form-control form-control-solid w-150px" id="filter_date_to" placeholder="Sampai" />
+                <input type="text" class="form-control form-control-solid w-150px" id="filter_date" placeholder="Tanggal" />
                 <button type="button" class="btn btn-light" id="filter_apply">Filter</button>
                 <button type="button" class="btn btn-light" id="filter_reset">Reset</button>
             </div>
@@ -53,12 +52,10 @@
     document.addEventListener('DOMContentLoaded', () => {
         const tableEl = $('#picker_transit_table');
         const searchInput = document.querySelector('[data-kt-filter="search"]');
-        const dateFromEl = document.getElementById('filter_date_from');
-        const dateToEl = document.getElementById('filter_date_to');
+        const dateEl = document.getElementById('filter_date');
         const filterApplyBtn = document.getElementById('filter_apply');
         const filterResetBtn = document.getElementById('filter_reset');
-        let fpFrom = null;
-        let fpTo = null;
+        let fpDate = null;
 
         if (!tableEl.length || !$.fn.DataTable) {
             console.error('DataTables unavailable');
@@ -66,11 +63,8 @@
         }
 
         if (typeof flatpickr !== 'undefined') {
-            if (dateFromEl) {
-                fpFrom = flatpickr(dateFromEl, { dateFormat: 'Y-m-d', allowInput: true });
-            }
-            if (dateToEl) {
-                fpTo = flatpickr(dateToEl, { dateFormat: 'Y-m-d', allowInput: true });
+            if (dateEl) {
+                fpDate = flatpickr(dateEl, { dateFormat: 'Y-m-d', allowInput: true });
             }
         }
 
@@ -84,8 +78,7 @@
                 dataSrc: 'data',
                 data: function(params) {
                     params.q = searchInput?.value || '';
-                    if (dateFromEl?.value) params.date_from = dateFromEl.value;
-                    if (dateToEl?.value) params.date_to = dateToEl.value;
+                    if (dateEl?.value) params.date = dateEl.value;
                 }
             },
             columns: [
@@ -102,8 +95,7 @@
         searchInput?.addEventListener('keyup', reloadTable);
         filterApplyBtn?.addEventListener('click', reloadTable);
         filterResetBtn?.addEventListener('click', () => {
-            if (fpFrom) fpFrom.clear(); else if (dateFromEl) dateFromEl.value = '';
-            if (fpTo) fpTo.clear(); else if (dateToEl) dateToEl.value = '';
+            if (fpDate) fpDate.clear(); else if (dateEl) dateEl.value = '';
             reloadTable();
         });
     });

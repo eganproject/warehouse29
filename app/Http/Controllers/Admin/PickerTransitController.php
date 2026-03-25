@@ -64,17 +64,12 @@ class PickerTransitController extends Controller
 
     private function applyDateFilter($query, Request $request): void
     {
-        $dateFrom = $request->input('date_from');
-        $dateTo = $request->input('date_to');
+        $date = $request->input('date');
 
         try {
-            if ($dateFrom) {
-                $from = Carbon::parse($dateFrom)->toDateString();
-                $query->where('picked_date', '>=', $from);
-            }
-            if ($dateTo) {
-                $to = Carbon::parse($dateTo)->toDateString();
-                $query->where('picked_date', '<=', $to);
+            if ($date) {
+                $target = Carbon::parse($date)->toDateString();
+                $query->where('picked_date', $target);
             }
         } catch (\Throwable) {
             // ignore invalid date filters
