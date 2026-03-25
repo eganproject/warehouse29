@@ -4,9 +4,9 @@ namespace App\Http\Controllers\Picker;
 
 use App\Http\Controllers\Controller;
 use App\Models\Item;
-use App\Models\ItemStock;
 use App\Models\PickerSession;
 use App\Models\PickerSessionItem;
+use App\Models\PickerTransitItem;
 use App\Support\StockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -69,13 +69,17 @@ class PickerSessionController extends Controller
 
         DB::beginTransaction();
         try {
+            $deltaQty = (int) $validated['qty'];
+            $occurredAt = now();
+            $pickedDate = $session->started_at?->toDateString() ?? $occurredAt->toDateString();
+
             $itemRow = PickerSessionItem::where('picker_session_id', $session->id)
                 ->where('item_id', $validated['item_id'])
                 ->lockForUpdate()
                 ->first();
 
             if ($itemRow) {
-                $itemRow->qty += (int) $validated['qty'];
+                $itemRow->qty += $deltaQty;
                 if (!empty($validated['note'])) {
                     $itemRow->note = $validated['note'];
                 }
@@ -84,12 +88,51 @@ class PickerSessionController extends Controller
                 PickerSessionItem::create([
                     'picker_session_id' => $session->id,
                     'item_id' => $validated['item_id'],
-                    'qty' => (int) $validated['qty'],
+                    'qty' => $deltaQty,
                     'note' => $validated['note'] ?? null,
                 ]);
             }
 
+            $transitRow = PickerTransitItem::where('item_id', $validated['item_id'])
+                ->where('picked_date', $pickedDate)
+                ->lockForUpdate()
+                ->first();
+
+            if ($transitRow) {
+                $transitRow->qty += $deltaQty;
+                $transitRow->remaining_qty += $deltaQty;
+                $transitRow->picked_at = $occurredAt;
+                $transitRow->save();
+            } else {
+                PickerTransitItem::create([
+                    'item_id' => $validated['item_id'],
+                    'picked_date' => $pickedDate,
+                    'qty' => $deltaQty,
+                    'remaining_qty' => $deltaQty,
+                    'picked_at' => $occurredAt,
+                ]);
+            }
+
+            StockService::mutate([
+                'item_id' => $validated['item_id'],
+                'direction' => 'out',
+                'qty' => $deltaQty,
+                'source_type' => 'picker',
+                'source_subtype' => 'mobile',
+                'source_id' => $session->id,
+                'source_code' => $session->code,
+                'note' => $validated['note'] ?? null,
+                'occurred_at' => $occurredAt,
+                'created_by' => auth()->id(),
+            ]);
+
             DB::commit();
+        } catch (ValidationException $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => $e->getMessage(),
+                'errors' => $e->errors(),
+            ], 422);
         } catch (\Throwable $e) {
             DB::rollBack();
             return response()->json([
@@ -119,13 +162,78 @@ class PickerSessionController extends Controller
             ]);
         }
 
-        $itemRow = PickerSessionItem::where('picker_session_id', $session->id)
-            ->where('id', $id)
-            ->firstOrFail();
+        DB::beginTransaction();
+        try {
+            $itemRow = PickerSessionItem::where('picker_session_id', $session->id)
+                ->where('id', $id)
+                ->lockForUpdate()
+                ->firstOrFail();
 
-        $itemRow->qty = (int) $validated['qty'];
-        $itemRow->note = $validated['note'] ?? $itemRow->note;
-        $itemRow->save();
+            $newQty = (int) $validated['qty'];
+            $oldQty = (int) $itemRow->qty;
+            $delta = $newQty - $oldQty;
+            $occurredAt = now();
+            $pickedDate = $session->started_at?->toDateString() ?? $occurredAt->toDateString();
+
+            if ($delta !== 0) {
+                StockService::mutate([
+                    'item_id' => $itemRow->item_id,
+                    'direction' => $delta > 0 ? 'out' : 'in',
+                    'qty' => abs($delta),
+                    'source_type' => 'picker',
+                    'source_subtype' => 'mobile',
+                    'source_id' => $session->id,
+                    'source_code' => $session->code,
+                    'note' => $validated['note'] ?? $itemRow->note,
+                    'occurred_at' => $occurredAt,
+                    'created_by' => auth()->id(),
+                ]);
+            }
+
+            $itemRow->qty = $newQty;
+            $itemRow->note = $validated['note'] ?? $itemRow->note;
+            $itemRow->save();
+
+            $transitRow = PickerTransitItem::where('item_id', $itemRow->item_id)
+                ->where('picked_date', $pickedDate)
+                ->lockForUpdate()
+                ->first();
+
+            if ($transitRow) {
+                $transitRow->qty += $delta;
+                $transitRow->remaining_qty = max(0, $transitRow->remaining_qty + $delta);
+                if ($delta !== 0) {
+                    $transitRow->picked_at = $occurredAt;
+                }
+                if ($transitRow->qty <= 0) {
+                    $transitRow->delete();
+                } else {
+                    $transitRow->save();
+                }
+            } elseif ($newQty > 0) {
+                PickerTransitItem::create([
+                    'item_id' => $itemRow->item_id,
+                    'picked_date' => $pickedDate,
+                    'qty' => $newQty,
+                    'remaining_qty' => $newQty,
+                    'picked_at' => $occurredAt,
+                ]);
+            }
+
+            DB::commit();
+        } catch (ValidationException $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => $e->getMessage(),
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Gagal memperbarui item',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
 
         $session->load('items.item');
 
@@ -143,9 +251,64 @@ class PickerSessionController extends Controller
             ]);
         }
 
-        PickerSessionItem::where('picker_session_id', $session->id)
-            ->where('id', $id)
-            ->delete();
+        DB::beginTransaction();
+        try {
+            $itemRow = PickerSessionItem::where('picker_session_id', $session->id)
+                ->where('id', $id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $qty = (int) $itemRow->qty;
+            $occurredAt = now();
+            $pickedDate = $session->started_at?->toDateString() ?? $occurredAt->toDateString();
+
+            $itemRow->delete();
+
+            if ($qty > 0) {
+                StockService::mutate([
+                    'item_id' => $itemRow->item_id,
+                    'direction' => 'in',
+                    'qty' => $qty,
+                    'source_type' => 'picker',
+                    'source_subtype' => 'mobile',
+                    'source_id' => $session->id,
+                    'source_code' => $session->code,
+                    'note' => $itemRow->note ?? null,
+                    'occurred_at' => $occurredAt,
+                    'created_by' => auth()->id(),
+                ]);
+            }
+
+            $transitRow = PickerTransitItem::where('item_id', $itemRow->item_id)
+                ->where('picked_date', $pickedDate)
+                ->lockForUpdate()
+                ->first();
+
+            if ($transitRow) {
+                $transitRow->qty -= $qty;
+                $transitRow->remaining_qty = max(0, $transitRow->remaining_qty - $qty);
+                $transitRow->picked_at = $occurredAt;
+                if ($transitRow->qty <= 0) {
+                    $transitRow->delete();
+                } else {
+                    $transitRow->save();
+                }
+            }
+
+            DB::commit();
+        } catch (ValidationException $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => $e->getMessage(),
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Gagal menghapus item',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
 
         $session->load('items.item');
 
@@ -176,45 +339,7 @@ class PickerSessionController extends Controller
                 ]);
             }
 
-            $insufficient = [];
-            foreach ($session->items as $row) {
-                $stock = ItemStock::where('item_id', $row->item_id)->lockForUpdate()->first();
-                $available = (int) ($stock?->stock ?? 0);
-                $required = (int) $row->qty;
-                if ($available < $required) {
-                    $insufficient[] = [
-                        'item_id' => $row->item_id,
-                        'sku' => $row->item?->sku ?? '',
-                        'name' => $row->item?->name ?? '',
-                        'available' => $available,
-                        'required' => $required,
-                    ];
-                }
-            }
-
-            if (!empty($insufficient)) {
-                DB::rollBack();
-                return response()->json([
-                    'message' => 'Stok tidak mencukupi',
-                    'insufficient' => $insufficient,
-                ], 422);
-            }
-
             $occurredAt = now();
-            foreach ($session->items as $row) {
-                StockService::mutate([
-                    'item_id' => $row->item_id,
-                    'direction' => 'out',
-                    'qty' => (int) $row->qty,
-                    'source_type' => 'picker',
-                    'source_subtype' => 'mobile',
-                    'source_id' => $session->id,
-                    'source_code' => $session->code,
-                    'note' => $row->note ?? null,
-                    'occurred_at' => $occurredAt,
-                    'created_by' => auth()->id(),
-                ]);
-            }
 
             $session->status = 'submitted';
             $session->submitted_at = $occurredAt;
