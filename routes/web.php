@@ -14,6 +14,7 @@ use App\Http\Controllers\Admin\ResiImportController;
 use App\Http\Controllers\Admin\PickerTransitController;
 use App\Http\Controllers\Admin\PickingListController;
 use App\Http\Controllers\Admin\PickerHistoryController;
+use App\Http\Controllers\Admin\PackerHistoryController;
 use App\Http\Controllers\Admin\PickerReportController;
 use App\Http\Controllers\Admin\ActivityLogController;
 use App\Http\Controllers\Admin\StockOpnameReportController;
@@ -236,6 +237,9 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         Route::get('/picker-sessions/data', [PickerHistoryController::class, 'data'])->name('picker-sessions.data');
         Route::post('/picker-sessions/{id}/submit', [PickerHistoryController::class, 'submit'])->name('picker-sessions.submit');
         Route::delete('/picker-sessions/{id}', [PickerHistoryController::class, 'destroy'])->name('picker-sessions.destroy');
+
+        Route::get('/packer-history', [PackerHistoryController::class, 'index'])->name('packer-history.index');
+        Route::get('/packer-history/data', [PackerHistoryController::class, 'data'])->name('packer-history.data');
 
         Route::get('/picker-reports', [PickerReportController::class, 'index'])->name('picker-reports.index');
         Route::get('/picker-reports/data', [PickerReportController::class, 'data'])->name('picker-reports.data');

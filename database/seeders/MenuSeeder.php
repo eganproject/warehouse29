@@ -39,6 +39,7 @@ class MenuSeeder extends Seeder
             ['name' => 'Manual', 'slug' => 'outbound-manual', 'route' => 'admin.outbound.manuals.index', 'icon' => 'fa-solid fa-pen-to-square', 'parent_slug' => 'outbound', 'sort_order' => 11],
             ['name' => 'Retur', 'slug' => 'outbound-return', 'route' => 'admin.outbound.returns.index', 'icon' => 'fa-solid fa-rotate-left', 'parent_slug' => 'outbound', 'sort_order' => 12],
             ['name' => 'History Picker', 'slug' => 'outbound-picker-history', 'route' => 'admin.outbound.picker-sessions.index', 'icon' => 'fa-solid fa-clipboard-list', 'parent_slug' => 'outbound', 'sort_order' => 13],
+            ['name' => 'History Packer', 'slug' => 'outbound-packer-history', 'route' => 'admin.outbound.packer-history.index', 'icon' => 'fa-solid fa-box-archive', 'parent_slug' => 'outbound', 'sort_order' => 13.5],
             ['name' => 'Laporan Picker', 'slug' => 'outbound-picker-report', 'route' => 'admin.outbound.picker-reports.index', 'icon' => 'fa-solid fa-file-lines', 'parent_slug' => 'reports', 'sort_order' => 1],
             ['name' => 'Aktivitas User', 'slug' => 'activity-logs', 'route' => 'admin.reports.activity-logs.index', 'icon' => 'fa-solid fa-clipboard-check', 'parent_slug' => 'reports', 'sort_order' => 2],
             ['name' => 'Laporan Stock Opname', 'slug' => 'report-stock-opname', 'route' => 'admin.reports.stock-opname.index', 'icon' => 'fa-solid fa-clipboard-list', 'parent_slug' => 'reports', 'sort_order' => 3],
