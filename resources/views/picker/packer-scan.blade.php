@@ -28,6 +28,20 @@
         border: 1px solid var(--border);
         background: #fff;
     }
+    .photo-scan {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .photo-btn {
+        width: auto;
+        padding: 10px 12px;
+        font-size: 12px;
+        border-radius: 12px;
+        font-weight: 700;
+        border: 1px dashed var(--border);
+        background: #fff;
+    }
     .status-line {
         font-size: 12px;
         color: var(--muted);
@@ -148,6 +162,11 @@
                 <input type="text" class="input" id="scan_code" placeholder="Scan No. Resi" autocomplete="off" />
                 <button type="button" class="scan-btn" id="btn_open_scanner">Scan</button>
             </div>
+            <div class="photo-scan" id="photo_scan_wrap">
+                <button type="button" class="photo-btn" id="btn_scan_photo">Scan via Foto</button>
+                <span class="muted">Alternatif untuk iPhone.</span>
+            </div>
+            <input type="file" id="scan_photo" accept="image/*" capture="environment" style="display:none;" />
             <button type="button" class="primary-btn" id="btn_scan">Proses Resi</button>
         </div>
         <div class="status-line" id="scan_status">Siap memproses resi.</div>
@@ -187,6 +206,9 @@
         scanCode: document.getElementById('scan_code'),
         btnScan: document.getElementById('btn_scan'),
         btnOpenScanner: document.getElementById('btn_open_scanner'),
+        btnScanPhoto: document.getElementById('btn_scan_photo'),
+        scanPhotoInput: document.getElementById('scan_photo'),
+        photoScanWrap: document.getElementById('photo_scan_wrap'),
         scanStatus: document.getElementById('scan_status'),
         resultCard: document.getElementById('result_card'),
         resultMeta: document.getElementById('result_meta'),
@@ -521,10 +543,47 @@
         scanLoopId = requestAnimationFrame(scanLoop);
     };
 
+    const scanFromPhoto = async (file) => {
+        if (!file) return;
+
+        setStatus('Memproses foto...', 'pending');
+        const ready = await loadHtml5Qr();
+        if (!ready || typeof Html5Qrcode === 'undefined') {
+            showError('Library scan belum tersedia. Gunakan input manual.');
+            setStatus('Scan foto gagal.', 'error');
+            return;
+        }
+
+        try {
+            closeScanner();
+            const photoScanner = new Html5Qrcode('scanner_qr');
+            const decodedText = await photoScanner.scanFile(file, true);
+            await photoScanner.clear();
+            el.scanCode.value = decodedText || '';
+            el.scanCode.focus();
+            setStatus('Hasil scan foto siap. Tekan Proses Resi.', 'success');
+        } catch (error) {
+            showError('Gagal membaca barcode dari foto. Pastikan barcode jelas dan tidak blur.');
+            setStatus('Scan foto gagal.', 'error');
+        } finally {
+            el.scanPhotoInput.value = '';
+        }
+    };
+
     el.btnScan.addEventListener('click', submitScan);
     el.btnOpenScanner.addEventListener('click', openScanner);
     el.btnCloseScanner.addEventListener('click', closeScanner);
     el.btnStartScan.addEventListener('click', startScanner);
+    if (el.photoScanWrap) {
+        el.photoScanWrap.style.display = isIOS ? 'flex' : 'none';
+    }
+    el.btnScanPhoto.addEventListener('click', () => {
+        el.scanPhotoInput.click();
+    });
+    el.scanPhotoInput.addEventListener('change', (event) => {
+        const file = event.target.files && event.target.files[0];
+        scanFromPhoto(file);
+    });
     el.scannerModal.addEventListener('click', (event) => {
         if (event.target === el.scannerModal) {
             closeScanner();
