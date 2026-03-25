@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Picker;
 use App\Http\Controllers\Controller;
 use App\Models\Item;
 use App\Models\PackerResiScan;
+use App\Models\PackerTransitHistory;
 use App\Models\PickerTransitItem;
 use App\Models\Resi;
 use App\Models\ResiDetail;
@@ -165,6 +166,21 @@ class PackerScanController extends Controller
                 'scanned_at' => now(),
                 'scanned_by' => auth()->id(),
             ]);
+
+            $transitHistory = PackerTransitHistory::where('resi_id', $resi->id)
+                ->lockForUpdate()
+                ->first();
+            if (!$transitHistory) {
+                PackerTransitHistory::create([
+                    'resi_id' => $resi->id,
+                    'id_pesanan' => $resi->id_pesanan,
+                    'no_resi' => $resi->no_resi,
+                    'status' => 'menunggu scan out',
+                ]);
+            } elseif (empty($transitHistory->no_resi) && !empty($resi->no_resi)) {
+                $transitHistory->no_resi = $resi->no_resi;
+                $transitHistory->save();
+            }
 
             DB::commit();
         } catch (\Throwable $e) {

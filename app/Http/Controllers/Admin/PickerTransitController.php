@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\PackerTransitHistory;
 use App\Models\PickerTransitItem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -13,6 +14,7 @@ class PickerTransitController extends Controller
     {
         return view('admin.inventory.picker-transit.index', [
             'dataUrl' => route('admin.inventory.picker-transit.data'),
+            'dataUrlPacker' => route('admin.inventory.picker-transit.packer-data'),
             'today' => now()->toDateString(),
         ]);
     }
@@ -63,6 +65,49 @@ class PickerTransitController extends Controller
         ]);
     }
 
+    public function dataPacker(Request $request)
+    {
+        $query = PackerTransitHistory::query()
+            ->orderByDesc('created_at')
+            ->orderByDesc('id');
+
+        $search = trim((string) $request->input('q', ''));
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('id_pesanan', 'like', "%{$search}%")
+                    ->orWhere('no_resi', 'like', "%{$search}%")
+                    ->orWhere('status', 'like', "%{$search}%");
+            });
+        }
+
+        $this->applyPackerDateFilter($query, $request);
+
+        $recordsTotal = PackerTransitHistory::count();
+        $recordsFiltered = (clone $query)->count();
+
+        $start = (int) $request->input('start', 0);
+        $length = (int) $request->input('length', 10);
+        if ($length > 0) {
+            $query->skip($start)->take($length);
+        }
+
+        $data = $query->get()->map(function ($row) {
+            return [
+                'created_at' => $row->created_at?->format('Y-m-d H:i') ?? '-',
+                'id_pesanan' => $row->id_pesanan ?? '-',
+                'no_resi' => $row->no_resi ?? '-',
+                'status' => $row->status ?? '-',
+            ];
+        });
+
+        return response()->json([
+            'draw' => (int) $request->input('draw'),
+            'recordsTotal' => $recordsTotal,
+            'recordsFiltered' => $recordsFiltered,
+            'data' => $data,
+        ]);
+    }
+
     private function applyDateFilter($query, Request $request): void
     {
         $date = $request->input('date') ?: now()->toDateString();
@@ -71,6 +116,20 @@ class PickerTransitController extends Controller
             if ($date) {
                 $target = Carbon::parse($date)->toDateString();
                 $query->where('picked_date', $target);
+            }
+        } catch (\Throwable) {
+            // ignore invalid date filters
+        }
+    }
+
+    private function applyPackerDateFilter($query, Request $request): void
+    {
+        $date = $request->input('date') ?: now()->toDateString();
+
+        try {
+            if ($date) {
+                $target = Carbon::parse($date)->toDateString();
+                $query->whereDate('created_at', $target);
             }
         } catch (\Throwable) {
             // ignore invalid date filters

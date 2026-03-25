@@ -1,7 +1,7 @@
 @extends('layouts.admin')
 
-@section('title', 'Picker Transit')
-@section('page_title', 'Picker Transit')
+@section('title', 'Transit')
+@section('page_title', 'Transit')
 
 @section('content')
 <div class="card">
@@ -14,7 +14,7 @@
                         <path d="M11 19C6.55556 19 3 15.4444 3 11C3 6.55556 6.55556 3 11 3C15.4444 3 19 6.55556 19 11C19 15.4444 15.4444 19 11 19ZM11 5C7.53333 5 5 7.53333 5 11C5 14.4667 7.53333 17 11 17C14.4667 17 17 14.4667 17 11C17 7.53333 14.4667 5 11 5Z" fill="black" />
                     </svg>
                 </span>
-                <input type="text" class="form-control form-control-solid w-250px ps-14" placeholder="Search SKU / Nama" data-kt-filter="search" />
+                <input type="text" class="form-control form-control-solid w-250px ps-14" placeholder="Search" data-kt-filter="search" />
             </div>
         </div>
         <div class="card-toolbar">
@@ -26,20 +26,47 @@
         </div>
     </div>
     <div class="card-body py-6">
-        <div class="table-responsive">
-            <table class="table align-middle table-row-dashed fs-6 gy-5" id="picker_transit_table">
-                <thead>
-                    <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
-                        <th>Tanggal</th>
-                        <th>SKU</th>
-                        <th>Nama</th>
-                        <th class="text-end">Qty Transit</th>
-                        <th class="text-end">Sisa Qty</th>
-                        <th>Last Picked</th>
-                    </tr>
-                </thead>
-                <tbody></tbody>
-            </table>
+        <ul class="nav nav-tabs nav-line-tabs mb-6" role="tablist">
+            <li class="nav-item" role="presentation">
+                <a class="nav-link active" data-bs-toggle="tab" href="#tab_picker_transit" role="tab">Picker Transit</a>
+            </li>
+            <li class="nav-item" role="presentation">
+                <a class="nav-link" data-bs-toggle="tab" href="#tab_packer_transit" role="tab">Packer Transit</a>
+            </li>
+        </ul>
+        <div class="tab-content">
+            <div class="tab-pane fade show active" id="tab_picker_transit" role="tabpanel">
+                <div class="table-responsive">
+                    <table class="table align-middle table-row-dashed fs-6 gy-5" id="picker_transit_table">
+                        <thead>
+                            <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
+                                <th>Tanggal</th>
+                                <th>SKU</th>
+                                <th>Nama</th>
+                                <th class="text-end">Qty Transit</th>
+                                <th class="text-end">Sisa Qty</th>
+                                <th>Last Picked</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="tab-pane fade" id="tab_packer_transit" role="tabpanel">
+                <div class="table-responsive">
+                    <table class="table align-middle table-row-dashed fs-6 gy-5" id="packer_transit_table">
+                        <thead>
+                            <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
+                                <th>Waktu Input</th>
+                                <th>ID Pesanan</th>
+                                <th>No Resi</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -48,15 +75,19 @@
 @push('scripts')
 <script>
     const dataUrl = '{{ $dataUrl }}';
+    const dataUrlPacker = '{{ $dataUrlPacker }}';
     const todayStr = '{{ $today ?? '' }}';
 
     document.addEventListener('DOMContentLoaded', () => {
         const tableEl = $('#picker_transit_table');
+        const packerTableEl = $('#packer_transit_table');
         const searchInput = document.querySelector('[data-kt-filter="search"]');
         const dateEl = document.getElementById('filter_date');
         const filterApplyBtn = document.getElementById('filter_apply');
         const filterResetBtn = document.getElementById('filter_reset');
         let fpDate = null;
+        let dtPicker = null;
+        let dtPacker = null;
 
         if (!tableEl.length || !$.fn.DataTable) {
             console.error('DataTables unavailable');
@@ -69,7 +100,7 @@
             }
         }
 
-        const dt = tableEl.DataTable({
+        dtPicker = tableEl.DataTable({
             processing: true,
             serverSide: true,
             dom: 'rtip',
@@ -92,16 +123,53 @@
             ]
         });
 
-        const reloadTable = () => dt.ajax.reload();
-        searchInput?.addEventListener('keyup', reloadTable);
-        filterApplyBtn?.addEventListener('click', reloadTable);
+        dtPacker = packerTableEl.DataTable({
+            processing: true,
+            serverSide: true,
+            dom: 'rtip',
+            order: [[0, 'desc']],
+            ajax: {
+                url: dataUrlPacker,
+                dataSrc: 'data',
+                data: function(params) {
+                    params.q = searchInput?.value || '';
+                    if (dateEl?.value) params.date = dateEl.value;
+                }
+            },
+            columns: [
+                { data: 'created_at' },
+                { data: 'id_pesanan' },
+                { data: 'no_resi' },
+                { data: 'status' },
+            ]
+        });
+
+        const activeTab = () => document.querySelector('.nav-link.active')?.getAttribute('href') || '#tab_picker_transit';
+        const reloadActive = () => {
+            const tab = activeTab();
+            if (tab === '#tab_packer_transit') {
+                dtPacker?.ajax?.reload();
+            } else {
+                dtPicker?.ajax?.reload();
+            }
+        };
+
+        document.querySelectorAll('a[data-bs-toggle="tab"]').forEach((el) => {
+            el.addEventListener('shown.bs.tab', () => {
+                dtPicker?.columns?.adjust();
+                dtPacker?.columns?.adjust();
+            });
+        });
+
+        searchInput?.addEventListener('keyup', reloadActive);
+        filterApplyBtn?.addEventListener('click', reloadActive);
         filterResetBtn?.addEventListener('click', () => {
             if (fpDate && todayStr) {
                 fpDate.setDate(todayStr, true);
             } else if (dateEl) {
                 dateEl.value = todayStr || '';
             }
-            reloadTable();
+            reloadActive();
         });
     });
 </script>

@@ -27,7 +27,7 @@ class MenuSeeder extends Seeder
             ['name' => 'Penyesuaian Stok', 'slug' => 'stock-adjustments', 'route' => 'admin.inventory.stock-adjustments.index', 'icon' => 'fa-solid fa-sliders', 'parent_slug' => 'inventory', 'sort_order' => 12.5],
             ['name' => 'Barang Rusak', 'slug' => 'damaged-goods', 'route' => 'admin.inventory.damaged-goods.index', 'icon' => 'fa-solid fa-triangle-exclamation', 'parent_slug' => 'inventory', 'sort_order' => 13],
             ['name' => 'Import Resi', 'slug' => 'resi-import', 'route' => 'admin.inventory.resi-import.index', 'icon' => 'fa-solid fa-file-import', 'parent_slug' => 'inventory', 'sort_order' => 13.5],
-            ['name' => 'Picker Transit', 'slug' => 'picker-transit', 'route' => 'admin.inventory.picker-transit.index', 'icon' => 'fa-solid fa-box-open', 'parent_slug' => 'inventory', 'sort_order' => 14],
+            ['name' => 'Transit', 'slug' => 'picker-transit', 'route' => 'admin.inventory.picker-transit.index', 'icon' => 'fa-solid fa-box-open', 'parent_slug' => 'inventory', 'sort_order' => 14],
             ['name' => 'Picking List', 'slug' => 'picking-list', 'route' => 'admin.inventory.picking-list.index', 'icon' => 'fa-solid fa-list-check', 'parent_slug' => 'inventory', 'sort_order' => 14.5],
             ['name' => 'Stores', 'slug' => 'stores', 'route' => 'admin.masterdata.stores.index', 'icon' => 'fa-solid fa-store', 'parent_slug' => 'master-data', 'sort_order' => 21.7],
             ['name' => 'Menus', 'slug' => 'menus', 'route' => 'admin.masterdata.menus.index', 'icon' => 'fa-solid fa-bars', 'parent_slug' => 'master-data', 'sort_order' => 22],
