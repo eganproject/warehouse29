@@ -20,12 +20,35 @@
         <div class="card-toolbar">
             <div class="d-flex align-items-center gap-2">
                 <input type="text" class="form-control form-control-solid w-150px" id="filter_date" placeholder="Tanggal" value="{{ $today ?? '' }}" />
+                <select class="form-select form-select-solid w-175px" id="filter_status">
+                    <option value="">Semua Status</option>
+                    <option value="ongoing">Dalam Proses</option>
+                    <option value="done">Selesai</option>
+                </select>
                 <button type="button" class="btn btn-light" id="filter_apply">Filter</button>
                 <button type="button" class="btn btn-light" id="filter_reset">Reset</button>
             </div>
         </div>
     </div>
     <div class="card-body py-6">
+        <div class="row g-4 mb-6">
+            <div class="col-md-3">
+                <div class="card card-flush h-100">
+                    <div class="card-body">
+                        <div class="text-muted">SKU Dalam Proses</div>
+                        <div class="fs-2 fw-bold" id="summary_ongoing">0</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card card-flush h-100">
+                    <div class="card-body">
+                        <div class="text-muted">SKU Selesai</div>
+                        <div class="fs-2 fw-bold" id="summary_done">0</div>
+                    </div>
+                </div>
+            </div>
+        </div>
         <ul class="nav nav-tabs nav-line-tabs mb-6" role="tablist">
             <li class="nav-item" role="presentation">
                 <a class="nav-link active" data-bs-toggle="tab" href="#tab_picking_list" role="tab">Picking List</a>
@@ -82,8 +105,11 @@
         const exceptionTableEl = $('#picking_exception_table');
         const searchInput = document.querySelector('[data-kt-filter="search"]');
         const dateEl = document.getElementById('filter_date');
+        const statusEl = document.getElementById('filter_status');
         const filterApplyBtn = document.getElementById('filter_apply');
         const filterResetBtn = document.getElementById('filter_reset');
+        const summaryOngoingEl = document.getElementById('summary_ongoing');
+        const summaryDoneEl = document.getElementById('summary_done');
         let fpDate = null;
         let dtList = null;
         let dtException = null;
@@ -106,10 +132,16 @@
             order: [[0, 'desc']],
             ajax: {
                 url: dataUrl,
-                dataSrc: 'data',
+                dataSrc: function(json) {
+                    const summary = json?.summary || {};
+                    if (summaryOngoingEl) summaryOngoingEl.textContent = summary.ongoing ?? 0;
+                    if (summaryDoneEl) summaryDoneEl.textContent = summary.done ?? 0;
+                    return json.data || [];
+                },
                 data: function(params) {
                     params.q = searchInput?.value || '';
                     if (dateEl?.value) params.date = dateEl.value;
+                    if (statusEl?.value) params.status = statusEl.value;
                 }
             },
             columns: [
@@ -142,14 +174,9 @@
             ]
         });
 
-        const activeTab = () => document.querySelector('.nav-link.active')?.getAttribute('href') || '#tab_picking_list';
-        const reloadActive = () => {
-            const tab = activeTab();
-            if (tab === '#tab_picking_exception') {
-                dtException?.ajax?.reload();
-            } else {
-                dtList?.ajax?.reload();
-            }
+        const reloadAll = () => {
+            dtList?.ajax?.reload();
+            dtException?.ajax?.reload();
         };
 
         document.querySelectorAll('a[data-bs-toggle="tab"]').forEach((el) => {
@@ -159,15 +186,20 @@
             });
         });
 
-        searchInput?.addEventListener('keyup', reloadActive);
-        filterApplyBtn?.addEventListener('click', reloadActive);
+        searchInput?.addEventListener('keyup', (e) => {
+            if (e.key === 'Enter') reloadAll();
+        });
+        filterApplyBtn?.addEventListener('click', reloadAll);
+        statusEl?.addEventListener('change', reloadAll);
         filterResetBtn?.addEventListener('click', () => {
             if (fpDate && todayStr) {
                 fpDate.setDate(todayStr, true);
             } else if (dateEl) {
                 dateEl.value = todayStr || '';
             }
-            reloadActive();
+            if (searchInput) searchInput.value = '';
+            if (statusEl) statusEl.value = '';
+            reloadAll();
         });
     });
 </script>

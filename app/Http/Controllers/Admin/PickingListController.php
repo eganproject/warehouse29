@@ -21,14 +21,14 @@ class PickingListController extends Controller
 
     public function data(Request $request)
     {
-        $query = PickingList::query()
+        $baseQuery = PickingList::query()
             ->with('item')
             ->orderBy('list_date', 'desc')
             ->orderBy('sku');
 
         $search = trim((string) $request->input('q', ''));
         if ($search !== '') {
-            $query->where(function ($q) use ($search) {
+            $baseQuery->where(function ($q) use ($search) {
                 $q->where('sku', 'like', "%{$search}%")
                     ->orWhereHas('item', function ($itemQ) use ($search) {
                         $itemQ->where('name', 'like', "%{$search}%");
@@ -36,9 +36,17 @@ class PickingListController extends Controller
             });
         }
 
-        $this->applyDateFilter($query, $request);
+        $this->applyDateFilter($baseQuery, $request);
 
         $recordsTotal = PickingList::count();
+        $summaryQuery = clone $baseQuery;
+        $summary = [
+            'ongoing' => (clone $summaryQuery)->where('remaining_qty', '>', 0)->count(),
+            'done' => (clone $summaryQuery)->where('remaining_qty', '<=', 0)->count(),
+        ];
+
+        $query = clone $baseQuery;
+        $this->applyStatusFilter($query, $request);
         $recordsFiltered = (clone $query)->count();
 
         $start = (int) $request->input('start', 0);
@@ -62,6 +70,7 @@ class PickingListController extends Controller
             'draw' => (int) $request->input('draw'),
             'recordsTotal' => $recordsTotal,
             'recordsFiltered' => $recordsFiltered,
+            'summary' => $summary,
             'data' => $data,
         ]);
     }
@@ -123,6 +132,16 @@ class PickingListController extends Controller
             }
         } catch (\Throwable) {
             // ignore invalid date filters
+        }
+    }
+
+    private function applyStatusFilter($query, Request $request): void
+    {
+        $status = (string) $request->input('status', '');
+        if ($status === 'ongoing') {
+            $query->where('remaining_qty', '>', 0);
+        } elseif ($status === 'done') {
+            $query->where('remaining_qty', '<=', 0);
         }
     }
 }
