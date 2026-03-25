@@ -15,6 +15,7 @@ use App\Http\Controllers\Admin\PickerTransitController;
 use App\Http\Controllers\Admin\PickingListController;
 use App\Http\Controllers\Admin\PickerHistoryController;
 use App\Http\Controllers\Admin\PackerHistoryController;
+use App\Http\Controllers\Admin\PackerScanOutHistoryController;
 use App\Http\Controllers\Admin\PickerReportController;
 use App\Http\Controllers\Admin\ActivityLogController;
 use App\Http\Controllers\Admin\StockOpnameReportController;
@@ -25,6 +26,7 @@ use App\Http\Controllers\Admin\DivisiController;
 use App\Http\Controllers\Mobile\StockOpnameMobileController;
 use App\Http\Controllers\Picker\PickerDashboardController;
 use App\Http\Controllers\Picker\PackerScanController;
+use App\Http\Controllers\Picker\PackerScanOutController;
 use App\Http\Controllers\Picker\PickerSessionController;
 use Illuminate\Support\Facades\Route;
 
@@ -51,6 +53,8 @@ Route::middleware('auth')->prefix('picker')->as('picker.')->group(function () {
     Route::get('/dashboard', [PickerDashboardController::class, 'index'])->name('dashboard');
     Route::get('/packer', [PackerScanController::class, 'index'])->name('packer.index');
     Route::post('/packer/scan', [PackerScanController::class, 'scan'])->name('packer.scan');
+    Route::get('/scan-out', [PackerScanOutController::class, 'index'])->name('scan-out.index');
+    Route::post('/scan-out/scan', [PackerScanOutController::class, 'scan'])->name('scan-out.scan');
     Route::get('/', [PickerSessionController::class, 'index'])->name('index');
     Route::get('/current', [PickerSessionController::class, 'current'])->name('current');
     Route::post('/start', [PickerSessionController::class, 'start'])->name('start');
@@ -241,6 +245,8 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
 
         Route::get('/packer-history', [PackerHistoryController::class, 'index'])->name('packer-history.index');
         Route::get('/packer-history/data', [PackerHistoryController::class, 'data'])->name('packer-history.data');
+        Route::get('/packer-scan-outs', [PackerScanOutHistoryController::class, 'index'])->name('packer-scan-outs.index');
+        Route::get('/packer-scan-outs/data', [PackerScanOutHistoryController::class, 'data'])->name('packer-scan-outs.data');
 
         Route::get('/picker-reports', [PickerReportController::class, 'index'])->name('picker-reports.index');
         Route::get('/picker-reports/data', [PickerReportController::class, 'data'])->name('picker-reports.data');

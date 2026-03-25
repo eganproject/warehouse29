@@ -39,6 +39,10 @@
         background: linear-gradient(135deg, rgba(249,115,22,0.2), rgba(251,191,36,0.2));
         border-color: rgba(249,115,22,0.25);
     }
+    .menu-icon.scan-out {
+        background: linear-gradient(135deg, rgba(14,116,144,0.2), rgba(56,189,248,0.2));
+        border-color: rgba(14,116,144,0.25);
+    }
     .menu-title {
         font-weight: 700;
         font-size: 15px;
@@ -110,6 +114,16 @@
                 <div>
                     <div class="menu-title">Packer Scan Resi</div>
                     <div class="menu-desc">Scan resi untuk mengurangi sisa transit.</div>
+                </div>
+            </a>
+        @endif
+
+        @if(!empty($showScanOut))
+            <a class="menu-card" href="{{ $routes['scanOut'] }}">
+                <div class="menu-icon scan-out">SO</div>
+                <div>
+                    <div class="menu-title">Scan Out</div>
+                    <div class="menu-desc">Scan resi keluar gudang.</div>
                 </div>
             </a>
         @endif
