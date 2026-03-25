@@ -21,8 +21,8 @@ class PickerDashboardController extends Controller
                 'packer' => route('picker.packer.index'),
                 'logout' => route('logout'),
             ],
-            'showPicking' => $hasPicker || $hasOtherRoles,
-            'showPacking' => $hasPacker || $hasOtherRoles,
+            'showPicking' => $hasPicker || $hasPacker || $hasOtherRoles,
+            'showPacking' => $hasPicker || $hasPacker || $hasOtherRoles,
         ]);
     }
 }

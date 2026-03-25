@@ -38,14 +38,8 @@ class RestrictPickerAccess
         $isOpnameRoute = str_starts_with($routeName, 'opname.') || str_starts_with($path, 'opname');
         $isLogoutRoute = $routeName === 'logout';
 
-        if ($hasPicker) {
-            if ($isPickerRoute || $isOpnameRoute || $isLogoutRoute || $isDashboardRoute) {
-                return $next($request);
-            }
-        }
-
-        if ($hasPacker) {
-            if ($isPackerRoute || $isOpnameRoute || $isLogoutRoute || $isDashboardRoute) {
+        if ($hasPicker || $hasPacker) {
+            if ($isPickerRoute || $isPackerRoute || $isOpnameRoute || $isLogoutRoute || $isDashboardRoute) {
                 return $next($request);
             }
         }
