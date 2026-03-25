@@ -142,6 +142,7 @@
             <div class="subtitle">Scan Out Gudang</div>
         </div>
         <div class="topbar-actions">
+            <a href="{{ $routes['history'] }}" class="logout">History</a>
             <a href="{{ $routes['dashboard'] }}" class="logout">Dashboard</a>
             <form method="POST" action="{{ $routes['logout'] }}">
                 @csrf

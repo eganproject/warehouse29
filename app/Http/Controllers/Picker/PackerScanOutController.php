@@ -17,8 +17,64 @@ class PackerScanOutController extends Controller
             'routes' => [
                 'dashboard' => route('picker.dashboard'),
                 'scan' => route('picker.scan-out.scan'),
+                'history' => route('picker.scan-out.history'),
                 'logout' => route('logout'),
             ],
+        ]);
+    }
+
+    public function history()
+    {
+        return view('picker.scan-out-history', [
+            'routes' => [
+                'dashboard' => route('picker.dashboard'),
+                'scanOut' => route('picker.scan-out.index'),
+                'data' => route('picker.scan-out.history-data'),
+                'logout' => route('logout'),
+            ],
+            'today' => now()->toDateString(),
+        ]);
+    }
+
+    public function historyData(Request $request)
+    {
+        $query = PackerScanOut::query()
+            ->with('resi')
+            ->orderByDesc('scanned_at')
+            ->orderByDesc('id');
+
+        $search = trim((string) $request->input('q', ''));
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('scan_code', 'like', "%{$search}%")
+                    ->orWhereHas('resi', function ($resiQ) use ($search) {
+                        $resiQ->where('id_pesanan', 'like', "%{$search}%")
+                            ->orWhere('no_resi', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        $date = $request->input('date') ?: now()->toDateString();
+        try {
+            if ($date) {
+                $query->whereDate('scan_date', $date);
+            }
+        } catch (\Throwable) {
+            // ignore invalid date
+        }
+
+        $items = $query->get()->map(function ($row) {
+            return [
+                'id_pesanan' => $row->resi?->id_pesanan ?? '-',
+                'no_resi' => $row->resi?->no_resi ?? '-',
+                'scan_type' => $row->scan_type ?? '-',
+                'scan_code' => $row->scan_code ?? '-',
+                'scanned_at' => $row->scanned_at?->format('Y-m-d H:i') ?? '-',
+            ];
+        });
+
+        return response()->json([
+            'items' => $items,
         ]);
     }
 
