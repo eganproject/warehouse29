@@ -26,6 +26,7 @@ class MenuSeeder extends Seeder
             ['name' => 'Stock Opname', 'slug' => 'stock-opname', 'route' => 'admin.inventory.stock-opname.index', 'icon' => 'fa-solid fa-clipboard-check', 'parent_slug' => 'inventory', 'sort_order' => 12],
             ['name' => 'Penyesuaian Stok', 'slug' => 'stock-adjustments', 'route' => 'admin.inventory.stock-adjustments.index', 'icon' => 'fa-solid fa-sliders', 'parent_slug' => 'inventory', 'sort_order' => 12.5],
             ['name' => 'Barang Rusak', 'slug' => 'damaged-goods', 'route' => 'admin.inventory.damaged-goods.index', 'icon' => 'fa-solid fa-triangle-exclamation', 'parent_slug' => 'inventory', 'sort_order' => 13],
+            ['name' => 'Import Resi', 'slug' => 'resi-import', 'route' => 'admin.inventory.resi-import.index', 'icon' => 'fa-solid fa-file-import', 'parent_slug' => 'inventory', 'sort_order' => 13.5],
             ['name' => 'Stores', 'slug' => 'stores', 'route' => 'admin.masterdata.stores.index', 'icon' => 'fa-solid fa-store', 'parent_slug' => 'master-data', 'sort_order' => 21.7],
             ['name' => 'Menus', 'slug' => 'menus', 'route' => 'admin.masterdata.menus.index', 'icon' => 'fa-solid fa-bars', 'parent_slug' => 'master-data', 'sort_order' => 22],
             ['name' => 'Permissions', 'slug' => 'permissions', 'route' => 'admin.masterdata.permissions.index', 'icon' => 'fa-solid fa-lock', 'parent_slug' => 'master-data', 'sort_order' => 23],
