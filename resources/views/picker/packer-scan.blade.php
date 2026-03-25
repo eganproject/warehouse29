@@ -206,6 +206,13 @@
     let html5Qr = null;
     let scanMode = 'native';
     let html5LoadPromise = null;
+    const isIOS = (() => {
+        const ua = navigator.userAgent || '';
+        const platform = navigator.platform || '';
+        const isAppleMobile = /iPad|iPhone|iPod/.test(ua);
+        const isIpadOs = platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+        return isAppleMobile || isIpadOs;
+    })();
 
     const loadHtml5Qr = () => {
         if (typeof Html5Qrcode !== 'undefined') {
@@ -391,7 +398,7 @@
             return;
         }
 
-        const hasNative = 'BarcodeDetector' in window;
+        const hasNative = 'BarcodeDetector' in window && !isIOS;
         const html5Ready = await loadHtml5Qr();
         const hasHtml5 = html5Ready && typeof Html5Qrcode !== 'undefined';
 
