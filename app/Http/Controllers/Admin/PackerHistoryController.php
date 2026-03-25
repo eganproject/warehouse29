@@ -20,7 +20,7 @@ class PackerHistoryController extends Controller
     public function data(Request $request)
     {
         $baseQuery = PackerResiScan::query()
-            ->with(['resi', 'scanner'])
+            ->with(['resi.details', 'scanner'])
             ->select('packer_resi_scans.*')
             ->selectSub(function ($q) {
                 $q->from('resi_details')
@@ -47,6 +47,9 @@ class PackerHistoryController extends Controller
                         $resiQ->where('id_pesanan', 'like', "%{$search}%")
                             ->orWhere('no_resi', 'like', "%{$search}%");
                     })
+                    ->orWhereHas('resi.details', function ($detailQ) use ($search) {
+                        $detailQ->where('sku', 'like', "%{$search}%");
+                    })
                     ->orWhereHas('scanner', function ($userQ) use ($search) {
                         $userQ->where('name', 'like', "%{$search}%")
                             ->orWhere('email', 'like', "%{$search}%");
@@ -66,6 +69,19 @@ class PackerHistoryController extends Controller
         $data = $query->get()->map(function ($row) {
             $scanDate = $row->scan_date ? Carbon::parse($row->scan_date)->format('Y-m-d') : '';
             $scannedAt = $row->scanned_at ? Carbon::parse($row->scanned_at)->format('Y-m-d H:i') : '';
+            $details = $row->resi?->details ?? collect();
+            $skuTotals = [];
+            foreach ($details as $detail) {
+                $sku = trim((string) $detail->sku);
+                $qty = (int) ($detail->qty ?? 0);
+                if ($sku === '' || $qty <= 0) {
+                    continue;
+                }
+                $skuTotals[$sku] = ($skuTotals[$sku] ?? 0) + $qty;
+            }
+            $skuList = collect($skuTotals)->map(function ($qty, $sku) {
+                return sprintf('%s (%d)', $sku, $qty);
+            })->implode(', ');
 
             return [
                 'id' => $row->id,
@@ -76,6 +92,7 @@ class PackerHistoryController extends Controller
                 'scan_code' => $row->scan_code ?? '-',
                 'id_pesanan' => $row->resi?->id_pesanan ?? '-',
                 'no_resi' => $row->resi?->no_resi ?? '-',
+                'sku_list' => $skuList !== '' ? $skuList : '-',
                 'total_sku' => (int) ($row->total_sku ?? 0),
                 'total_qty' => (int) ($row->total_qty ?? 0),
             ];

@@ -39,6 +39,7 @@
                         <th>Kode Scan</th>
                         <th>ID Pesanan</th>
                         <th>No Resi</th>
+                        <th>SKU</th>
                         <th>Total SKU</th>
                         <th>Total Qty</th>
                     </tr>
@@ -108,6 +109,7 @@
                 { data: 'scan_code' },
                 { data: 'id_pesanan' },
                 { data: 'no_resi' },
+                { data: 'sku_list' },
                 { data: 'total_sku' },
                 { data: 'total_qty' },
             ]
