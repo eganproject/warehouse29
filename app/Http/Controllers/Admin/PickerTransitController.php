@@ -38,6 +38,10 @@ class PickerTransitController extends Controller
 
         $recordsTotal = PickerTransitItem::count();
         $recordsFiltered = (clone $query)->count();
+        $summary = [
+            'ongoing' => (clone $query)->where('remaining_qty', '>', 0)->count(),
+            'done' => (clone $query)->where('remaining_qty', '<=', 0)->count(),
+        ];
 
         $start = (int) $request->input('start', 0);
         $length = (int) $request->input('length', 10);
@@ -61,6 +65,7 @@ class PickerTransitController extends Controller
             'draw' => (int) $request->input('draw'),
             'recordsTotal' => $recordsTotal,
             'recordsFiltered' => $recordsFiltered,
+            'summary' => $summary,
             'data' => $data,
         ]);
     }
@@ -84,6 +89,10 @@ class PickerTransitController extends Controller
 
         $recordsTotal = PackerTransitHistory::count();
         $recordsFiltered = (clone $query)->count();
+        $summary = [
+            'pending' => (clone $query)->where('status', 'menunggu scan out')->count(),
+            'done' => (clone $query)->where('status', 'selesai')->count(),
+        ];
 
         $start = (int) $request->input('start', 0);
         $length = (int) $request->input('length', 10);
@@ -104,6 +113,7 @@ class PickerTransitController extends Controller
             'draw' => (int) $request->input('draw'),
             'recordsTotal' => $recordsTotal,
             'recordsFiltered' => $recordsFiltered,
+            'summary' => $summary,
             'data' => $data,
         ]);
     }

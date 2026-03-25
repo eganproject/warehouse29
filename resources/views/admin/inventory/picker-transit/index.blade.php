@@ -26,6 +26,40 @@
         </div>
     </div>
     <div class="card-body py-6">
+        <div class="row g-4 mb-6">
+            <div class="col-md-3">
+                <div class="card card-flush h-100">
+                    <div class="card-body">
+                        <div class="text-muted">Picker Transit - Dalam Proses</div>
+                        <div class="fs-2 fw-bold" id="picker_summary_ongoing">0</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card card-flush h-100">
+                    <div class="card-body">
+                        <div class="text-muted">Picker Transit - Selesai</div>
+                        <div class="fs-2 fw-bold" id="picker_summary_done">0</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card card-flush h-100">
+                    <div class="card-body">
+                        <div class="text-muted">Packer Transit - Menunggu Scan Out</div>
+                        <div class="fs-2 fw-bold" id="packer_summary_pending">0</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card card-flush h-100">
+                    <div class="card-body">
+                        <div class="text-muted">Packer Transit - Selesai</div>
+                        <div class="fs-2 fw-bold" id="packer_summary_done">0</div>
+                    </div>
+                </div>
+            </div>
+        </div>
         <ul class="nav nav-tabs nav-line-tabs mb-6" role="tablist">
             <li class="nav-item" role="presentation">
                 <a class="nav-link active" data-bs-toggle="tab" href="#tab_picker_transit" role="tab">Picker Transit</a>
@@ -40,6 +74,7 @@
                     <table class="table align-middle table-row-dashed fs-6 gy-5" id="picker_transit_table">
                         <thead>
                             <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
+                                <th>No</th>
                                 <th>Tanggal</th>
                                 <th>SKU</th>
                                 <th>Nama</th>
@@ -57,6 +92,7 @@
                     <table class="table align-middle table-row-dashed fs-6 gy-5" id="packer_transit_table">
                         <thead>
                             <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
+                                <th>No</th>
                                 <th>Waktu Input</th>
                                 <th>ID Pesanan</th>
                                 <th>No Resi</th>
@@ -104,16 +140,26 @@
             processing: true,
             serverSide: true,
             dom: 'rtip',
-            order: [[0, 'desc']],
+            order: [[1, 'desc']],
             ajax: {
                 url: dataUrl,
-                dataSrc: 'data',
+                dataSrc: function(json) {
+                    const summary = json?.summary || {};
+                    const ongoing = summary.ongoing ?? 0;
+                    const done = summary.done ?? 0;
+                    const elOngoing = document.getElementById('picker_summary_ongoing');
+                    const elDone = document.getElementById('picker_summary_done');
+                    if (elOngoing) elOngoing.textContent = ongoing;
+                    if (elDone) elDone.textContent = done;
+                    return json.data || [];
+                },
                 data: function(params) {
                     params.q = searchInput?.value || '';
                     if (dateEl?.value) params.date = dateEl.value;
                 }
             },
             columns: [
+                { data: null, orderable: false, searchable: false, render: (data, type, row, meta) => meta.row + meta.settings._iDisplayStart + 1 },
                 { data: 'date' },
                 { data: 'sku' },
                 { data: 'name' },
@@ -127,16 +173,26 @@
             processing: true,
             serverSide: true,
             dom: 'rtip',
-            order: [[0, 'desc']],
+            order: [[1, 'desc']],
             ajax: {
                 url: dataUrlPacker,
-                dataSrc: 'data',
+                dataSrc: function(json) {
+                    const summary = json?.summary || {};
+                    const pending = summary.pending ?? 0;
+                    const done = summary.done ?? 0;
+                    const elPending = document.getElementById('packer_summary_pending');
+                    const elDone = document.getElementById('packer_summary_done');
+                    if (elPending) elPending.textContent = pending;
+                    if (elDone) elDone.textContent = done;
+                    return json.data || [];
+                },
                 data: function(params) {
                     params.q = searchInput?.value || '';
                     if (dateEl?.value) params.date = dateEl.value;
                 }
             },
             columns: [
+                { data: null, orderable: false, searchable: false, render: (data, type, row, meta) => meta.row + meta.settings._iDisplayStart + 1 },
                 { data: 'created_at' },
                 { data: 'id_pesanan' },
                 { data: 'no_resi' },
@@ -144,14 +200,9 @@
             ]
         });
 
-        const activeTab = () => document.querySelector('.nav-link.active')?.getAttribute('href') || '#tab_picker_transit';
-        const reloadActive = () => {
-            const tab = activeTab();
-            if (tab === '#tab_packer_transit') {
-                dtPacker?.ajax?.reload();
-            } else {
-                dtPicker?.ajax?.reload();
-            }
+        const reloadAll = () => {
+            dtPicker?.ajax?.reload();
+            dtPacker?.ajax?.reload();
         };
 
         document.querySelectorAll('a[data-bs-toggle="tab"]').forEach((el) => {
@@ -161,15 +212,15 @@
             });
         });
 
-        searchInput?.addEventListener('keyup', reloadActive);
-        filterApplyBtn?.addEventListener('click', reloadActive);
+        searchInput?.addEventListener('keyup', reloadAll);
+        filterApplyBtn?.addEventListener('click', reloadAll);
         filterResetBtn?.addEventListener('click', () => {
             if (fpDate && todayStr) {
                 fpDate.setDate(todayStr, true);
             } else if (dateEl) {
                 dateEl.value = todayStr || '';
             }
-            reloadActive();
+            reloadAll();
         });
     });
 </script>
