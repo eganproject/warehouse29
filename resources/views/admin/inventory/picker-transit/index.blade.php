@@ -7,22 +7,7 @@
 <div class="card">
     <div class="card-header border-0 pt-6">
         <div class="card-title">
-            <div class="d-flex align-items-center position-relative my-1">
-                <span class="svg-icon svg-icon-1 position-absolute ms-6">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
-                        <rect opacity="0.5" x="17.0365" y="15.1223" width="8.15546" height="2" rx="1" transform="rotate(45 17.0365 15.1223)" fill="black" />
-                        <path d="M11 19C6.55556 19 3 15.4444 3 11C3 6.55556 6.55556 3 11 3C15.4444 3 19 6.55556 19 11C19 15.4444 15.4444 19 11 19ZM11 5C7.53333 5 5 7.53333 5 11C5 14.4667 7.53333 17 11 17C14.4667 17 17 14.4667 17 11C17 7.53333 14.4667 5 11 5Z" fill="black" />
-                    </svg>
-                </span>
-                <input type="text" class="form-control form-control-solid w-250px ps-14" placeholder="Search" data-kt-filter="search" />
-            </div>
-        </div>
-        <div class="card-toolbar">
-            <div class="d-flex align-items-center gap-2">
-                <input type="text" class="form-control form-control-solid w-150px" id="filter_date" placeholder="Tanggal" value="{{ $today ?? '' }}" />
-                <button type="button" class="btn btn-light" id="filter_apply">Filter</button>
-                <button type="button" class="btn btn-light" id="filter_reset">Reset</button>
-            </div>
+            <div class="fw-bold">Transit</div>
         </div>
     </div>
     <div class="card-body py-6">
@@ -70,6 +55,20 @@
         </ul>
         <div class="tab-content">
             <div class="tab-pane fade show active" id="tab_picker_transit" role="tabpanel">
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-4">
+                    <div class="d-flex align-items-center position-relative my-1">
+                        <span class="svg-icon svg-icon-1 position-absolute ms-6">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                <rect opacity="0.5" x="17.0365" y="15.1223" width="8.15546" height="2" rx="1" transform="rotate(45 17.0365 15.1223)" fill="black" />
+                                <path d="M11 19C6.55556 19 3 15.4444 3 11C3 6.55556 6.55556 3 11 3C15.4444 3 19 6.55556 19 11C19 15.4444 15.4444 19 11 19ZM11 5C7.53333 5 5 7.53333 5 11C5 14.4667 7.53333 17 11 17C14.4667 17 17 14.4667 17 11C17 7.53333 14.4667 5 11 5Z" fill="black" />
+                            </svg>
+                        </span>
+                        <input type="text" class="form-control form-control-solid w-250px ps-14" id="picker_filter_search" placeholder="Search SKU / Nama" />
+                    </div>
+                    <input type="text" class="form-control form-control-solid w-150px" id="picker_filter_date" placeholder="Tanggal" value="{{ $today ?? '' }}" />
+                    <button type="button" class="btn btn-light" id="picker_filter_apply">Filter</button>
+                    <button type="button" class="btn btn-light" id="picker_filter_reset">Reset</button>
+                </div>
                 <div class="table-responsive">
                     <table class="table align-middle table-row-dashed fs-6 gy-5" id="picker_transit_table">
                         <thead>
@@ -88,6 +87,20 @@
                 </div>
             </div>
             <div class="tab-pane fade" id="tab_packer_transit" role="tabpanel">
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-4">
+                    <div class="d-flex align-items-center position-relative my-1">
+                        <span class="svg-icon svg-icon-1 position-absolute ms-6">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                <rect opacity="0.5" x="17.0365" y="15.1223" width="8.15546" height="2" rx="1" transform="rotate(45 17.0365 15.1223)" fill="black" />
+                                <path d="M11 19C6.55556 19 3 15.4444 3 11C3 6.55556 6.55556 3 11 3C15.4444 3 19 6.55556 19 11C19 15.4444 15.4444 19 11 19ZM11 5C7.53333 5 5 7.53333 5 11C5 14.4667 7.53333 17 11 17C14.4667 17 17 14.4667 17 11C17 7.53333 14.4667 5 11 5Z" fill="black" />
+                            </svg>
+                        </span>
+                        <input type="text" class="form-control form-control-solid w-250px ps-14" id="packer_filter_search" placeholder="Search ID Pesanan / Resi / Status" />
+                    </div>
+                    <input type="text" class="form-control form-control-solid w-150px" id="packer_filter_date" placeholder="Tanggal" value="{{ $today ?? '' }}" />
+                    <button type="button" class="btn btn-light" id="packer_filter_apply">Filter</button>
+                    <button type="button" class="btn btn-light" id="packer_filter_reset">Reset</button>
+                </div>
                 <div class="table-responsive">
                     <table class="table align-middle table-row-dashed fs-6 gy-5" id="packer_transit_table">
                         <thead>
@@ -117,11 +130,16 @@
     document.addEventListener('DOMContentLoaded', () => {
         const tableEl = $('#picker_transit_table');
         const packerTableEl = $('#packer_transit_table');
-        const searchInput = document.querySelector('[data-kt-filter="search"]');
-        const dateEl = document.getElementById('filter_date');
-        const filterApplyBtn = document.getElementById('filter_apply');
-        const filterResetBtn = document.getElementById('filter_reset');
-        let fpDate = null;
+        const pickerSearchInput = document.getElementById('picker_filter_search');
+        const pickerDateEl = document.getElementById('picker_filter_date');
+        const pickerApplyBtn = document.getElementById('picker_filter_apply');
+        const pickerResetBtn = document.getElementById('picker_filter_reset');
+        const packerSearchInput = document.getElementById('packer_filter_search');
+        const packerDateEl = document.getElementById('packer_filter_date');
+        const packerApplyBtn = document.getElementById('packer_filter_apply');
+        const packerResetBtn = document.getElementById('packer_filter_reset');
+        let fpPickerDate = null;
+        let fpPackerDate = null;
         let dtPicker = null;
         let dtPacker = null;
 
@@ -131,8 +149,11 @@
         }
 
         if (typeof flatpickr !== 'undefined') {
-            if (dateEl) {
-                fpDate = flatpickr(dateEl, { dateFormat: 'Y-m-d', allowInput: true });
+            if (pickerDateEl) {
+                fpPickerDate = flatpickr(pickerDateEl, { dateFormat: 'Y-m-d', allowInput: true });
+            }
+            if (packerDateEl) {
+                fpPackerDate = flatpickr(packerDateEl, { dateFormat: 'Y-m-d', allowInput: true });
             }
         }
 
@@ -154,8 +175,8 @@
                     return json.data || [];
                 },
                 data: function(params) {
-                    params.q = searchInput?.value || '';
-                    if (dateEl?.value) params.date = dateEl.value;
+                    params.q = pickerSearchInput?.value || '';
+                    if (pickerDateEl?.value) params.date = pickerDateEl.value;
                 }
             },
             columns: [
@@ -164,7 +185,11 @@
                 { data: 'sku' },
                 { data: 'name' },
                 { data: 'qty', className: 'text-end' },
-                { data: 'remaining_qty', className: 'text-end' },
+                { data: 'remaining_qty', className: 'text-end', render: (data) => {
+                    const value = Number(data) || 0;
+                    const badgeClass = value > 0 ? 'badge-light-warning' : 'badge-light-success';
+                    return `<span class="badge ${badgeClass}">${value}</span>`;
+                }},
                 { data: 'picked_at' },
             ]
         });
@@ -187,8 +212,8 @@
                     return json.data || [];
                 },
                 data: function(params) {
-                    params.q = searchInput?.value || '';
-                    if (dateEl?.value) params.date = dateEl.value;
+                    params.q = packerSearchInput?.value || '';
+                    if (packerDateEl?.value) params.date = packerDateEl.value;
                 }
             },
             columns: [
@@ -196,14 +221,22 @@
                 { data: 'created_at' },
                 { data: 'id_pesanan' },
                 { data: 'no_resi' },
-                { data: 'status' },
+                { data: 'status', render: (data) => {
+                    const text = data || '-';
+                    const normalized = String(text).toLowerCase();
+                    let badgeClass = 'badge-light-secondary';
+                    if (normalized === 'menunggu scan out') {
+                        badgeClass = 'badge-light-warning';
+                    } else if (normalized === 'selesai') {
+                        badgeClass = 'badge-light-success';
+                    }
+                    return `<span class="badge ${badgeClass}">${text}</span>`;
+                }},
             ]
         });
 
-        const reloadAll = () => {
-            dtPicker?.ajax?.reload();
-            dtPacker?.ajax?.reload();
-        };
+        const reloadPicker = () => dtPicker?.ajax?.reload();
+        const reloadPacker = () => dtPacker?.ajax?.reload();
 
         document.querySelectorAll('a[data-bs-toggle="tab"]').forEach((el) => {
             el.addEventListener('shown.bs.tab', () => {
@@ -212,15 +245,32 @@
             });
         });
 
-        searchInput?.addEventListener('keyup', reloadAll);
-        filterApplyBtn?.addEventListener('click', reloadAll);
-        filterResetBtn?.addEventListener('click', () => {
-            if (fpDate && todayStr) {
-                fpDate.setDate(todayStr, true);
-            } else if (dateEl) {
-                dateEl.value = todayStr || '';
+        pickerSearchInput?.addEventListener('keyup', (e) => {
+            if (e.key === 'Enter') reloadPicker();
+        });
+        pickerApplyBtn?.addEventListener('click', reloadPicker);
+        pickerResetBtn?.addEventListener('click', () => {
+            if (fpPickerDate && todayStr) {
+                fpPickerDate.setDate(todayStr, true);
+            } else if (pickerDateEl) {
+                pickerDateEl.value = todayStr || '';
             }
-            reloadAll();
+            if (pickerSearchInput) pickerSearchInput.value = '';
+            reloadPicker();
+        });
+
+        packerSearchInput?.addEventListener('keyup', (e) => {
+            if (e.key === 'Enter') reloadPacker();
+        });
+        packerApplyBtn?.addEventListener('click', reloadPacker);
+        packerResetBtn?.addEventListener('click', () => {
+            if (fpPackerDate && todayStr) {
+                fpPackerDate.setDate(todayStr, true);
+            } else if (packerDateEl) {
+                packerDateEl.value = todayStr || '';
+            }
+            if (packerSearchInput) packerSearchInput.value = '';
+            reloadPacker();
         });
     });
 </script>

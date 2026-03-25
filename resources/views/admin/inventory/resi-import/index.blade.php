@@ -9,6 +9,35 @@
 @endphp
 
 @section('content')
+<style>
+    .import-loading-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.55);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 2050;
+        padding: 24px;
+    }
+    .import-loading-card {
+        background: #fff;
+        border-radius: 16px;
+        padding: 24px 28px;
+        text-align: center;
+        box-shadow: 0 20px 50px rgba(15, 23, 42, 0.2);
+        min-width: 260px;
+    }
+</style>
+
+<div class="import-loading-overlay" id="import_loading_overlay">
+    <div class="import-loading-card">
+        <div class="spinner-border text-primary" role="status"></div>
+        <div class="fw-bold mt-3">Memproses import...</div>
+        <div class="text-muted fs-7 mt-1">Mohon tunggu, jangan tutup halaman.</div>
+    </div>
+</div>
+
 <div class="card">
     <div class="card-header border-0 pt-6">
         <div class="card-title">
@@ -132,6 +161,7 @@
         const importInput = document.getElementById('import_resi_file');
         const importError = document.getElementById('error_import_resi_file');
         const importSubmit = document.getElementById('btn_import_resi_submit');
+        const loadingOverlay = document.getElementById('import_loading_overlay');
         const filterDateEl = document.getElementById('filter_date');
         const filterSearchEl = document.getElementById('filter_search');
         const filterApplyBtn = document.getElementById('filter_apply');
@@ -209,6 +239,15 @@
             if (importError) importError.textContent = '';
         });
 
+        const setLoading = (state) => {
+            if (!loadingOverlay) return;
+            loadingOverlay.style.display = state ? 'flex' : 'none';
+            if (importSubmit) importSubmit.disabled = state;
+            if (importInput) importInput.disabled = state;
+            if (importBtn) importBtn.disabled = state;
+            document.body.style.cursor = state ? 'progress' : '';
+        };
+
         importSubmit?.addEventListener('click', async () => {
             if (!importUrl) return;
             if (importError) importError.textContent = '';
@@ -222,6 +261,7 @@
             formData.append('file', file);
 
             try {
+                setLoading(true);
                 const res = await fetch(importUrl, {
                     method: 'POST',
                     headers: {
@@ -258,6 +298,8 @@
                 } else if (importError) {
                     importError.textContent = 'Gagal import';
                 }
+            } finally {
+                setLoading(false);
             }
         });
     });
