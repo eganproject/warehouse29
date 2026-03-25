@@ -19,7 +19,7 @@
         </div>
         <div class="card-toolbar">
             <div class="d-flex align-items-center gap-2">
-                <input type="text" class="form-control form-control-solid w-150px" id="filter_date" placeholder="Tanggal" />
+                <input type="text" class="form-control form-control-solid w-150px" id="filter_date" placeholder="Tanggal" value="{{ $today ?? '' }}" />
                 <button type="button" class="btn btn-light" id="filter_apply">Filter</button>
                 <button type="button" class="btn btn-light" id="filter_reset">Reset</button>
             </div>
@@ -48,6 +48,7 @@
 @push('scripts')
 <script>
     const dataUrl = '{{ $dataUrl }}';
+    const todayStr = '{{ $today ?? '' }}';
 
     document.addEventListener('DOMContentLoaded', () => {
         const tableEl = $('#picker_transit_table');
@@ -95,7 +96,11 @@
         searchInput?.addEventListener('keyup', reloadTable);
         filterApplyBtn?.addEventListener('click', reloadTable);
         filterResetBtn?.addEventListener('click', () => {
-            if (fpDate) fpDate.clear(); else if (dateEl) dateEl.value = '';
+            if (fpDate && todayStr) {
+                fpDate.setDate(todayStr, true);
+            } else if (dateEl) {
+                dateEl.value = todayStr || '';
+            }
             reloadTable();
         });
     });

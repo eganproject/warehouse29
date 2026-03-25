@@ -29,6 +29,7 @@ class PickerHistoryController extends Controller
         return view('admin.outbound.picker-sessions.index', [
             'dataUrl' => route('admin.outbound.picker-sessions.data'),
             'users' => $users,
+            'today' => now()->toDateString(),
         ]);
     }
 

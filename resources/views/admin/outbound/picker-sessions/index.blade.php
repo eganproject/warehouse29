@@ -19,8 +19,8 @@
         </div>
         <div class="card-toolbar">
             <div class="d-flex align-items-center gap-2 me-4">
-                <input type="text" class="form-control form-control-solid w-150px" id="filter_date_from" placeholder="Dari" />
-                <input type="text" class="form-control form-control-solid w-150px" id="filter_date_to" placeholder="Sampai" />
+                <input type="text" class="form-control form-control-solid w-150px" id="filter_date_from" placeholder="Dari" value="{{ $today ?? '' }}" />
+                <input type="text" class="form-control form-control-solid w-150px" id="filter_date_to" placeholder="Sampai" value="{{ $today ?? '' }}" />
                 <button type="button" class="btn btn-light" id="filter_date_apply">Filter</button>
                 <button type="button" class="btn btn-light" id="filter_date_reset">Reset</button>
             </div>
@@ -95,6 +95,7 @@
     const submitUrlTpl = '{{ route('admin.outbound.picker-sessions.submit', ':id') }}';
     const deleteUrlTpl = '{{ route('admin.outbound.picker-sessions.destroy', ':id') }}';
     const csrfToken = '{{ csrf_token() }}';
+    const todayStr = '{{ $today ?? '' }}';
 
     document.addEventListener('DOMContentLoaded', () => {
         const tableEl = $('#picker_sessions_table');
@@ -128,9 +129,11 @@
         if (typeof flatpickr !== 'undefined') {
             if (dateFromEl) {
                 fpFrom = flatpickr(dateFromEl, { dateFormat: 'Y-m-d', allowInput: true });
+                if (todayStr && !dateFromEl.value) fpFrom.setDate(todayStr, true);
             }
             if (dateToEl) {
                 fpTo = flatpickr(dateToEl, { dateFormat: 'Y-m-d', allowInput: true });
+                if (todayStr && !dateToEl.value) fpTo.setDate(todayStr, true);
             }
         }
 
@@ -195,8 +198,16 @@
         });
         dateApplyBtn?.addEventListener('click', reloadTable);
         dateResetBtn?.addEventListener('click', () => {
-            if (fpFrom) fpFrom.clear(); else if (dateFromEl) dateFromEl.value = '';
-            if (fpTo) fpTo.clear(); else if (dateToEl) dateToEl.value = '';
+            if (fpFrom && todayStr) {
+                fpFrom.setDate(todayStr, true);
+            } else if (dateFromEl) {
+                dateFromEl.value = todayStr || '';
+            }
+            if (fpTo && todayStr) {
+                fpTo.setDate(todayStr, true);
+            } else if (dateToEl) {
+                dateToEl.value = todayStr || '';
+            }
             reloadTable();
         });
 

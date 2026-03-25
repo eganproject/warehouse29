@@ -13,6 +13,7 @@ class PickerTransitController extends Controller
     {
         return view('admin.inventory.picker-transit.index', [
             'dataUrl' => route('admin.inventory.picker-transit.data'),
+            'today' => now()->toDateString(),
         ]);
     }
 
@@ -64,7 +65,7 @@ class PickerTransitController extends Controller
 
     private function applyDateFilter($query, Request $request): void
     {
-        $date = $request->input('date');
+        $date = $request->input('date') ?: now()->toDateString();
 
         try {
             if ($date) {
