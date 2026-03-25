@@ -283,8 +283,28 @@
         }
     };
 
+    const buildErrorMessage = (res, json) => {
+        if (json?.message) {
+            return json.message;
+        }
+        if (res.status === 419) {
+            return 'Sesi habis. Silakan refresh halaman dan coba lagi.';
+        }
+        if (res.status === 403) {
+            return 'Akses ditolak.';
+        }
+        if (res.status === 404) {
+            return 'Endpoint tidak ditemukan.';
+        }
+        if (res.status >= 500) {
+            return 'Terjadi kesalahan server. Coba lagi.';
+        }
+        return 'Terjadi kesalahan.';
+    };
+
     const fetchJson = async (url, options = {}) => {
         const res = await fetch(url, {
+            credentials: 'same-origin',
             headers: {
                 'Accept': 'application/json',
                 'X-CSRF-TOKEN': csrfToken,
@@ -298,10 +318,11 @@
         try { json = JSON.parse(text); } catch (err) { json = null; }
 
         if (!res.ok) {
-            const error = new Error(json?.message || 'Terjadi kesalahan');
+            const error = new Error(buildErrorMessage(res, json));
             if (json?.details) {
                 error.details = json.details;
             }
+            error.status = res.status;
             throw error;
         }
 
@@ -371,7 +392,7 @@
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ code, type }),
+                body: JSON.stringify({ code, type, _token: csrfToken }),
             });
 
             setStatus(data?.message || 'Resi berhasil diproses.', 'success');
