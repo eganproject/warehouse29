@@ -43,6 +43,10 @@
         background: linear-gradient(135deg, rgba(14,116,144,0.2), rgba(56,189,248,0.2));
         border-color: rgba(14,116,144,0.25);
     }
+    .menu-icon.picking-list {
+        background: linear-gradient(135deg, rgba(30,64,175,0.18), rgba(59,130,246,0.2));
+        border-color: rgba(59,130,246,0.25);
+    }
     .menu-title {
         font-weight: 700;
         font-size: 15px;
@@ -124,6 +128,16 @@
                 <div>
                     <div class="menu-title">Scan Out</div>
                     <div class="menu-desc">Scan resi keluar gudang.</div>
+                </div>
+            </a>
+        @endif
+
+        @if(!empty($showPickingList))
+            <a class="menu-card" href="{{ $routes['pickingList'] }}">
+                <div class="menu-icon picking-list">PL</div>
+                <div>
+                    <div class="menu-title">Picking List</div>
+                    <div class="menu-desc">Lihat picking list & sisa qty.</div>
                 </div>
             </a>
         @endif

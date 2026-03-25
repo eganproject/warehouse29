@@ -27,6 +27,7 @@ use App\Http\Controllers\Mobile\StockOpnameMobileController;
 use App\Http\Controllers\Picker\PickerDashboardController;
 use App\Http\Controllers\Picker\PackerScanController;
 use App\Http\Controllers\Picker\PackerScanOutController;
+use App\Http\Controllers\Picker\PickingListMobileController;
 use App\Http\Controllers\Picker\PickerSessionController;
 use Illuminate\Support\Facades\Route;
 
@@ -55,6 +56,8 @@ Route::middleware('auth')->prefix('picker')->as('picker.')->group(function () {
     Route::post('/packer/scan', [PackerScanController::class, 'scan'])->name('packer.scan');
     Route::get('/scan-out', [PackerScanOutController::class, 'index'])->name('scan-out.index');
     Route::post('/scan-out/scan', [PackerScanOutController::class, 'scan'])->name('scan-out.scan');
+    Route::get('/picking-list', [PickingListMobileController::class, 'index'])->name('picking-list.index');
+    Route::get('/picking-list/data', [PickingListMobileController::class, 'data'])->name('picking-list.data');
     Route::get('/', [PickerSessionController::class, 'index'])->name('index');
     Route::get('/current', [PickerSessionController::class, 'current'])->name('current');
     Route::post('/start', [PickerSessionController::class, 'start'])->name('start');
