@@ -12,6 +12,7 @@ class PickerDashboardController extends Controller
         $roles = $user ? $user->roles()->pluck('slug') : collect();
         $hasPicker = $roles->contains('picker');
         $hasPacker = $roles->contains('packer');
+        $hasOtherRoles = $roles->diff(['picker', 'packer'])->isNotEmpty();
 
         return view('picker.dashboard', [
             'routes' => [
@@ -20,8 +21,8 @@ class PickerDashboardController extends Controller
                 'packer' => route('picker.packer.index'),
                 'logout' => route('logout'),
             ],
-            'showPicking' => $hasPicker,
-            'showPacking' => $hasPacker,
+            'showPicking' => $hasPicker || $hasOtherRoles,
+            'showPacking' => $hasPacker || $hasOtherRoles,
         ]);
     }
 }
