@@ -21,27 +21,31 @@ class PickerTransitController extends Controller
 
     public function data(Request $request)
     {
-        $query = PickerTransitItem::query()
+        $baseQuery = PickerTransitItem::query()
             ->with('item')
             ->orderBy('picked_date', 'desc')
             ->orderBy('id', 'desc');
 
         $search = trim((string) $request->input('q', ''));
         if ($search !== '') {
-            $query->whereHas('item', function ($itemQ) use ($search) {
+            $baseQuery->whereHas('item', function ($itemQ) use ($search) {
                 $itemQ->where('sku', 'like', "%{$search}%")
                     ->orWhere('name', 'like', "%{$search}%");
             });
         }
 
-        $this->applyDateFilter($query, $request);
+        $this->applyDateFilter($baseQuery, $request);
 
         $recordsTotal = PickerTransitItem::count();
-        $recordsFiltered = (clone $query)->count();
+        $summaryQuery = clone $baseQuery;
         $summary = [
-            'ongoing' => (clone $query)->where('remaining_qty', '>', 0)->count(),
-            'done' => (clone $query)->where('remaining_qty', '<=', 0)->count(),
+            'ongoing' => (clone $summaryQuery)->where('remaining_qty', '>', 0)->count(),
+            'done' => (clone $summaryQuery)->where('remaining_qty', '<=', 0)->count(),
         ];
+
+        $query = clone $baseQuery;
+        $this->applyPickerStatusFilter($query, $request);
+        $recordsFiltered = (clone $query)->count();
 
         $start = (int) $request->input('start', 0);
         $length = (int) $request->input('length', 10);
@@ -72,27 +76,31 @@ class PickerTransitController extends Controller
 
     public function dataPacker(Request $request)
     {
-        $query = PackerTransitHistory::query()
+        $baseQuery = PackerTransitHistory::query()
             ->orderByDesc('created_at')
             ->orderByDesc('id');
 
         $search = trim((string) $request->input('q', ''));
         if ($search !== '') {
-            $query->where(function ($q) use ($search) {
+            $baseQuery->where(function ($q) use ($search) {
                 $q->where('id_pesanan', 'like', "%{$search}%")
                     ->orWhere('no_resi', 'like', "%{$search}%")
                     ->orWhere('status', 'like', "%{$search}%");
             });
         }
 
-        $this->applyPackerDateFilter($query, $request);
+        $this->applyPackerDateFilter($baseQuery, $request);
 
         $recordsTotal = PackerTransitHistory::count();
-        $recordsFiltered = (clone $query)->count();
+        $summaryQuery = clone $baseQuery;
         $summary = [
-            'pending' => (clone $query)->where('status', 'menunggu scan out')->count(),
-            'done' => (clone $query)->where('status', 'selesai')->count(),
+            'pending' => (clone $summaryQuery)->where('status', 'menunggu scan out')->count(),
+            'done' => (clone $summaryQuery)->where('status', 'selesai')->count(),
         ];
+
+        $query = clone $baseQuery;
+        $this->applyPackerStatusFilter($query, $request);
+        $recordsFiltered = (clone $query)->count();
 
         $start = (int) $request->input('start', 0);
         $length = (int) $request->input('length', 10);
@@ -143,6 +151,26 @@ class PickerTransitController extends Controller
             }
         } catch (\Throwable) {
             // ignore invalid date filters
+        }
+    }
+
+    private function applyPickerStatusFilter($query, Request $request): void
+    {
+        $status = (string) $request->input('status', '');
+        if ($status === 'ongoing') {
+            $query->where('remaining_qty', '>', 0);
+        } elseif ($status === 'done') {
+            $query->where('remaining_qty', '<=', 0);
+        }
+    }
+
+    private function applyPackerStatusFilter($query, Request $request): void
+    {
+        $status = (string) $request->input('status', '');
+        if ($status === 'pending') {
+            $query->where('status', 'menunggu scan out');
+        } elseif ($status === 'done') {
+            $query->where('status', 'selesai');
         }
     }
 }

@@ -66,6 +66,11 @@
                         <input type="text" class="form-control form-control-solid w-250px ps-14" id="picker_filter_search" placeholder="Search SKU / Nama" />
                     </div>
                     <input type="text" class="form-control form-control-solid w-150px" id="picker_filter_date" placeholder="Tanggal" value="{{ $today ?? '' }}" />
+                    <select class="form-select form-select-solid w-175px" id="picker_filter_status">
+                        <option value="">Semua Status</option>
+                        <option value="ongoing">Dalam Proses</option>
+                        <option value="done">Selesai</option>
+                    </select>
                     <button type="button" class="btn btn-light" id="picker_filter_apply">Filter</button>
                     <button type="button" class="btn btn-light" id="picker_filter_reset">Reset</button>
                 </div>
@@ -98,6 +103,11 @@
                         <input type="text" class="form-control form-control-solid w-250px ps-14" id="packer_filter_search" placeholder="Search ID Pesanan / Resi / Status" />
                     </div>
                     <input type="text" class="form-control form-control-solid w-150px" id="packer_filter_date" placeholder="Tanggal" value="{{ $today ?? '' }}" />
+                    <select class="form-select form-select-solid w-175px" id="packer_filter_status">
+                        <option value="">Semua Status</option>
+                        <option value="pending">Menunggu Scan Out</option>
+                        <option value="done">Selesai</option>
+                    </select>
                     <button type="button" class="btn btn-light" id="packer_filter_apply">Filter</button>
                     <button type="button" class="btn btn-light" id="packer_filter_reset">Reset</button>
                 </div>
@@ -134,10 +144,12 @@
         const pickerDateEl = document.getElementById('picker_filter_date');
         const pickerApplyBtn = document.getElementById('picker_filter_apply');
         const pickerResetBtn = document.getElementById('picker_filter_reset');
+        const pickerStatusEl = document.getElementById('picker_filter_status');
         const packerSearchInput = document.getElementById('packer_filter_search');
         const packerDateEl = document.getElementById('packer_filter_date');
         const packerApplyBtn = document.getElementById('packer_filter_apply');
         const packerResetBtn = document.getElementById('packer_filter_reset');
+        const packerStatusEl = document.getElementById('packer_filter_status');
         let fpPickerDate = null;
         let fpPackerDate = null;
         let dtPicker = null;
@@ -177,6 +189,7 @@
                 data: function(params) {
                     params.q = pickerSearchInput?.value || '';
                     if (pickerDateEl?.value) params.date = pickerDateEl.value;
+                    if (pickerStatusEl?.value) params.status = pickerStatusEl.value;
                 }
             },
             columns: [
@@ -214,6 +227,7 @@
                 data: function(params) {
                     params.q = packerSearchInput?.value || '';
                     if (packerDateEl?.value) params.date = packerDateEl.value;
+                    if (packerStatusEl?.value) params.status = packerStatusEl.value;
                 }
             },
             columns: [
@@ -256,8 +270,10 @@
                 pickerDateEl.value = todayStr || '';
             }
             if (pickerSearchInput) pickerSearchInput.value = '';
+            if (pickerStatusEl) pickerStatusEl.value = '';
             reloadPicker();
         });
+        pickerStatusEl?.addEventListener('change', reloadPicker);
 
         packerSearchInput?.addEventListener('keyup', (e) => {
             if (e.key === 'Enter') reloadPacker();
@@ -270,8 +286,10 @@
                 packerDateEl.value = todayStr || '';
             }
             if (packerSearchInput) packerSearchInput.value = '';
+            if (packerStatusEl) packerStatusEl.value = '';
             reloadPacker();
         });
+        packerStatusEl?.addEventListener('change', reloadPacker);
     });
 </script>
 @endpush
