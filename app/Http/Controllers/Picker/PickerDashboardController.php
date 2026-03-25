@@ -27,7 +27,7 @@ class PickerDashboardController extends Controller
             ],
             'showPicking' => ($hasPicker || $hasPacker || $hasOtherRoles) && !$isAdminScanOnly,
             'showPacking' => ($hasPicker || $hasPacker || $hasOtherRoles) && !$isAdminScanOnly,
-            'showScanOut' => $hasPicker || $hasPacker || $hasAdminScan || $hasOtherRoles,
+            'showScanOut' => ($hasAdminScan || $hasOtherRoles) && !$hasPicker && !$hasPacker,
             'showPickingList' => ($hasPicker || $hasPacker || $hasOtherRoles) && !$isAdminScanOnly,
         ]);
     }
