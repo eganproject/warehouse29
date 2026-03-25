@@ -570,6 +570,21 @@
         }
     };
 
+    const updateScanAvailability = async () => {
+        const hasNative = 'BarcodeDetector' in window && !isIOS;
+        const html5Ready = await loadHtml5Qr();
+        const hasHtml5 = html5Ready && typeof Html5Qrcode !== 'undefined';
+        const canUseCamera = window.isSecureContext && navigator.mediaDevices && navigator.mediaDevices.getUserMedia;
+        const supported = canUseCamera && (hasNative || hasHtml5);
+
+        if (!supported) {
+            if (el.btnOpenScanner) el.btnOpenScanner.style.display = 'none';
+            if (el.photoScanWrap) el.photoScanWrap.style.display = 'none';
+            setStatus('Scan kamera tidak tersedia. Gunakan input manual.', 'error');
+            return;
+        }
+    };
+
     el.btnScan.addEventListener('click', submitScan);
     el.btnOpenScanner.addEventListener('click', openScanner);
     el.btnCloseScanner.addEventListener('click', closeScanner);
@@ -600,5 +615,7 @@
             submitScan();
         }
     });
+
+    updateScanAvailability();
 </script>
 @endsection
