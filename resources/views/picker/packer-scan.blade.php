@@ -178,7 +178,6 @@
     </div>
 </div>
 
-<script src="https://unpkg.com/html5-qrcode@2.3.10/minified/html5-qrcode.min.js"></script>
 <script>
     const routes = @json($routes);
     const csrfToken = '{{ csrf_token() }}';
@@ -206,6 +205,41 @@
     let scanLoopId = null;
     let html5Qr = null;
     let scanMode = 'native';
+    let html5LoadPromise = null;
+
+    const loadHtml5Qr = () => {
+        if (typeof Html5Qrcode !== 'undefined') {
+            return Promise.resolve(true);
+        }
+        if (html5LoadPromise) {
+            return html5LoadPromise;
+        }
+
+        const sources = [
+            '{{ asset('vendor/html5-qrcode.min.js') }}',
+            'https://unpkg.com/html5-qrcode@2.3.10/minified/html5-qrcode.min.js',
+        ];
+
+        html5LoadPromise = new Promise((resolve) => {
+            const tryLoad = (index) => {
+                if (index >= sources.length) {
+                    resolve(false);
+                    return;
+                }
+
+                const script = document.createElement('script');
+                script.src = sources[index];
+                script.async = true;
+                script.onload = () => resolve(true);
+                script.onerror = () => tryLoad(index + 1);
+                document.head.appendChild(script);
+            };
+
+            tryLoad(0);
+        });
+
+        return html5LoadPromise;
+    };
 
     const setStatus = (text, type = 'muted') => {
         el.scanStatus.textContent = text;
@@ -352,11 +386,17 @@
     };
 
     const openScanner = async () => {
+        if (!window.isSecureContext) {
+            showError('Akses kamera membutuhkan HTTPS. Gunakan domain HTTPS atau localhost.');
+            return;
+        }
+
         const hasNative = 'BarcodeDetector' in window;
-        const hasHtml5 = typeof Html5Qrcode !== 'undefined';
+        const html5Ready = await loadHtml5Qr();
+        const hasHtml5 = html5Ready && typeof Html5Qrcode !== 'undefined';
 
         if (!hasNative && !hasHtml5) {
-            showError('Browser belum mendukung scan kamera. Gunakan input manual.');
+            showError('Browser belum mendukung scan kamera. Gunakan input manual atau pastikan file html5-qrcode tersedia.');
             return;
         }
 
