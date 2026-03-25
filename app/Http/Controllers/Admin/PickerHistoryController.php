@@ -3,9 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\ItemStock;
 use App\Models\PickerSession;
-use App\Support\StockService;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -152,48 +150,8 @@ class PickerHistoryController extends Controller
                 ]);
             }
 
-            $insufficient = [];
-            foreach ($session->items as $row) {
-                $stock = ItemStock::where('item_id', $row->item_id)->lockForUpdate()->first();
-                $available = (int) ($stock?->stock ?? 0);
-                $required = (int) $row->qty;
-                if ($available < $required) {
-                    $insufficient[] = [
-                        'item_id' => $row->item_id,
-                        'sku' => $row->item?->sku ?? '',
-                        'name' => $row->item?->name ?? '',
-                        'available' => $available,
-                        'required' => $required,
-                    ];
-                }
-            }
-
-            if (!empty($insufficient)) {
-                DB::rollBack();
-                return response()->json([
-                    'message' => 'Stok tidak mencukupi',
-                    'insufficient' => $insufficient,
-                ], 422);
-            }
-
-            $occurredAt = now();
-            foreach ($session->items as $row) {
-                StockService::mutate([
-                    'item_id' => $row->item_id,
-                    'direction' => 'out',
-                    'qty' => (int) $row->qty,
-                    'source_type' => 'picker',
-                    'source_subtype' => 'mobile',
-                    'source_id' => $session->id,
-                    'source_code' => $session->code,
-                    'note' => $row->note ?? null,
-                    'occurred_at' => $occurredAt,
-                    'created_by' => auth()->id(),
-                ]);
-            }
-
             $session->status = 'submitted';
-            $session->submitted_at = $occurredAt;
+            $session->submitted_at = now();
             $session->save();
 
             DB::commit();

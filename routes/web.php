@@ -12,6 +12,7 @@ use App\Http\Controllers\Admin\StockAdjustmentController;
 use App\Http\Controllers\Admin\DamagedGoodsController;
 use App\Http\Controllers\Admin\ResiImportController;
 use App\Http\Controllers\Admin\PickerTransitController;
+use App\Http\Controllers\Admin\PickingListController;
 use App\Http\Controllers\Admin\PickerHistoryController;
 use App\Http\Controllers\Admin\PickerReportController;
 use App\Http\Controllers\Admin\ActivityLogController;
@@ -159,6 +160,11 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         // Picker Transit
         Route::get('/picker-transit', [PickerTransitController::class, 'index'])->name('picker-transit.index');
         Route::get('/picker-transit/data', [PickerTransitController::class, 'data'])->name('picker-transit.data');
+
+        // Picking List
+        Route::get('/picking-list', [PickingListController::class, 'index'])->name('picking-list.index');
+        Route::get('/picking-list/data', [PickingListController::class, 'data'])->name('picking-list.data');
+        Route::get('/picking-list/exceptions', [PickingListController::class, 'dataExceptions'])->name('picking-list.exceptions');
     });
 
     Route::prefix('inbound')->as('inbound.')->group(function () {

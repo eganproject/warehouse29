@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Imports\ResiImport;
+use App\Models\PickingList;
 use App\Models\Resi;
 use App\Models\ResiDetail;
 use Illuminate\Http\Request;
@@ -125,6 +126,12 @@ class ResiImportController extends Controller
             $today = now()->toDateString();
 
             foreach ($groups as $group) {
+                $existing = Resi::where('id_pesanan', $group['id_pesanan'])->first();
+                $oldTanggalUpload = $existing?->tanggal_upload?->format('Y-m-d');
+                $oldDetails = $existing
+                    ? ResiDetail::where('resi_id', $existing->id)->get(['sku', 'qty'])
+                    : collect();
+
                 $tanggalPesanan = $this->parseTanggalPesanan($group['tanggal_pesanan'] ?? null);
                 if ($tanggalPesanan === null) {
                     throw ValidationException::withMessages([
@@ -157,6 +164,11 @@ class ResiImportController extends Controller
                     ]);
                     $createdDetails++;
                 }
+
+                if ($existing && $oldTanggalUpload) {
+                    $this->adjustPickingList($oldTanggalUpload, $oldDetails, -1);
+                }
+                $this->adjustPickingList($today, $group['items'], 1);
             }
 
             DB::commit();
@@ -195,6 +207,44 @@ class ResiImportController extends Controller
             return Carbon::parse($raw)->format('Y-m-d');
         } catch (\Throwable $e) {
             return null;
+        }
+    }
+
+    private function adjustPickingList(string $date, $items, int $direction): void
+    {
+        $grouped = [];
+        foreach ($items as $row) {
+            $sku = trim((string) ($row['sku'] ?? $row->sku ?? ''));
+            $qty = (int) ($row['qty'] ?? $row->qty ?? 0);
+            if ($sku === '' || $qty <= 0) {
+                continue;
+            }
+            $grouped[$sku] = ($grouped[$sku] ?? 0) + $qty;
+        }
+
+        foreach ($grouped as $sku => $qty) {
+            $delta = $direction * $qty;
+            $listRow = PickingList::where('list_date', $date)
+                ->where('sku', $sku)
+                ->lockForUpdate()
+                ->first();
+
+            if ($listRow) {
+                $listRow->qty = max(0, (int) $listRow->qty + $delta);
+                $listRow->remaining_qty = max(0, (int) $listRow->remaining_qty + $delta);
+                if ($listRow->qty <= 0 && $listRow->remaining_qty <= 0) {
+                    $listRow->delete();
+                } else {
+                    $listRow->save();
+                }
+            } elseif ($delta > 0) {
+                PickingList::create([
+                    'list_date' => $date,
+                    'sku' => $sku,
+                    'qty' => $delta,
+                    'remaining_qty' => $delta,
+                ]);
+            }
         }
     }
 

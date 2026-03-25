@@ -7,6 +7,8 @@ use App\Models\Item;
 use App\Models\PickerSession;
 use App\Models\PickerSessionItem;
 use App\Models\PickerTransitItem;
+use App\Models\PickingList;
+use App\Models\PickingListException;
 use App\Support\StockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -72,6 +74,7 @@ class PickerSessionController extends Controller
             $deltaQty = (int) $validated['qty'];
             $occurredAt = now();
             $pickedDate = $session->started_at?->toDateString() ?? $occurredAt->toDateString();
+            $sku = Item::where('id', $validated['item_id'])->value('sku') ?? '';
 
             $itemRow = PickerSessionItem::where('picker_session_id', $session->id)
                 ->where('item_id', $validated['item_id'])
@@ -126,6 +129,8 @@ class PickerSessionController extends Controller
                 'created_by' => auth()->id(),
             ]);
 
+            $this->adjustPickingRemaining($pickedDate, $sku, $deltaQty);
+
             DB::commit();
         } catch (ValidationException $e) {
             DB::rollBack();
@@ -174,6 +179,7 @@ class PickerSessionController extends Controller
             $delta = $newQty - $oldQty;
             $occurredAt = now();
             $pickedDate = $session->started_at?->toDateString() ?? $occurredAt->toDateString();
+            $sku = Item::where('id', $itemRow->item_id)->value('sku') ?? '';
 
             if ($delta !== 0) {
                 StockService::mutate([
@@ -193,6 +199,10 @@ class PickerSessionController extends Controller
             $itemRow->qty = $newQty;
             $itemRow->note = $validated['note'] ?? $itemRow->note;
             $itemRow->save();
+
+            if ($delta !== 0) {
+                $this->adjustPickingRemaining($pickedDate, $sku, $delta);
+            }
 
             $transitRow = PickerTransitItem::where('item_id', $itemRow->item_id)
                 ->where('picked_date', $pickedDate)
@@ -261,6 +271,7 @@ class PickerSessionController extends Controller
             $qty = (int) $itemRow->qty;
             $occurredAt = now();
             $pickedDate = $session->started_at?->toDateString() ?? $occurredAt->toDateString();
+            $sku = Item::where('id', $itemRow->item_id)->value('sku') ?? '';
 
             $itemRow->delete();
 
@@ -294,6 +305,8 @@ class PickerSessionController extends Controller
                     $transitRow->save();
                 }
             }
+
+            $this->adjustPickingRemaining($pickedDate, $sku, -$qty);
 
             DB::commit();
         } catch (ValidationException $e) {
@@ -434,5 +447,61 @@ class PickerSessionController extends Controller
     private function generateCode(string $prefix): string
     {
         return $prefix.'-'.Carbon::now()->format('YmdHis').'-'.Str::upper(Str::random(4));
+    }
+
+    private function adjustPickingRemaining(string $date, string $sku, int $deltaPicked): void
+    {
+        if ($sku === '' || $deltaPicked === 0) {
+            return;
+        }
+
+        $row = PickingList::where('list_date', $date)
+            ->where('sku', $sku)
+            ->lockForUpdate()
+            ->first();
+
+        if (!$row) {
+            $this->adjustPickingException($date, $sku, $deltaPicked);
+            return;
+        }
+
+        $remaining = (int) $row->remaining_qty;
+        $total = (int) $row->qty;
+
+        if ($deltaPicked > 0) {
+            if ($remaining < $deltaPicked) {
+                throw ValidationException::withMessages([
+                    'qty' => 'Sisa picking tidak mencukupi untuk SKU '.$sku,
+                ]);
+            }
+            $row->remaining_qty = $remaining - $deltaPicked;
+        } else {
+            $row->remaining_qty = min($total, $remaining + abs($deltaPicked));
+        }
+
+        $row->save();
+    }
+
+    private function adjustPickingException(string $date, string $sku, int $deltaPicked): void
+    {
+        $exception = PickingListException::where('list_date', $date)
+            ->where('sku', $sku)
+            ->lockForUpdate()
+            ->first();
+
+        if ($exception) {
+            $exception->qty = max(0, (int) $exception->qty + $deltaPicked);
+            if ($exception->qty <= 0) {
+                $exception->delete();
+            } else {
+                $exception->save();
+            }
+        } elseif ($deltaPicked > 0) {
+            PickingListException::create([
+                'list_date' => $date,
+                'sku' => $sku,
+                'qty' => $deltaPicked,
+            ]);
+        }
     }
 }
