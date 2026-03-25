@@ -469,17 +469,48 @@ class PickerSessionController extends Controller
         $total = (int) $row->qty;
 
         if ($deltaPicked > 0) {
-            if ($remaining < $deltaPicked) {
-                throw ValidationException::withMessages([
-                    'qty' => 'Sisa picking tidak mencukupi untuk SKU '.$sku,
-                ]);
+            if ($remaining >= $deltaPicked) {
+                $row->remaining_qty = $remaining - $deltaPicked;
+                $row->save();
+                return;
             }
-            $row->remaining_qty = $remaining - $deltaPicked;
-        } else {
-            $row->remaining_qty = min($total, $remaining + abs($deltaPicked));
+
+            $overflow = $deltaPicked - max(0, $remaining);
+            $row->remaining_qty = 0;
+            $row->save();
+
+            if ($overflow > 0) {
+                $this->adjustPickingException($date, $sku, $overflow);
+            }
+            return;
         }
 
-        $row->save();
+        $reduce = abs($deltaPicked);
+        if ($reduce <= 0) {
+            return;
+        }
+
+        $exception = PickingListException::where('list_date', $date)
+            ->where('sku', $sku)
+            ->lockForUpdate()
+            ->first();
+
+        if ($exception) {
+            $exceptionQty = (int) $exception->qty;
+            if ($exceptionQty > $reduce) {
+                $exception->qty = $exceptionQty - $reduce;
+                $exception->save();
+                $reduce = 0;
+            } else {
+                $reduce -= $exceptionQty;
+                $exception->delete();
+            }
+        }
+
+        if ($reduce > 0) {
+            $row->remaining_qty = min($total, $remaining + $reduce);
+            $row->save();
+        }
     }
 
     private function adjustPickingException(string $date, string $sku, int $deltaPicked): void
