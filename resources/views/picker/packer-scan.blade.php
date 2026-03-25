@@ -13,6 +13,21 @@
         gap: 10px;
         margin-top: 10px;
     }
+    .scan-row {
+        display: grid;
+        gap: 8px;
+        grid-template-columns: 1fr auto;
+        align-items: center;
+    }
+    .scan-btn {
+        width: auto;
+        padding: 10px 12px;
+        font-size: 12px;
+        border-radius: 12px;
+        font-weight: 700;
+        border: 1px solid var(--border);
+        background: #fff;
+    }
     .status-line {
         font-size: 12px;
         color: var(--muted);
@@ -63,6 +78,42 @@
     .topbar-actions form {
         margin: 0;
     }
+    .scanner-modal {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.72);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+        z-index: 50;
+    }
+    .scanner-card {
+        width: 100%;
+        max-width: 520px;
+        background: #fff;
+        border-radius: 18px;
+        padding: 14px;
+        border: 1px solid var(--border);
+        box-shadow: var(--shadow);
+        display: grid;
+        gap: 10px;
+    }
+    .scanner-video {
+        width: 100%;
+        border-radius: 14px;
+        background: #111827;
+    }
+    .scanner-actions {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+    }
+    .scanner-actions .primary-btn {
+        width: auto;
+        padding: 10px 12px;
+        font-size: 12px;
+    }
 </style>
 
 <div class="screen">
@@ -88,7 +139,10 @@
                 <option value="no_resi">No Resi</option>
                 <option value="id_pesanan">ID Pesanan</option>
             </select>
-            <input type="text" class="input" id="scan_code" placeholder="Scan No. Resi" autocomplete="off" />
+            <div class="scan-row">
+                <input type="text" class="input" id="scan_code" placeholder="Scan No. Resi" autocomplete="off" />
+                <button type="button" class="scan-btn" id="btn_open_scanner">Scan</button>
+            </div>
             <button type="button" class="primary-btn" id="btn_scan">Proses Resi</button>
         </div>
         <div class="status-line" id="scan_status">Siap memproses resi.</div>
@@ -106,6 +160,18 @@
     </div>
 </div>
 
+<div class="scanner-modal" id="scanner_modal">
+    <div class="scanner-card">
+        <div style="font-weight:700;">Kamera Scanner</div>
+        <video class="scanner-video" id="scanner_video" playsinline></video>
+        <div class="scanner-actions">
+            <button type="button" class="ghost-btn" id="btn_close_scanner">Tutup</button>
+            <button type="button" class="primary-btn" id="btn_start_scan">Mulai Scan</button>
+        </div>
+        <div class="muted" id="scanner_hint">Arahkan kamera ke barcode resi.</div>
+    </div>
+</div>
+
 <script>
     const routes = @json($routes);
     const csrfToken = '{{ csrf_token() }}';
@@ -114,11 +180,22 @@
         scanType: document.getElementById('scan_type'),
         scanCode: document.getElementById('scan_code'),
         btnScan: document.getElementById('btn_scan'),
+        btnOpenScanner: document.getElementById('btn_open_scanner'),
         scanStatus: document.getElementById('scan_status'),
         resultCard: document.getElementById('result_card'),
         resultMeta: document.getElementById('result_meta'),
         resultItems: document.getElementById('result_items'),
+        scannerModal: document.getElementById('scanner_modal'),
+        scannerVideo: document.getElementById('scanner_video'),
+        btnCloseScanner: document.getElementById('btn_close_scanner'),
+        btnStartScan: document.getElementById('btn_start_scan'),
+        scannerHint: document.getElementById('scanner_hint'),
     };
+
+    let scannerStream = null;
+    let scannerActive = false;
+    let barcodeDetector = null;
+    let scanLoopId = null;
 
     const setStatus = (text, type = 'muted') => {
         el.scanStatus.textContent = text;
@@ -236,7 +313,94 @@
         }
     };
 
+    const stopScanner = () => {
+        scannerActive = false;
+        if (scanLoopId) {
+            cancelAnimationFrame(scanLoopId);
+            scanLoopId = null;
+        }
+        if (scannerStream) {
+            scannerStream.getTracks().forEach((track) => track.stop());
+            scannerStream = null;
+        }
+        el.scannerVideo.srcObject = null;
+    };
+
+    const closeScanner = () => {
+        stopScanner();
+        el.scannerModal.style.display = 'none';
+        el.btnStartScan.disabled = false;
+        el.scannerHint.textContent = 'Arahkan kamera ke barcode resi.';
+    };
+
+    const openScanner = async () => {
+        if (!('BarcodeDetector' in window)) {
+            showError('Browser belum mendukung scan kamera. Gunakan input manual.');
+            return;
+        }
+
+        try {
+            barcodeDetector = new BarcodeDetector({
+                formats: ['code_128', 'code_39', 'ean_13', 'ean_8', 'qr_code', 'upc_a', 'upc_e'],
+            });
+        } catch (error) {
+            showError('Fitur scan tidak tersedia. Gunakan input manual.');
+            return;
+        }
+
+        el.scannerModal.style.display = 'flex';
+    };
+
+    const startScanner = async () => {
+        try {
+            el.btnStartScan.disabled = true;
+            el.scannerHint.textContent = 'Mengaktifkan kamera...';
+            scannerStream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    facingMode: { ideal: 'environment' },
+                },
+                audio: false,
+            });
+            el.scannerVideo.srcObject = scannerStream;
+            await el.scannerVideo.play();
+            scannerActive = true;
+            el.scannerHint.textContent = 'Scan berjalan. Arahkan ke barcode.';
+            scanLoop();
+        } catch (error) {
+            el.btnStartScan.disabled = false;
+            showError('Tidak bisa membuka kamera. Pastikan izin kamera aktif.');
+            closeScanner();
+        }
+    };
+
+    const scanLoop = async () => {
+        if (!scannerActive || !barcodeDetector) return;
+        try {
+            const barcodes = await barcodeDetector.detect(el.scannerVideo);
+            if (Array.isArray(barcodes) && barcodes.length) {
+                const code = barcodes[0].rawValue || '';
+                if (code) {
+                    el.scanCode.value = code;
+                    el.scanCode.focus();
+                    closeScanner();
+                    return;
+                }
+            }
+        } catch (error) {
+            // ignore frame errors
+        }
+        scanLoopId = requestAnimationFrame(scanLoop);
+    };
+
     el.btnScan.addEventListener('click', submitScan);
+    el.btnOpenScanner.addEventListener('click', openScanner);
+    el.btnCloseScanner.addEventListener('click', closeScanner);
+    el.btnStartScan.addEventListener('click', startScanner);
+    el.scannerModal.addEventListener('click', (event) => {
+        if (event.target === el.scannerModal) {
+            closeScanner();
+        }
+    });
     el.scanType.addEventListener('change', () => {
         const type = el.scanType.value;
         el.scanCode.placeholder = type === 'id_pesanan' ? 'Scan ID Pesanan' : 'Scan No. Resi';
