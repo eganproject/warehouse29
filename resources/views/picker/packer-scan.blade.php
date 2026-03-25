@@ -99,10 +99,15 @@
         display: grid;
         gap: 10px;
     }
-    .scanner-video {
+    .scanner-video,
+    .scanner-qr {
         width: 100%;
         border-radius: 14px;
         background: #111827;
+    }
+    .scanner-qr {
+        overflow: hidden;
+        display: none;
     }
     .scanner-actions {
         display: flex;
@@ -164,6 +169,7 @@
     <div class="scanner-card">
         <div style="font-weight:700;">Kamera Scanner</div>
         <video class="scanner-video" id="scanner_video" playsinline></video>
+        <div class="scanner-qr" id="scanner_qr"></div>
         <div class="scanner-actions">
             <button type="button" class="ghost-btn" id="btn_close_scanner">Tutup</button>
             <button type="button" class="primary-btn" id="btn_start_scan">Mulai Scan</button>
@@ -172,6 +178,7 @@
     </div>
 </div>
 
+<script src="https://unpkg.com/html5-qrcode@2.3.10/minified/html5-qrcode.min.js"></script>
 <script>
     const routes = @json($routes);
     const csrfToken = '{{ csrf_token() }}';
@@ -187,6 +194,7 @@
         resultItems: document.getElementById('result_items'),
         scannerModal: document.getElementById('scanner_modal'),
         scannerVideo: document.getElementById('scanner_video'),
+        scannerQr: document.getElementById('scanner_qr'),
         btnCloseScanner: document.getElementById('btn_close_scanner'),
         btnStartScan: document.getElementById('btn_start_scan'),
         scannerHint: document.getElementById('scanner_hint'),
@@ -196,6 +204,8 @@
     let scannerActive = false;
     let barcodeDetector = null;
     let scanLoopId = null;
+    let html5Qr = null;
+    let scanMode = 'native';
 
     const setStatus = (text, type = 'muted') => {
         el.scanStatus.textContent = text;
@@ -323,6 +333,14 @@
             scannerStream.getTracks().forEach((track) => track.stop());
             scannerStream = null;
         }
+        if (html5Qr) {
+            html5Qr.stop()
+                .then(() => html5Qr.clear())
+                .catch(() => {})
+                .finally(() => {
+                    html5Qr = null;
+                });
+        }
         el.scannerVideo.srcObject = null;
     };
 
@@ -334,24 +352,88 @@
     };
 
     const openScanner = async () => {
-        if (!('BarcodeDetector' in window)) {
+        const hasNative = 'BarcodeDetector' in window;
+        const hasHtml5 = typeof Html5Qrcode !== 'undefined';
+
+        if (!hasNative && !hasHtml5) {
             showError('Browser belum mendukung scan kamera. Gunakan input manual.');
             return;
         }
 
-        try {
-            barcodeDetector = new BarcodeDetector({
-                formats: ['code_128', 'code_39', 'ean_13', 'ean_8', 'qr_code', 'upc_a', 'upc_e'],
-            });
-        } catch (error) {
-            showError('Fitur scan tidak tersedia. Gunakan input manual.');
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            showError('Akses kamera tidak tersedia di browser ini. Gunakan input manual.');
             return;
+        }
+
+        scanMode = hasNative ? 'native' : 'html5';
+        el.scannerVideo.style.display = scanMode === 'native' ? 'block' : 'none';
+        el.scannerQr.style.display = scanMode === 'html5' ? 'block' : 'none';
+
+        if (scanMode === 'native') {
+            try {
+                barcodeDetector = new BarcodeDetector({
+                    formats: ['code_128', 'code_39', 'ean_13', 'ean_8', 'qr_code', 'upc_a', 'upc_e'],
+                });
+            } catch (error) {
+                if (hasHtml5) {
+                    scanMode = 'html5';
+                    el.scannerVideo.style.display = 'none';
+                    el.scannerQr.style.display = 'block';
+                } else {
+                    showError('Fitur scan tidak tersedia. Gunakan input manual.');
+                    return;
+                }
+            }
         }
 
         el.scannerModal.style.display = 'flex';
     };
 
     const startScanner = async () => {
+        if (scanMode === 'html5') {
+            try {
+                el.btnStartScan.disabled = true;
+                el.scannerHint.textContent = 'Mengaktifkan kamera...';
+                const config = {
+                    fps: 10,
+                    qrbox: { width: 250, height: 250 },
+                };
+                if (typeof Html5QrcodeSupportedFormats !== 'undefined') {
+                    config.formatsToSupport = [
+                        Html5QrcodeSupportedFormats.CODE_128,
+                        Html5QrcodeSupportedFormats.CODE_39,
+                        Html5QrcodeSupportedFormats.EAN_13,
+                        Html5QrcodeSupportedFormats.EAN_8,
+                        Html5QrcodeSupportedFormats.QR_CODE,
+                        Html5QrcodeSupportedFormats.UPC_A,
+                        Html5QrcodeSupportedFormats.UPC_E,
+                    ];
+                }
+
+                html5Qr = new Html5Qrcode('scanner_qr');
+                await html5Qr.start(
+                    { facingMode: 'environment' },
+                    config,
+                    (decodedText) => {
+                        if (decodedText) {
+                            el.scanCode.value = decodedText;
+                            el.scanCode.focus();
+                            closeScanner();
+                        }
+                    },
+                    () => {}
+                );
+                scannerActive = true;
+                el.scannerHint.textContent = 'Scan berjalan. Arahkan ke barcode.';
+                return;
+            } catch (error) {
+                el.btnStartScan.disabled = false;
+                showError('Tidak bisa membuka kamera. Pastikan izin kamera aktif.');
+                closeScanner();
+                return;
+            }
+        }
+
         try {
             el.btnStartScan.disabled = true;
             el.scannerHint.textContent = 'Mengaktifkan kamera...';
