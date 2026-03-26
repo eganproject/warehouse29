@@ -164,7 +164,6 @@
             <div class="modal-header">
                 <div>
                     <h2 class="fw-bolder mb-0" id="picker_status_title">Picker Transit</h2>
-                    <div class="text-muted fs-7" id="picker_status_subtitle"></div>
                 </div>
                 <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
                     <span class="svg-icon svg-icon-1">
@@ -206,7 +205,6 @@
             <div class="modal-header">
                 <div>
                     <h2 class="fw-bolder mb-0" id="packer_status_title">Packer Transit</h2>
-                    <div class="text-muted fs-7" id="packer_status_subtitle"></div>
                 </div>
                 <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
                     <span class="svg-icon svg-icon-1">
@@ -267,9 +265,7 @@
         const pickerStatusModal = pickerStatusModalEl ? new bootstrap.Modal(pickerStatusModalEl) : null;
         const packerStatusModal = packerStatusModalEl ? new bootstrap.Modal(packerStatusModalEl) : null;
         const pickerStatusTitleEl = document.getElementById('picker_status_title');
-        const pickerStatusSubtitleEl = document.getElementById('picker_status_subtitle');
         const packerStatusTitleEl = document.getElementById('packer_status_title');
-        const packerStatusSubtitleEl = document.getElementById('packer_status_subtitle');
         const pickerStatusSearchEl = document.getElementById('picker_status_search');
         const packerStatusSearchEl = document.getElementById('packer_status_search');
         let fpPickerDate = null;
@@ -478,8 +474,6 @@
         const openPickerStatus = (status, title) => {
             pickerStatusFilter = status || '';
             if (pickerStatusTitleEl) pickerStatusTitleEl.textContent = title || 'Picker Transit';
-            const dateText = pickerDateEl?.value || todayStr || '';
-            if (pickerStatusSubtitleEl) pickerStatusSubtitleEl.textContent = dateText ? `Tanggal: ${dateText}` : '';
             if (pickerStatusSearchEl) pickerStatusSearchEl.value = '';
             initPickerStatusTable();
             dtPickerStatus?.ajax?.reload();
@@ -489,8 +483,6 @@
         const openPackerStatus = (status, title) => {
             packerStatusFilter = status || '';
             if (packerStatusTitleEl) packerStatusTitleEl.textContent = title || 'Packer Transit';
-            const dateText = packerDateEl?.value || todayStr || '';
-            if (packerStatusSubtitleEl) packerStatusSubtitleEl.textContent = dateText ? `Tanggal: ${dateText}` : '';
             if (packerStatusSearchEl) packerStatusSearchEl.value = '';
             initPackerStatusTable();
             dtPackerStatus?.ajax?.reload();
