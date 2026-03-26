@@ -15,6 +15,7 @@ use App\Http\Controllers\Admin\PickerTransitController;
 use App\Http\Controllers\Admin\PickingListController;
 use App\Http\Controllers\Admin\PickerHistoryController;
 use App\Http\Controllers\Admin\PackerHistoryController;
+use App\Http\Controllers\Admin\PackerScanExceptionController;
 use App\Http\Controllers\Admin\PackerScanOutHistoryController;
 use App\Http\Controllers\Admin\PickerReportController;
 use App\Http\Controllers\Admin\ActivityLogController;
@@ -253,6 +254,11 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         Route::get('/packer-history/data', [PackerHistoryController::class, 'data'])->name('packer-history.data');
         Route::get('/packer-scan-outs', [PackerScanOutHistoryController::class, 'index'])->name('packer-scan-outs.index');
         Route::get('/packer-scan-outs/data', [PackerScanOutHistoryController::class, 'data'])->name('packer-scan-outs.data');
+        Route::get('/packer-scan-exceptions', [PackerScanExceptionController::class, 'index'])->name('packer-scan-exceptions.index');
+        Route::get('/packer-scan-exceptions/data', [PackerScanExceptionController::class, 'data'])->name('packer-scan-exceptions.data');
+        Route::post('/packer-scan-exceptions', [PackerScanExceptionController::class, 'store'])->name('packer-scan-exceptions.store');
+        Route::put('/packer-scan-exceptions/{exception}', [PackerScanExceptionController::class, 'update'])->name('packer-scan-exceptions.update');
+        Route::delete('/packer-scan-exceptions/{exception}', [PackerScanExceptionController::class, 'destroy'])->name('packer-scan-exceptions.destroy');
 
         Route::get('/picker-reports', [PickerReportController::class, 'index'])->name('picker-reports.index');
         Route::get('/picker-reports/data', [PickerReportController::class, 'data'])->name('picker-reports.data');

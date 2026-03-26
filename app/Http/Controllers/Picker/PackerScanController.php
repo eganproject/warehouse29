@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Picker;
 use App\Http\Controllers\Controller;
 use App\Models\Item;
 use App\Models\PackerResiScan;
+use App\Models\PackerScanException;
 use App\Models\PackerTransitHistory;
 use App\Models\PickerTransitItem;
 use App\Models\Resi;
@@ -64,17 +65,31 @@ class PackerScanController extends Controller
             ], 422);
         }
 
+        $exceptionSkus = PackerScanException::query()
+            ->pluck('sku')
+            ->map(fn ($sku) => strtolower(trim((string) $sku)))
+            ->filter()
+            ->values()
+            ->all();
+        $exceptionLookup = array_flip($exceptionSkus);
+
         $skuTotals = [];
+        $excludedTotals = [];
         foreach ($details as $detail) {
             $sku = trim((string) $detail->sku);
             $qty = (int) $detail->qty;
             if ($sku === '' || $qty <= 0) {
                 continue;
             }
+            $skuKey = strtolower($sku);
+            if (isset($exceptionLookup[$skuKey])) {
+                $excludedTotals[$sku] = ($excludedTotals[$sku] ?? 0) + $qty;
+                continue;
+            }
             $skuTotals[$sku] = ($skuTotals[$sku] ?? 0) + $qty;
         }
 
-        if (empty($skuTotals)) {
+        if (empty($skuTotals) && empty($excludedTotals)) {
             return response()->json([
                 'message' => 'Detail resi tidak valid.',
             ], 422);
@@ -95,9 +110,12 @@ class PackerScanController extends Controller
                 ], 422);
             }
 
-            $items = Item::whereIn('sku', array_keys($skuTotals))
-                ->get(['id', 'sku', 'name'])
-                ->keyBy('sku');
+            $items = collect();
+            if (!empty($skuTotals)) {
+                $items = Item::whereIn('sku', array_keys($skuTotals))
+                    ->get(['id', 'sku', 'name'])
+                    ->keyBy('sku');
+            }
 
             $issues = [];
             $updates = [];
@@ -197,6 +215,14 @@ class PackerScanController extends Controller
             $itemsPayload[] = [
                 'sku' => $sku,
                 'qty' => $qty,
+                'excluded' => false,
+            ];
+        }
+        foreach ($excludedTotals as $sku => $qty) {
+            $itemsPayload[] = [
+                'sku' => $sku,
+                'qty' => $qty,
+                'excluded' => true,
             ];
         }
 
