@@ -185,7 +185,6 @@
                                 <th>No</th>
                                 <th>Tanggal</th>
                                 <th>SKU</th>
-                                <th>Nama</th>
                                 <th class="text-end">Qty Transit</th>
                                 <th class="text-end">Sisa Qty</th>
                                 <th>Last Picked</th>
@@ -435,7 +434,6 @@
                     { data: null, orderable: false, searchable: false, render: (data, type, row, meta) => meta.row + meta.settings._iDisplayStart + 1 },
                     { data: 'date' },
                     { data: 'sku' },
-                    { data: 'name' },
                     { data: 'qty', className: 'text-end' },
                     { data: 'remaining_qty', className: 'text-end' },
                     { data: 'picked_at' },
