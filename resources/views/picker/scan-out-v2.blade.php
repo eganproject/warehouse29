@@ -213,7 +213,7 @@
         }
         return audioCtx;
     };
-    const playBeep = (frequency = 880, duration = 120, volume = 0.15) => {
+    const playBeep = (frequency = 880, duration = 120, volume = 0.35) => {
         const ctx = getAudioCtx();
         if (!ctx) return;
         const osc = ctx.createOscillator();
@@ -230,8 +230,8 @@
             gain.disconnect();
         }, duration);
     };
-    const playScanSound = () => playBeep(760, 120, 0.15);
-    const playSuccessSound = () => playBeep(1200, 140, 0.18);
+    const playScanSound = () => playBeep(760, 120, 0.35);
+    const playSuccessSound = () => playBeep(1200, 140, 0.45);
 
     const el = {
         scanType: document.getElementById('scan_type'),
