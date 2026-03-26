@@ -3,10 +3,13 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Exports\PackerTransitStatusExport;
+use App\Exports\PickerTransitStatusExport;
 use App\Models\PackerTransitHistory;
 use App\Models\PickerTransitItem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Maatwebsite\Excel\Facades\Excel;
 
 class PickerTransitController extends Controller
 {
@@ -124,6 +127,36 @@ class PickerTransitController extends Controller
             'summary' => $summary,
             'data' => $data,
         ]);
+    }
+
+    public function exportPickerStatus(Request $request)
+    {
+        $filters = [
+            'q' => $request->input('q', ''),
+            'date' => $request->input('date'),
+            'status' => $request->input('status', ''),
+        ];
+
+        $date = $filters['date'] ?: now()->toDateString();
+        $suffix = $filters['status'] ?: 'all';
+        $filename = "picker-transit-{$date}-{$suffix}.xlsx";
+
+        return Excel::download(new PickerTransitStatusExport($filters), $filename);
+    }
+
+    public function exportPackerStatus(Request $request)
+    {
+        $filters = [
+            'q' => $request->input('q', ''),
+            'date' => $request->input('date'),
+            'status' => $request->input('status', ''),
+        ];
+
+        $date = $filters['date'] ?: now()->toDateString();
+        $suffix = $filters['status'] ?: 'all';
+        $filename = "packer-transit-{$date}-{$suffix}.xlsx";
+
+        return Excel::download(new PackerTransitStatusExport($filters), $filename);
     }
 
     private function applyDateFilter($query, Request $request): void

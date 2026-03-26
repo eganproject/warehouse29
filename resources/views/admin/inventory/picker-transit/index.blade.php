@@ -176,7 +176,8 @@
             </div>
             <div class="modal-body">
                 <div class="d-flex flex-wrap align-items-center gap-2 mb-4">
-                    <input type="text" class="form-control form-control-solid w-250px" id="picker_status_search" placeholder="Search SKU / Nama" />
+                    <input type="text" class="form-control form-control-solid w-250px" id="picker_status_search" placeholder="Search SKU" />
+                    <button type="button" class="btn btn-light-primary" id="picker_status_export">Export Excel</button>
                 </div>
                 <div class="table-responsive">
                     <table class="table align-middle table-row-dashed fs-6 gy-5" id="picker_status_table">
@@ -217,6 +218,7 @@
             <div class="modal-body">
                 <div class="d-flex flex-wrap align-items-center gap-2 mb-4">
                     <input type="text" class="form-control form-control-solid w-250px" id="packer_status_search" placeholder="Search ID Pesanan / Resi" />
+                    <button type="button" class="btn btn-light-primary" id="packer_status_export">Export Excel</button>
                 </div>
                 <div class="table-responsive">
                     <table class="table align-middle table-row-dashed fs-6 gy-5" id="packer_status_table">
@@ -242,6 +244,8 @@
 <script>
     const dataUrl = '{{ $dataUrl }}';
     const dataUrlPacker = '{{ $dataUrlPacker }}';
+    const exportPickerUrl = '{{ route('admin.inventory.picker-transit.export-picker') }}';
+    const exportPackerUrl = '{{ route('admin.inventory.picker-transit.export-packer') }}';
     const todayStr = '{{ $today ?? '' }}';
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -267,6 +271,8 @@
         const packerStatusTitleEl = document.getElementById('packer_status_title');
         const pickerStatusSearchEl = document.getElementById('picker_status_search');
         const packerStatusSearchEl = document.getElementById('packer_status_search');
+        const pickerStatusExportBtn = document.getElementById('picker_status_export');
+        const packerStatusExportBtn = document.getElementById('packer_status_export');
         let fpPickerDate = null;
         let fpPackerDate = null;
         let dtPicker = null;
@@ -505,12 +511,30 @@
                 dtPickerStatus?.ajax?.reload();
             }, 300);
         });
+        pickerStatusExportBtn?.addEventListener('click', () => {
+            const params = new URLSearchParams();
+            const q = (pickerStatusSearchEl?.value || '').trim();
+            if (q) params.set('q', q);
+            if (pickerDateEl?.value) params.set('date', pickerDateEl.value);
+            if (pickerStatusFilter) params.set('status', pickerStatusFilter);
+            const url = params.toString() ? `${exportPickerUrl}?${params.toString()}` : exportPickerUrl;
+            window.location.href = url;
+        });
         let packerStatusTimer = null;
         packerStatusSearchEl?.addEventListener('input', () => {
             if (packerStatusTimer) clearTimeout(packerStatusTimer);
             packerStatusTimer = setTimeout(() => {
                 dtPackerStatus?.ajax?.reload();
             }, 300);
+        });
+        packerStatusExportBtn?.addEventListener('click', () => {
+            const params = new URLSearchParams();
+            const q = (packerStatusSearchEl?.value || '').trim();
+            if (q) params.set('q', q);
+            if (packerDateEl?.value) params.set('date', packerDateEl.value);
+            if (packerStatusFilter) params.set('status', packerStatusFilter);
+            const url = params.toString() ? `${exportPackerUrl}?${params.toString()}` : exportPackerUrl;
+            window.location.href = url;
         });
 
         pickerStatusModalEl?.addEventListener('shown.bs.modal', () => {
