@@ -33,7 +33,10 @@ class RestrictPickerAccess
 
         $isDashboardRoute = $routeName === 'picker.dashboard' || $path === 'picker/dashboard';
         $isPackerRoute = str_starts_with($routeName, 'picker.packer') || str_starts_with($path, 'picker/packer');
-        $isScanOutRoute = str_starts_with($routeName, 'picker.scan-out') || str_starts_with($path, 'picker/scan-out');
+        $isScanOutRoute = str_starts_with($routeName, 'picker.scan-out')
+            || str_starts_with($routeName, 'picker.scan-out-v2')
+            || str_starts_with($path, 'picker/scan-out')
+            || str_starts_with($path, 'picker/scan-out-v2');
         $isPickerRoute = (str_starts_with($routeName, 'picker.') || str_starts_with($path, 'picker'))
             && !$isPackerRoute
             && !$isScanOutRoute

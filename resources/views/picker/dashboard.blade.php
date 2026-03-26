@@ -43,6 +43,10 @@
         background: linear-gradient(135deg, rgba(14,116,144,0.2), rgba(56,189,248,0.2));
         border-color: rgba(14,116,144,0.25);
     }
+    .menu-icon.scan-out-v2 {
+        background: linear-gradient(135deg, rgba(37,99,235,0.2), rgba(14,165,233,0.2));
+        border-color: rgba(37,99,235,0.25);
+    }
     .menu-icon.picking-list {
         background: linear-gradient(135deg, rgba(30,64,175,0.18), rgba(59,130,246,0.2));
         border-color: rgba(59,130,246,0.25);
@@ -128,6 +132,16 @@
                 <div>
                     <div class="menu-title">Scan Out</div>
                     <div class="menu-desc">Scan resi keluar gudang.</div>
+                </div>
+            </a>
+        @endif
+
+        @if(!empty($showScanOutV2))
+            <a class="menu-card" href="{{ $routes['scanOutV2'] }}">
+                <div class="menu-icon scan-out-v2">S2</div>
+                <div>
+                    <div class="menu-title">Scan Out V2</div>
+                    <div class="menu-desc">Auto proses setelah scan.</div>
                 </div>
             </a>
         @endif

@@ -58,6 +58,7 @@ Route::middleware('auth')->prefix('picker')->as('picker.')->group(function () {
     Route::post('/scan-out/scan', [PackerScanOutController::class, 'scan'])->name('scan-out.scan');
     Route::get('/scan-out/history', [PackerScanOutController::class, 'history'])->name('scan-out.history');
     Route::get('/scan-out/history/data', [PackerScanOutController::class, 'historyData'])->name('scan-out.history-data');
+    Route::get('/scan-out-v2', [PackerScanOutController::class, 'indexV2'])->name('scan-out-v2.index');
     Route::get('/picking-list', [PickingListMobileController::class, 'index'])->name('picking-list.index');
     Route::get('/picking-list/data', [PickingListMobileController::class, 'data'])->name('picking-list.data');
     Route::get('/', [PickerSessionController::class, 'index'])->name('index');

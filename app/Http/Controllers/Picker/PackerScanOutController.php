@@ -23,6 +23,18 @@ class PackerScanOutController extends Controller
         ]);
     }
 
+    public function indexV2()
+    {
+        return view('picker.scan-out-v2', [
+            'routes' => [
+                'dashboard' => route('picker.dashboard'),
+                'scan' => route('picker.scan-out.scan'),
+                'history' => route('picker.scan-out.history'),
+                'logout' => route('logout'),
+            ],
+        ]);
+    }
+
     public function history()
     {
         return view('picker.scan-out-history', [
