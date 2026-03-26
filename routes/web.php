@@ -92,6 +92,7 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
     Route::prefix('masterdata')->as('masterdata.')->group(function () {
         // Users DataTables
         Route::get('/users/data', [AdminUserController::class, 'data'])->name('users.data');
+        Route::post('/users/import', [AdminUserController::class, 'import'])->name('users.import');
         // Users CRUD
         Route::resource('users', AdminUserController::class)->except(['show'])->names('users');
 

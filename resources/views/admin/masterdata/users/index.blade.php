@@ -49,6 +49,9 @@
                     </div>
                 </div>
                 @if(Perm::can(auth()->user(), 'admin.masterdata.users.index', 'create'))
+                    <button type="button" class="btn btn-light-primary me-3" id="btn_import_users" data-bs-toggle="modal" data-bs-target="#modal_import_users">
+                        Import Excel
+                    </button>
                     <a href="{{ route('admin.masterdata.users.create') }}" class="btn btn-primary">
                         Add User
                     </a>
@@ -75,12 +78,55 @@
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="modal_import_users" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-650px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bolder">Import Users (Excel)</h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <span class="svg-icon svg-icon-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                            <rect opacity="0.5" x="6" y="17.3137" width="16" height="2" rx="1" transform="rotate(-45 6 17.3137)" fill="black" />
+                            <rect x="7.41422" y="6" width="16" height="2" rx="1" transform="rotate(45 7.41422 6)" fill="black" />
+                        </svg>
+                    </span>
+                </div>
+            </div>
+            <div class="modal-body scroll-y px-10 py-10">
+                <div class="mb-7">
+                    <p class="fw-semibold mb-3">Pastikan file Excel memiliki header berikut:</p>
+                    <ul class="ms-5 mb-4">
+                        <li><strong>Nama</strong> (wajib)</li>
+                        <li><strong>Email</strong> (wajib)</li>
+                        <li><strong>Password</strong> (wajib)</li>
+                        <li><strong>Roles</strong> (opsional, pisahkan dengan koma)</li>
+                        <li><strong>Divisi</strong> atau <strong>Divisi ID</strong> (opsional)</li>
+                    </ul>
+                    <p class="text-muted small mb-0">
+                        Roles dapat diisi dengan <em>nama</em>, <em>slug</em>, atau <em>ID</em> role.
+                    </p>
+                </div>
+                <div class="mb-10">
+                    <label class="required fs-6 fw-bold form-label mb-2">File Excel</label>
+                    <input type="file" class="form-control form-control-solid" id="import_users_file" accept=".xlsx,.xls" />
+                    <div class="invalid-feedback d-block" id="error_import_users_file"></div>
+                </div>
+                <div class="text-end">
+                    <button type="button" class="btn btn-light me-3" data-bs-dismiss="modal">Batal</button>
+                    <button type="button" class="btn btn-primary" id="btn_import_users_submit">Import</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 @endsection
 
 @push('scripts')
 <script>
     const csrfToken = '{{ csrf_token() }}';
     const dataUrl   = '{{ route('admin.masterdata.users.data') }}';
+    const importUrl = '{{ route('admin.masterdata.users.import') }}';
     const editTpl   = '{{ route('admin.masterdata.users.edit', ':id') }}';
     const delTpl    = '{{ route('admin.masterdata.users.destroy', ':id') }}';
     const renderActionsDropdown = (items) => {
@@ -109,6 +155,10 @@
         const applyBtn = document.getElementById('filter_users_apply');
         const resetBtn = document.getElementById('filter_users_reset');
         const roleSelect = document.getElementById('filter_user_role');
+        const importBtn = document.getElementById('btn_import_users');
+        const importInput = document.getElementById('import_users_file');
+        const importError = document.getElementById('error_import_users_file');
+        const importSubmit = document.getElementById('btn_import_users_submit');
         if (!tableEl.length || !$.fn.DataTable) {
             console.error('DataTables is not available or #users_table missing');
             return;
@@ -168,6 +218,65 @@
             fetch(url, { method:'POST', headers:{ 'X-CSRF-TOKEN': csrfToken }, body: new URLSearchParams({ _method:'DELETE' }) })
                 .then(res => { if (res.ok) dt.ajax.reload(null, false); else AppSwal.error('Gagal menghapus user'); })
                 .catch(()=> AppSwal.error('Gagal menghapus user'));
+        });
+
+        importBtn?.addEventListener('click', () => {
+            if (importInput) importInput.value = '';
+            if (importError) importError.textContent = '';
+        });
+
+        importSubmit?.addEventListener('click', async () => {
+            if (!importUrl) return;
+            if (importError) importError.textContent = '';
+            const file = importInput?.files?.[0];
+            if (!file) {
+                if (importError) importError.textContent = 'Pilih file Excel terlebih dahulu.';
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const res = await fetch(importUrl, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json',
+                    },
+                    body: formData,
+                });
+                const text = await res.text();
+                let json = null;
+                try { json = JSON.parse(text); } catch (err) { json = null; }
+
+                if (!res.ok) {
+                    const msg = json?.errors?.file?.[0] || json?.message || 'Gagal import';
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire('Error', msg, 'error');
+                    } else if (importError) {
+                        importError.textContent = msg;
+                    }
+                    return;
+                }
+
+                const successMsg = json?.message || 'Import user berhasil';
+                if (typeof Swal !== 'undefined') {
+                    const count = json?.created ? ` (berhasil ${json.created})` : '';
+                    Swal.fire('Berhasil', successMsg + count, 'success');
+                }
+
+                if (importInput) importInput.value = '';
+                const modalEl = document.getElementById('modal_import_users');
+                if (modalEl) bootstrap.Modal.getInstance(modalEl)?.hide();
+                dt.ajax.reload();
+            } catch (err) {
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire('Error', 'Gagal import', 'error');
+                } else if (importError) {
+                    importError.textContent = 'Gagal import';
+                }
+            }
         });
     });
 </script>

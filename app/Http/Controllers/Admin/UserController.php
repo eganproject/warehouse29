@@ -6,11 +6,14 @@ use App\Http\Controllers\Controller;
 use App\Models\Divisi;
 use App\Models\Role;
 use App\Models\User;
+use App\Imports\UsersImport;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
+use Maatwebsite\Excel\Facades\Excel;
 
 class UserController extends Controller
 {
@@ -184,5 +187,127 @@ class UserController extends Controller
             DB::rollBack();
             return back()->withErrors(['user' => 'Gagal menghapus user: '.$e->getMessage()]);
         }
+    }
+
+    public function import(Request $request)
+    {
+        $validated = $request->validate([
+            'file' => ['required', 'file', 'mimes:xlsx,xls'],
+        ]);
+
+        $import = new UsersImport();
+        Excel::import($import, $validated['file']);
+
+        $rows = $import->rows;
+        if (empty($rows)) {
+            throw ValidationException::withMessages([
+                'file' => 'Tidak ada data valid untuk diimport',
+            ]);
+        }
+
+        $roles = Role::query()->get(['id', 'name', 'slug']);
+        $roleById = $roles->keyBy(fn ($r) => (string) $r->id);
+        $roleBySlug = $roles->keyBy(fn ($r) => strtolower((string) $r->slug));
+        $roleByName = $roles->keyBy(fn ($r) => strtolower((string) $r->name));
+
+        $divisis = Divisi::query()->get(['id', 'name']);
+        $divisiById = $divisis->keyBy(fn ($d) => (string) $d->id);
+        $divisiByName = $divisis->keyBy(fn ($d) => strtolower((string) $d->name));
+
+        $errors = [];
+        $prepared = [];
+
+        foreach ($rows as $row) {
+            $rowNo = $row['row'] ?? '?';
+            $email = (string) ($row['email'] ?? '');
+            if (User::where('email', $email)->exists()) {
+                $errors[] = "Baris {$rowNo}: Email sudah terdaftar ({$email})";
+                continue;
+            }
+
+            $divisiId = null;
+            $divisiRaw = trim((string) ($row['divisi_raw'] ?? ''));
+            if ($divisiRaw !== '') {
+                if (is_numeric($divisiRaw)) {
+                    $divisi = $divisiById->get((string) $divisiRaw);
+                } else {
+                    $divisi = $divisiByName->get(strtolower($divisiRaw));
+                }
+                if (!$divisi) {
+                    $errors[] = "Baris {$rowNo}: Divisi tidak ditemukan ({$divisiRaw})";
+                    continue;
+                }
+                $divisiId = $divisi->id;
+            }
+
+            $roleIds = [];
+            $rolesRaw = trim((string) ($row['roles_raw'] ?? ''));
+            if ($rolesRaw !== '') {
+                $tokens = preg_split('/[;,|]+/', $rolesRaw) ?: [];
+                foreach ($tokens as $token) {
+                    $token = trim((string) $token);
+                    if ($token === '') {
+                        continue;
+                    }
+                    if (is_numeric($token)) {
+                        $role = $roleById->get((string) $token);
+                    } else {
+                        $lower = strtolower($token);
+                        $role = $roleBySlug->get($lower) ?? $roleByName->get($lower);
+                    }
+                    if (!$role) {
+                        $errors[] = "Baris {$rowNo}: Role tidak ditemukan ({$token})";
+                        continue 2;
+                    }
+                    $roleIds[] = $role->id;
+                }
+            }
+
+            $prepared[] = [
+                'name' => $row['name'],
+                'email' => $email,
+                'password' => $row['password'],
+                'roles' => array_values(array_unique($roleIds)),
+                'divisi_id' => $divisiId,
+            ];
+        }
+
+        if (!empty($errors)) {
+            throw ValidationException::withMessages([
+                'file' => implode(' | ', array_slice($errors, 0, 5)),
+            ]);
+        }
+
+        $created = 0;
+        DB::beginTransaction();
+        try {
+            foreach ($prepared as $payload) {
+                $user = User::create([
+                    'name' => $payload['name'],
+                    'email' => $payload['email'],
+                    'password' => Hash::make((string) $payload['password']),
+                    'avatar' => User::defaultAvatar(),
+                    'email_verified_at' => now(),
+                    'divisi_id' => $payload['divisi_id'],
+                ]);
+                if (!empty($payload['roles'])) {
+                    $user->roles()->sync($payload['roles']);
+                }
+                $created++;
+            }
+
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Gagal import user',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+
+        return response()->json([
+            'message' => 'Import user berhasil',
+            'created' => $created,
+        ]);
     }
 }
