@@ -201,6 +201,38 @@
     const routes = @json($routes);
     const csrfToken = '{{ csrf_token() }}';
 
+    let audioCtx = null;
+    const getAudioCtx = () => {
+        if (!audioCtx) {
+            const Ctx = window.AudioContext || window.webkitAudioContext;
+            if (!Ctx) return null;
+            audioCtx = new Ctx();
+        }
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume().catch(() => {});
+        }
+        return audioCtx;
+    };
+    const playBeep = (frequency = 880, duration = 120, volume = 0.15) => {
+        const ctx = getAudioCtx();
+        if (!ctx) return;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = frequency;
+        gain.gain.value = volume;
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        setTimeout(() => {
+            try { osc.stop(); } catch (e) {}
+            osc.disconnect();
+            gain.disconnect();
+        }, duration);
+    };
+    const playScanSound = () => playBeep(760, 120, 0.15);
+    const playSuccessSound = () => playBeep(1200, 140, 0.18);
+
     const el = {
         scanType: document.getElementById('scan_type'),
         scanCode: document.getElementById('scan_code'),
@@ -376,6 +408,7 @@
     };
 
     const submitScan = async () => {
+        getAudioCtx();
         if (isSubmitting) return;
         const type = el.scanType.value;
         const code = el.scanCode.value.trim();
@@ -399,6 +432,7 @@
             });
 
             setStatus(data?.message || 'Resi berhasil diproses.', 'success');
+            playSuccessSound();
             renderResult(data);
             el.scanCode.value = '';
             el.scanCode.focus();
@@ -440,6 +474,7 @@
     };
 
     const openScanner = async () => {
+        getAudioCtx();
         if (!window.isSecureContext) {
             showError('Akses kamera membutuhkan HTTPS. Gunakan domain HTTPS atau localhost.');
             return;
@@ -510,6 +545,7 @@
                     config,
                     (decodedText) => {
                         if (decodedText) {
+                            playScanSound();
                             el.scanCode.value = decodedText;
                             el.scanCode.focus();
                             closeScanner();
@@ -557,6 +593,7 @@
             if (Array.isArray(barcodes) && barcodes.length) {
                 const code = barcodes[0].rawValue || '';
                 if (code) {
+                    playScanSound();
                     el.scanCode.value = code;
                     el.scanCode.focus();
                     closeScanner();
@@ -586,6 +623,7 @@
             const photoScanner = new Html5Qrcode('scanner_qr');
             const decodedText = await photoScanner.scanFile(file, true);
             await photoScanner.clear();
+            playScanSound();
             el.scanCode.value = decodedText || '';
             el.scanCode.focus();
             submitScan();
