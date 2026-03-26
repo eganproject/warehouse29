@@ -3,10 +3,12 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Exports\PickingListExport;
 use App\Models\PickingList;
 use App\Models\PickingListException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Maatwebsite\Excel\Facades\Excel;
 
 class PickingListController extends Controller
 {
@@ -119,6 +121,21 @@ class PickingListController extends Controller
             'recordsFiltered' => $recordsFiltered,
             'data' => $data,
         ]);
+    }
+
+    public function export(Request $request)
+    {
+        $filters = [
+            'q' => $request->input('q', ''),
+            'date' => $request->input('date'),
+            'status' => $request->input('status', ''),
+        ];
+
+        $date = $filters['date'] ?: now()->toDateString();
+        $suffix = $filters['status'] ?: 'all';
+        $filename = "picking-list-{$date}-{$suffix}.xlsx";
+
+        return Excel::download(new PickingListExport($filters), $filename);
     }
 
     private function applyDateFilter($query, Request $request): void

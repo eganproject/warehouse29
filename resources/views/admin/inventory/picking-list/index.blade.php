@@ -27,6 +27,7 @@
                 </select>
                 <button type="button" class="btn btn-light" id="filter_apply">Filter</button>
                 <button type="button" class="btn btn-light" id="filter_reset">Reset</button>
+                <button type="button" class="btn btn-light-primary" id="btn_export_picking_list">Export Excel</button>
             </div>
         </div>
     </div>
@@ -98,6 +99,7 @@
 <script>
     const dataUrl = '{{ $dataUrl }}';
     const dataUrlExceptions = '{{ $dataUrlExceptions }}';
+    const exportUrl = '{{ route('admin.inventory.picking-list.export') }}';
     const todayStr = '{{ $today ?? '' }}';
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -108,6 +110,7 @@
         const statusEl = document.getElementById('filter_status');
         const filterApplyBtn = document.getElementById('filter_apply');
         const filterResetBtn = document.getElementById('filter_reset');
+        const exportBtn = document.getElementById('btn_export_picking_list');
         const summaryOngoingEl = document.getElementById('summary_ongoing');
         const summaryDoneEl = document.getElementById('summary_done');
         let fpDate = null;
@@ -200,6 +203,16 @@
             if (searchInput) searchInput.value = '';
             if (statusEl) statusEl.value = '';
             reloadAll();
+        });
+
+        exportBtn?.addEventListener('click', () => {
+            const params = new URLSearchParams();
+            const q = (searchInput?.value || '').trim();
+            if (q) params.set('q', q);
+            if (dateEl?.value) params.set('date', dateEl.value);
+            if (statusEl?.value) params.set('status', statusEl.value);
+            const url = params.toString() ? `${exportUrl}?${params.toString()}` : exportUrl;
+            window.location.href = url;
         });
     });
 </script>
