@@ -166,7 +166,6 @@
                 <span>Alternatif untuk iPhone.</span>
             </div>
             <input type="file" id="scan_photo" accept="image/*" capture="environment" style="display:none;" />
-            <button type="button" class="primary-btn" id="btn_scan">Tambah via Scan</button>
         </div>
         <div class="status-line" id="scan_status">Siap scan barcode SKU.</div>
     </div>
@@ -239,7 +238,6 @@
         searchCard: document.getElementById('search_card'),
         scanCard: document.getElementById('scan_card'),
         scanCode: document.getElementById('scan_code'),
-        btnScan: document.getElementById('btn_scan'),
         btnOpenScanner: document.getElementById('btn_open_scanner'),
         btnScanPhoto: document.getElementById('btn_scan_photo'),
         scanPhotoInput: document.getElementById('scan_photo'),
@@ -644,6 +642,7 @@
         let html5Qr = null;
         let scanMode = 'native';
         let html5LoadPromise = null;
+        let scanInputTimer = null;
         const isIOS = (() => {
             const ua = navigator.userAgent || '';
             const platform = navigator.platform || '';
@@ -698,7 +697,7 @@
         updateScanStatusFn = setScanStatus;
 
         const syncScanControls = (enabled) => {
-            const controls = [el.scanCode, el.btnScan, el.btnOpenScanner, el.btnScanPhoto];
+            const controls = [el.scanCode, el.btnOpenScanner, el.btnScanPhoto];
             controls.forEach((control) => {
                 if (!control) return;
                 control.disabled = !enabled;
@@ -751,6 +750,10 @@
         const handleScannedCode = (rawCode) => {
             const clean = (rawCode || '').trim();
             if (!clean || !el.scanCode) return;
+            if (scanInputTimer) {
+                clearTimeout(scanInputTimer);
+                scanInputTimer = null;
+            }
             el.scanCode.value = clean;
             el.scanCode.focus();
             if (requireActiveSession()) {
@@ -767,8 +770,6 @@
                 el.scanCode.focus();
                 return;
             }
-            const btnInitiallyDisabled = el.btnScan ? el.btnScan.disabled : true;
-            if (el.btnScan && !btnInitiallyDisabled) el.btnScan.disabled = true;
             setScanStatus('Menambahkan barang hasil scan...', 'pending');
             try {
                 const json = await fetchJson(routes.scanItem, {
@@ -786,7 +787,6 @@
             } catch (err) {
                 setScanStatus(err.message || 'Gagal menambahkan hasil scan.', 'error');
             } finally {
-                if (el.btnScan && !btnInitiallyDisabled) el.btnScan.disabled = false;
             }
         };
 
@@ -966,12 +966,22 @@
             el.photoScanWrap.style.display = isIOS ? 'flex' : 'none';
         }
 
-        el.btnScan?.addEventListener('click', submitScan);
         el.scanCode?.addEventListener('keydown', (event) => {
             if (event.key === 'Enter') {
                 event.preventDefault();
                 submitScan();
             }
+        });
+        el.scanCode?.addEventListener('input', () => {
+            if (!canUseScan()) return;
+            if (scanInputTimer) clearTimeout(scanInputTimer);
+            const value = el.scanCode.value.trim();
+            if (!value) return;
+            scanInputTimer = setTimeout(() => {
+                if (value === el.scanCode.value.trim()) {
+                    submitScan();
+                }
+            }, 600);
         });
         el.btnOpenScanner?.addEventListener('click', openScanner);
         el.btnStartScan?.addEventListener('click', startScanner);
