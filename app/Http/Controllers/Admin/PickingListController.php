@@ -7,6 +7,7 @@ use App\Exports\PickingListExport;
 use App\Models\Item;
 use App\Models\PickingList;
 use App\Models\PickingListException;
+use App\Models\PackerScanException;
 use App\Models\PickerTransitItem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -31,6 +32,8 @@ class PickingListController extends Controller
             ->with('item')
             ->orderBy('list_date', 'desc')
             ->orderBy('sku');
+        $this->applyPackerExceptionFilter($baseQuery);
+        $recordsTotalQuery = clone $baseQuery;
 
         $search = trim((string) $request->input('q', ''));
         if ($search !== '') {
@@ -44,7 +47,7 @@ class PickingListController extends Controller
 
         $this->applyDateFilter($baseQuery, $request);
 
-        $recordsTotal = PickingList::count();
+        $recordsTotal = (clone $recordsTotalQuery)->count();
         $summaryQuery = clone $baseQuery;
         $summary = [
             'ongoing' => (clone $summaryQuery)->where('remaining_qty', '>', 0)->count(),
@@ -83,14 +86,16 @@ class PickingListController extends Controller
 
     public function dataExceptions(Request $request)
     {
-        $query = PickingListException::query()
+        $baseQuery = PickingListException::query()
             ->with('item')
             ->orderBy('list_date', 'desc')
             ->orderBy('sku');
+        $this->applyPackerExceptionFilter($baseQuery);
+        $recordsTotalQuery = clone $baseQuery;
 
         $search = trim((string) $request->input('q', ''));
         if ($search !== '') {
-            $query->where(function ($q) use ($search) {
+            $baseQuery->where(function ($q) use ($search) {
                 $q->where('sku', 'like', "%{$search}%")
                     ->orWhereHas('item', function ($itemQ) use ($search) {
                         $itemQ->where('name', 'like', "%{$search}%");
@@ -98,18 +103,18 @@ class PickingListController extends Controller
             });
         }
 
-        $this->applyDateFilter($query, $request);
+        $this->applyDateFilter($baseQuery, $request);
 
-        $recordsTotal = PickingListException::count();
-        $recordsFiltered = (clone $query)->count();
+        $recordsTotal = (clone $recordsTotalQuery)->count();
+        $recordsFiltered = (clone $baseQuery)->count();
 
         $start = (int) $request->input('start', 0);
         $length = (int) $request->input('length', 10);
         if ($length > 0) {
-            $query->skip($start)->take($length);
+            $baseQuery->skip($start)->take($length);
         }
 
-        $data = $query->get()->map(function ($row) {
+        $data = $baseQuery->get()->map(function ($row) {
             $item = $row->item;
             return [
                 'date' => $row->list_date?->format('Y-m-d') ?? '-',
@@ -305,5 +310,10 @@ class PickingListController extends Controller
         } elseif ($status === 'done') {
             $query->where('remaining_qty', '<=', 0);
         }
+    }
+
+    private function applyPackerExceptionFilter($query): void
+    {
+        $query->whereNotIn('sku', PackerScanException::query()->select('sku'));
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Exports;
 
+use App\Models\PackerScanException;
 use App\Models\PickingList;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Carbon;
@@ -22,6 +23,7 @@ class PickingListExport implements FromCollection, WithHeadings, WithMapping, Sh
             ->with('item')
             ->orderBy('list_date', 'desc')
             ->orderBy('sku');
+        $query->whereNotIn('sku', PackerScanException::query()->select('sku'));
 
         $search = trim((string) ($this->filters['q'] ?? ''));
         if ($search !== '') {

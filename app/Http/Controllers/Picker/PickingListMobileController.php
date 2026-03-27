@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Picker;
 
 use App\Http\Controllers\Controller;
+use App\Models\PackerScanException;
 use App\Models\PickingList;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -34,6 +35,7 @@ class PickingListMobileController extends Controller
             ->with('item')
             ->where('list_date', $date)
             ->orderBy('sku');
+        $this->applyPackerExceptionFilter($query);
 
         $search = trim((string) $request->input('q', ''));
         if ($search !== '') {
@@ -58,5 +60,10 @@ class PickingListMobileController extends Controller
             'date' => $date,
             'items' => $items,
         ]);
+    }
+
+    private function applyPackerExceptionFilter($query): void
+    {
+        $query->whereNotIn('sku', PackerScanException::query()->select('sku'));
     }
 }
