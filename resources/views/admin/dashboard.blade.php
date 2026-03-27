@@ -59,10 +59,22 @@
         margin-top: 6px;
         letter-spacing: -0.02em;
     }
+    .ratio-resi {
+        color: #1d4ed8;
+    }
+    .ratio-scan {
+        color: #047857;
+    }
+    .ratio-sep {
+        color: #9ca3af;
+        padding: 0 4px;
+        font-weight: 600;
+    }
     .kurir-remaining {
         font-size: 12px;
-        color: #6b7280;
+        color: #b45309;
         margin-top: 6px;
+        font-weight: 600;
     }
     .kurir-badge {
         display: inline-flex;
@@ -114,7 +126,9 @@
                     <div class="stat-card">
                         <div class="kurir-name">{{ $kurir['name'] }}</div>
                         <div class="kurir-ratio">
-                            {{ number_format($kurir['resi_total']) }}/{{ number_format($kurir['scan_total']) }}
+                            <span class="ratio-resi">{{ number_format($kurir['resi_total']) }}</span>
+                            <span class="ratio-sep">/</span>
+                            <span class="ratio-scan">{{ number_format($kurir['scan_total']) }}</span>
                         </div>
                         <div class="kurir-remaining">
                             Sisa resi: {{ number_format($kurir['remaining']) }}
