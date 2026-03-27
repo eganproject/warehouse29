@@ -11,6 +11,7 @@ class PackerScanOut extends Model
 
     protected $fillable = [
         'resi_id',
+        'kurir_id',
         'scan_type',
         'scan_code',
         'scan_date',
@@ -31,5 +32,10 @@ class PackerScanOut extends Model
     public function scanner()
     {
         return $this->belongsTo(User::class, 'scanned_by');
+    }
+
+    public function kurir()
+    {
+        return $this->belongsTo(Kurir::class, 'kurir_id');
     }
 }

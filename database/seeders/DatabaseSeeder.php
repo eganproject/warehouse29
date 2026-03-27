@@ -17,6 +17,7 @@ class DatabaseSeeder extends Seeder
             RoleSeeder::class,
             MenuSeeder::class,
             DivisiSeeder::class,
+            KurirSeeder::class,
             UserSeeder::class,
             CategoryItemSeeder::class,
             ItemStockSeeder::class,

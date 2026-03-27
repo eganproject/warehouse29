@@ -10,7 +10,7 @@ use Maatwebsite\Excel\Concerns\WithHeadingRow;
 
 class ResiImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
 {
-    /** @var array<string,array{id_pesanan:string,no_resi:string,tanggal_pesanan:string,items:array<string,array{sku:string,qty:int}>}> */
+    /** @var array<string,array{id_pesanan:string,no_resi:string,kurir:string,tanggal_pesanan:string,items:array<string,array{sku:string,qty:int}>}> */
     public array $groups = [];
     /** @var array<int,string> */
     private array $requiredHeaders = [
@@ -36,7 +36,7 @@ class ResiImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
             $detected = implode(', ', array_filter($headers));
             throw ValidationException::withMessages([
                 'file' => 'Header wajib: ID Pesanan, SKU, Jumlah, Tanggal Pembuatan. '
-                    .'AWB/No. Tracking opsional. Pastikan header berada di baris pertama. '
+                    .'AWB/No. Tracking dan Kurir opsional. Pastikan header berada di baris pertama. '
                     .($detected !== '' ? 'Header terdeteksi: '.$detected : ''),
             ]);
         }
@@ -48,6 +48,7 @@ class ResiImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
             $rowData = $this->normalizeRow($row);
             $idPesanan = trim((string) ($rowData['id_pesanan'] ?? ''));
             $noResi = trim((string) ($rowData['awb_no_tracking'] ?? ''));
+            $kurir = trim((string) ($rowData['kurir'] ?? ''));
             $sku = trim((string) ($rowData['sku'] ?? ''));
             $qty = $this->parseQty($rowData['jumlah'] ?? null);
             $tanggalPesanan = trim((string) ($rowData['tanggal_pembuatan'] ?? ''));
@@ -67,11 +68,15 @@ class ResiImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
                 $this->groups[$groupKey] = [
                     'id_pesanan' => $idPesanan,
                     'no_resi' => $noResi !== '' ? $noResi : null,
+                    'kurir' => $kurir !== '' ? $kurir : null,
                     'tanggal_pesanan' => $tanggalPesanan,
                     'items' => [],
                 ];
             } elseif ($this->groups[$groupKey]['no_resi'] === null && $noResi !== '') {
                 $this->groups[$groupKey]['no_resi'] = $noResi;
+            }
+            if ($this->groups[$groupKey]['kurir'] === null && $kurir !== '') {
+                $this->groups[$groupKey]['kurir'] = $kurir;
             }
 
             if (!isset($this->groups[$groupKey]['items'][$sku])) {
@@ -140,6 +145,9 @@ class ResiImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
         $key = trim($key, '_');
         if ($key === 'awbno_tracking') {
             return 'awb_no_tracking';
+        }
+        if (in_array($key, ['kurir', 'courier', 'ekspedisi', 'expedisi', 'jasa_kurir'], true)) {
+            return 'kurir';
         }
         return $key;
     }

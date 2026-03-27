@@ -14,6 +14,7 @@ class Resi extends Model
         'tanggal_pesanan',
         'tanggal_upload',
         'no_resi',
+        'kurir_id',
         'uploader_id',
     ];
 
@@ -30,5 +31,10 @@ class Resi extends Model
     public function uploader()
     {
         return $this->belongsTo(User::class, 'uploader_id');
+    }
+
+    public function kurir()
+    {
+        return $this->belongsTo(Kurir::class, 'kurir_id');
     }
 }

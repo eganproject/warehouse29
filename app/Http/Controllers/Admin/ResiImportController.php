@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Imports\ResiImport;
 use App\Models\Item;
+use App\Models\Kurir;
 use App\Models\PickingList;
 use App\Models\PickingListException;
 use App\Models\PickerTransitItem;
@@ -62,10 +63,10 @@ class ResiImportController extends Controller
         $summarySkus = ResiDetail::whereIn('resi_id', (clone $filterQuery)->select('id'))->count();
 
         $query = Resi::query()
-            ->select(['id', 'id_pesanan', 'no_resi', 'tanggal_pesanan'])
+            ->select(['id', 'id_pesanan', 'no_resi', 'tanggal_pesanan', 'kurir_id'])
             ->with(['details' => function ($q) {
                 $q->select(['id', 'resi_id', 'sku', 'qty']);
-            }])
+            }, 'kurir'])
             ->whereDate('tanggal_upload', $filterDate)
             ->orderByDesc('id');
 
@@ -90,6 +91,7 @@ class ResiImportController extends Controller
                 'id' => $row->id,
                 'no_resi' => $row->no_resi ?? '-',
                 'id_pesanan' => $row->id_pesanan ?? '-',
+                'kurir' => $row->kurir?->name ?? '-',
                 'sku' => $skuList,
                 'tanggal_pesanan' => $tanggalOrder,
             ];
@@ -127,6 +129,7 @@ class ResiImportController extends Controller
             $createdResi = 0;
             $createdDetails = 0;
             $today = now()->toDateString();
+            $defaultKurirId = $this->resolveDefaultKurirId();
 
             foreach ($groups as $group) {
                 $existing = Resi::where('id_pesanan', $group['id_pesanan'])->first();
@@ -147,6 +150,10 @@ class ResiImportController extends Controller
                     'tanggal_upload' => $today,
                     'uploader_id' => auth()->id(),
                 ];
+                $kurirId = $this->resolveKurirId($group['kurir'] ?? null, $defaultKurirId);
+                if ($kurirId) {
+                    $payload['kurir_id'] = $kurirId;
+                }
                 $noResi = isset($group['no_resi']) ? trim((string) $group['no_resi']) : '';
                 if ($noResi !== '') {
                     $payload['no_resi'] = $noResi;
@@ -328,9 +335,35 @@ class ResiImportController extends Controller
         $query->where(function ($sub) use ($search) {
             $sub->where('no_resi', 'like', "%{$search}%")
                 ->orWhere('id_pesanan', 'like', "%{$search}%")
+                ->orWhereHas('kurir', function ($kurirQ) use ($search) {
+                    $kurirQ->where('name', 'like', "%{$search}%");
+                })
                 ->orWhereHas('details', function ($detailQ) use ($search) {
                     $detailQ->where('sku', 'like', "%{$search}%");
                 });
         });
+    }
+
+    private function resolveDefaultKurirId(): ?int
+    {
+        $defaultName = 'Tidak ditemukan kurir';
+        $existingId = Kurir::where('name', $defaultName)->value('id');
+        if ($existingId) {
+            return (int) $existingId;
+        }
+
+        $kurir = Kurir::create(['name' => $defaultName]);
+        return $kurir->id;
+    }
+
+    private function resolveKurirId($rawName, ?int $defaultId): ?int
+    {
+        $name = trim((string) $rawName);
+        if ($name === '') {
+            return $defaultId;
+        }
+
+        $kurir = Kurir::firstOrCreate(['name' => $name]);
+        return $kurir->id ?? $defaultId;
     }
 }

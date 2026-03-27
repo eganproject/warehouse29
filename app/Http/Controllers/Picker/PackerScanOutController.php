@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Picker;
 
 use App\Http\Controllers\Controller;
+use App\Models\Kurir;
 use App\Models\PackerScanOut;
 use App\Models\PackerTransitHistory;
 use App\Models\Resi;
@@ -149,8 +150,17 @@ class PackerScanOutController extends Controller
                 ], 422);
             }
 
+            $kurirId = $resi->kurir_id;
+            if (!$kurirId) {
+                $kurirId = Kurir::where('name', 'Tidak ditemukan kurir')->value('id');
+                if (!$kurirId) {
+                    $kurirId = Kurir::create(['name' => 'Tidak ditemukan kurir'])->id;
+                }
+            }
+
             PackerScanOut::create([
                 'resi_id' => $resi->id,
+                'kurir_id' => $kurirId,
                 'scan_type' => $type,
                 'scan_code' => $code,
                 'scan_date' => now()->toDateString(),
