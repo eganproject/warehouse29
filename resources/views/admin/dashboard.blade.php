@@ -11,8 +11,18 @@
     }
     .kurir-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 16px;
+    }
+    @media (max-width: 991px) {
+        .kurir-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+    @media (max-width: 640px) {
+        .kurir-grid {
+            grid-template-columns: 1fr;
+        }
     }
     .stat-card {
         border: 1px solid var(--bs-gray-200);
@@ -43,11 +53,15 @@
         font-size: 15px;
         margin-bottom: 8px;
     }
-    .kurir-line {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        font-size: 13px;
+    .kurir-ratio {
+        font-size: 28px;
+        font-weight: 800;
+        margin-top: 6px;
+        letter-spacing: -0.02em;
+    }
+    .kurir-remaining {
+        font-size: 12px;
+        color: #6b7280;
         margin-top: 6px;
     }
     .kurir-badge {
@@ -99,17 +113,11 @@
                 @foreach($kurirs as $kurir)
                     <div class="stat-card">
                         <div class="kurir-name">{{ $kurir['name'] }}</div>
-                        <div class="kurir-line">
-                            <span class="text-muted">Total Resi</span>
-                            <strong>{{ number_format($kurir['resi_total']) }}</strong>
+                        <div class="kurir-ratio">
+                            {{ number_format($kurir['resi_total']) }}/{{ number_format($kurir['scan_total']) }}
                         </div>
-                        <div class="kurir-line">
-                            <span class="text-muted">Hasil Scan</span>
-                            <strong>{{ number_format($kurir['scan_total']) }}</strong>
-                        </div>
-                        <div class="kurir-line">
-                            <span class="text-muted">Sisa</span>
-                            <strong>{{ number_format($kurir['remaining']) }}</strong>
+                        <div class="kurir-remaining">
+                            Sisa resi: {{ number_format($kurir['remaining']) }}
                         </div>
                     </div>
                 @endforeach
