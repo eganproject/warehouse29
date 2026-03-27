@@ -761,15 +761,18 @@
             }
         };
 
+        let scanSubmitting = false;
         const submitScan = async () => {
             if (!el.scanCode || !routes.scanItem) return;
             if (!requireActiveSession()) return;
+            if (scanSubmitting) return;
             const code = el.scanCode.value.trim();
             if (!code) {
                 setScanStatus('Masukkan atau scan SKU terlebih dahulu.', 'error');
                 el.scanCode.focus();
                 return;
             }
+            scanSubmitting = true;
             setScanStatus('Menambahkan barang hasil scan...', 'pending');
             try {
                 const json = await fetchJson(routes.scanItem, {
@@ -787,6 +790,7 @@
             } catch (err) {
                 setScanStatus(err.message || 'Gagal menambahkan hasil scan.', 'error');
             } finally {
+                scanSubmitting = false;
             }
         };
 
