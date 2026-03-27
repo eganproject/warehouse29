@@ -4,7 +4,10 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Imports\ResiImport;
+use App\Models\Item;
 use App\Models\PickingList;
+use App\Models\PickingListException;
+use App\Models\PickerTransitItem;
 use App\Models\Resi;
 use App\Models\ResiDetail;
 use Illuminate\Http\Request;
@@ -229,9 +232,14 @@ class ResiImportController extends Controller
                 ->lockForUpdate()
                 ->first();
 
+            $newQty = $listRow
+                ? max(0, (int) $listRow->qty + $delta)
+                : ($delta > 0 ? $delta : 0);
+            $balances = $this->getPickingBalances($date, $sku, $newQty);
+
             if ($listRow) {
-                $listRow->qty = max(0, (int) $listRow->qty + $delta);
-                $listRow->remaining_qty = max(0, (int) $listRow->remaining_qty + $delta);
+                $listRow->qty = $newQty;
+                $listRow->remaining_qty = $balances['remaining'];
                 if ($listRow->qty <= 0 && $listRow->remaining_qty <= 0) {
                     $listRow->delete();
                 } else {
@@ -242,9 +250,73 @@ class ResiImportController extends Controller
                     'list_date' => $date,
                     'sku' => $sku,
                     'qty' => $delta,
-                    'remaining_qty' => $delta,
+                    'remaining_qty' => $balances['remaining'],
                 ]);
             }
+            $this->syncPickingException($date, $sku, $balances['exception']);
+        }
+    }
+
+    private function getPickingBalances(string $date, string $sku, int $listQty): array
+    {
+        if ($listQty <= 0) {
+            return [
+                'remaining' => 0,
+                'exception' => $this->getPickedQty($date, $sku),
+            ];
+        }
+
+        $pickedQty = $this->getPickedQty($date, $sku);
+        $remaining = $listQty - $pickedQty;
+        if ($remaining < 0) {
+            $remaining = 0;
+        }
+        $exception = $pickedQty - $listQty;
+        if ($exception < 0) {
+            $exception = 0;
+        }
+
+        return [
+            'remaining' => $remaining,
+            'exception' => $exception,
+        ];
+    }
+
+    private function getPickedQty(string $date, string $sku): int
+    {
+        $itemId = Item::where('sku', $sku)->value('id');
+        if (!$itemId) {
+            return 0;
+        }
+
+        return (int) PickerTransitItem::where('item_id', $itemId)
+            ->where('picked_date', $date)
+            ->value('qty');
+    }
+
+    private function syncPickingException(string $date, string $sku, int $exceptionQty): void
+    {
+        $exception = PickingListException::where('list_date', $date)
+            ->where('sku', $sku)
+            ->lockForUpdate()
+            ->first();
+
+        if ($exceptionQty > 0) {
+            if ($exception) {
+                $exception->qty = $exceptionQty;
+                $exception->save();
+            } else {
+                PickingListException::create([
+                    'list_date' => $date,
+                    'sku' => $sku,
+                    'qty' => $exceptionQty,
+                ]);
+            }
+            return;
+        }
+
+        if ($exception) {
+            $exception->delete();
         }
     }
 

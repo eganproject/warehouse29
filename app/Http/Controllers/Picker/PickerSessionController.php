@@ -119,6 +119,20 @@ class PickerSessionController extends Controller
             $pickedDate = $session->started_at?->toDateString() ?? $occurredAt->toDateString();
             $sku = Item::where('id', $itemRow->item_id)->value('sku') ?? '';
 
+            $transitRow = PickerTransitItem::where('item_id', $itemRow->item_id)
+                ->where('picked_date', $pickedDate)
+                ->lockForUpdate()
+                ->first();
+
+            if ($delta < 0) {
+                $remainingTransit = (int) ($transitRow?->remaining_qty ?? 0);
+                if (abs($delta) > $remainingTransit) {
+                    throw ValidationException::withMessages([
+                        'qty' => 'Qty tidak bisa dikurangi karena sudah dipacking.',
+                    ]);
+                }
+            }
+
             if ($delta !== 0) {
                 StockService::mutate([
                     'item_id' => $itemRow->item_id,
@@ -141,11 +155,6 @@ class PickerSessionController extends Controller
             if ($delta !== 0) {
                 $this->adjustPickingRemaining($pickedDate, $sku, $delta);
             }
-
-            $transitRow = PickerTransitItem::where('item_id', $itemRow->item_id)
-                ->where('picked_date', $pickedDate)
-                ->lockForUpdate()
-                ->first();
 
             if ($transitRow) {
                 $transitRow->qty += $delta;
@@ -211,6 +220,18 @@ class PickerSessionController extends Controller
             $pickedDate = $session->started_at?->toDateString() ?? $occurredAt->toDateString();
             $sku = Item::where('id', $itemRow->item_id)->value('sku') ?? '';
 
+            $transitRow = PickerTransitItem::where('item_id', $itemRow->item_id)
+                ->where('picked_date', $pickedDate)
+                ->lockForUpdate()
+                ->first();
+
+            $remainingTransit = (int) ($transitRow?->remaining_qty ?? 0);
+            if ($qty > $remainingTransit) {
+                throw ValidationException::withMessages([
+                    'qty' => 'Qty tidak bisa dihapus karena sudah dipacking.',
+                ]);
+            }
+
             $itemRow->delete();
 
             if ($qty > 0) {
@@ -227,11 +248,6 @@ class PickerSessionController extends Controller
                     'created_by' => auth()->id(),
                 ]);
             }
-
-            $transitRow = PickerTransitItem::where('item_id', $itemRow->item_id)
-                ->where('picked_date', $pickedDate)
-                ->lockForUpdate()
-                ->first();
 
             if ($transitRow) {
                 $transitRow->qty -= $qty;
@@ -372,9 +388,11 @@ class PickerSessionController extends Controller
 
     private function currentDraftSession(): ?PickerSession
     {
+        $today = now()->toDateString();
         return PickerSession::with('items.item')
             ->where('user_id', auth()->id())
             ->where('status', 'draft')
+            ->whereDate('started_at', $today)
             ->latest('id')
             ->first();
     }
@@ -382,8 +400,10 @@ class PickerSessionController extends Controller
     private function ensureDraftSession(): PickerSession
     {
         return DB::transaction(function () {
+            $today = now()->toDateString();
             $session = PickerSession::where('user_id', auth()->id())
                 ->where('status', 'draft')
+                ->whereDate('started_at', $today)
                 ->lockForUpdate()
                 ->latest('id')
                 ->first();

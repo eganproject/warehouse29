@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Exports\PickingListExport;
+use App\Models\Item;
 use App\Models\PickingList;
 use App\Models\PickingListException;
+use App\Models\PickerTransitItem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -163,13 +165,16 @@ class PickingListController extends Controller
                     ->first();
 
                 if ($existing) {
-                    $existing->qty = max(0, (int) $existing->qty + $delta);
-                    $existing->remaining_qty = max(0, (int) $existing->remaining_qty + $delta);
+                    $newQty = max(0, (int) $existing->qty + $delta);
+                    $balances = $this->getPickingBalances($listDate, $sku, $newQty);
+                    $existing->qty = $newQty;
+                    $existing->remaining_qty = $balances['remaining'];
                     if ($existing->qty <= 0 && $existing->remaining_qty <= 0) {
                         $existing->delete();
                         return null;
                     }
                     $existing->save();
+                    $this->syncPickingException($listDate, $sku, $balances['exception']);
                     return $existing;
                 }
 
@@ -179,12 +184,15 @@ class PickingListController extends Controller
                     ]);
                 }
 
-                return PickingList::create([
+                $balances = $this->getPickingBalances($listDate, $sku, $delta);
+                $created = PickingList::create([
                     'list_date' => $listDate,
                     'sku' => $sku,
                     'qty' => $delta,
-                    'remaining_qty' => $delta,
+                    'remaining_qty' => $balances['remaining'],
                 ]);
+                $this->syncPickingException($listDate, $sku, $balances['exception']);
+                return $created;
             });
         } catch (ValidationException $e) {
             throw $e;
@@ -210,6 +218,69 @@ class PickingListController extends Controller
                 'remaining_qty' => (int) $row->remaining_qty,
             ] : null,
         ]);
+    }
+
+    private function getPickingBalances(string $date, string $sku, int $listQty): array
+    {
+        if ($listQty <= 0) {
+            return [
+                'remaining' => 0,
+                'exception' => $this->getPickedQty($date, $sku),
+            ];
+        }
+
+        $pickedQty = $this->getPickedQty($date, $sku);
+        $remaining = $listQty - $pickedQty;
+        if ($remaining < 0) {
+            $remaining = 0;
+        }
+        $exception = $pickedQty - $listQty;
+        if ($exception < 0) {
+            $exception = 0;
+        }
+
+        return [
+            'remaining' => $remaining,
+            'exception' => $exception,
+        ];
+    }
+
+    private function getPickedQty(string $date, string $sku): int
+    {
+        $itemId = Item::where('sku', $sku)->value('id');
+        if (!$itemId) {
+            return 0;
+        }
+
+        return (int) PickerTransitItem::where('item_id', $itemId)
+            ->where('picked_date', $date)
+            ->value('qty');
+    }
+
+    private function syncPickingException(string $date, string $sku, int $exceptionQty): void
+    {
+        $exception = PickingListException::where('list_date', $date)
+            ->where('sku', $sku)
+            ->lockForUpdate()
+            ->first();
+
+        if ($exceptionQty > 0) {
+            if ($exception) {
+                $exception->qty = $exceptionQty;
+                $exception->save();
+            } else {
+                PickingListException::create([
+                    'list_date' => $date,
+                    'sku' => $sku,
+                    'qty' => $exceptionQty,
+                ]);
+            }
+            return;
+        }
+
+        if ($exception) {
+            $exception->delete();
+        }
     }
 
     private function applyDateFilter($query, Request $request): void
