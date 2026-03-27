@@ -7,10 +7,12 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Carbon;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
+use Maatwebsite\Excel\Concerns\WithColumnFormatting;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
+use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 
-class PickerTransitStatusExport implements FromCollection, WithHeadings, WithMapping, ShouldAutoSize
+class PickerTransitStatusExport implements FromCollection, WithHeadings, WithMapping, ShouldAutoSize, WithColumnFormatting
 {
     public function __construct(private array $filters = [])
     {
@@ -61,10 +63,17 @@ class PickerTransitStatusExport implements FromCollection, WithHeadings, WithMap
     {
         return [
             $row->picked_date?->format('Y-m-d') ?? '-',
-            $row->item?->sku ?? '-',
+            (string) ($row->item?->sku ?? '-'),
             (int) $row->qty,
             (int) $row->remaining_qty,
             $row->picked_at?->format('Y-m-d H:i') ?? '-',
+        ];
+    }
+
+    public function columnFormats(): array
+    {
+        return [
+            'B' => NumberFormat::FORMAT_TEXT,
         ];
     }
 }
