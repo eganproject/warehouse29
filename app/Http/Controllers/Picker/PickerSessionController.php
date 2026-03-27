@@ -33,6 +33,7 @@ class PickerSessionController extends Controller
                 'itemsDestroy' => route('picker.items.destroy', ':id'),
                 'submit' => route('picker.submit'),
                 'searchItems' => route('picker.items.search'),
+                'scanItem' => route('picker.scan-item'),
                 'logout' => route('logout'),
             ],
         ]);
@@ -67,86 +68,23 @@ class PickerSessionController extends Controller
             'note' => ['nullable', 'string'],
         ]);
 
-        $session = $this->ensureDraftSession();
-
-        DB::beginTransaction();
         try {
-            $deltaQty = (int) $validated['qty'];
-            $occurredAt = now();
-            $pickedDate = $session->started_at?->toDateString() ?? $occurredAt->toDateString();
-            $sku = Item::where('id', $validated['item_id'])->value('sku') ?? '';
-
-            $itemRow = PickerSessionItem::where('picker_session_id', $session->id)
-                ->where('item_id', $validated['item_id'])
-                ->lockForUpdate()
-                ->first();
-
-            if ($itemRow) {
-                $itemRow->qty += $deltaQty;
-                if (!empty($validated['note'])) {
-                    $itemRow->note = $validated['note'];
-                }
-                $itemRow->save();
-            } else {
-                PickerSessionItem::create([
-                    'picker_session_id' => $session->id,
-                    'item_id' => $validated['item_id'],
-                    'qty' => $deltaQty,
-                    'note' => $validated['note'] ?? null,
-                ]);
-            }
-
-            $transitRow = PickerTransitItem::where('item_id', $validated['item_id'])
-                ->where('picked_date', $pickedDate)
-                ->lockForUpdate()
-                ->first();
-
-            if ($transitRow) {
-                $transitRow->qty += $deltaQty;
-                $transitRow->remaining_qty += $deltaQty;
-                $transitRow->picked_at = $occurredAt;
-                $transitRow->save();
-            } else {
-                PickerTransitItem::create([
-                    'item_id' => $validated['item_id'],
-                    'picked_date' => $pickedDate,
-                    'qty' => $deltaQty,
-                    'remaining_qty' => $deltaQty,
-                    'picked_at' => $occurredAt,
-                ]);
-            }
-
-            StockService::mutate([
-                'item_id' => $validated['item_id'],
-                'direction' => 'out',
-                'qty' => $deltaQty,
-                'source_type' => 'picker',
-                'source_subtype' => 'mobile',
-                'source_id' => $session->id,
-                'source_code' => $session->code,
-                'note' => $validated['note'] ?? null,
-                'occurred_at' => $occurredAt,
-                'created_by' => auth()->id(),
-            ]);
-
-            $this->adjustPickingRemaining($pickedDate, $sku, $deltaQty);
-
-            DB::commit();
+            $session = $this->addItemToSession(
+                (int) $validated['item_id'],
+                (int) $validated['qty'],
+                $validated['note'] ?? null
+            );
         } catch (ValidationException $e) {
-            DB::rollBack();
             return response()->json([
                 'message' => $e->getMessage(),
                 'errors' => $e->errors(),
             ], 422);
         } catch (\Throwable $e) {
-            DB::rollBack();
             return response()->json([
                 'message' => 'Gagal menyimpan item',
                 'error' => $e->getMessage(),
             ], 500);
         }
-
-        $session->load('items.item');
 
         return response()->json([
             'session' => $this->serializeSession($session),
@@ -392,6 +330,46 @@ class PickerSessionController extends Controller
         ]);
     }
 
+    public function scanItem(Request $request)
+    {
+        $validated = $request->validate([
+            'code' => ['required', 'string'],
+            'qty' => ['nullable', 'integer', 'min:1'],
+        ]);
+
+        $code = trim($validated['code']);
+        $qty = (int) ($validated['qty'] ?? 1);
+
+        $item = Item::where('sku', $code)->first();
+        if (!$item) {
+            return response()->json([
+                'message' => 'SKU tidak ditemukan pada master item.',
+                'errors' => [
+                    'code' => ['SKU tidak ditemukan pada master item.'],
+                ],
+            ], 422);
+        }
+
+        try {
+            $session = $this->addItemToSession($item->id, $qty);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'message' => 'Gagal menambahkan item hasil scan',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+
+        return response()->json([
+            'message' => 'Item berhasil ditambahkan melalui scan.',
+            'session' => $this->serializeSession($session),
+        ]);
+    }
+
     private function currentDraftSession(): ?PickerSession
     {
         return PickerSession::with('items.item')
@@ -420,6 +398,90 @@ class PickerSessionController extends Controller
                 'started_at' => now(),
             ]);
         });
+    }
+
+    private function addItemToSession(int $itemId, int $qty, ?string $note = null): PickerSession
+    {
+        if ($qty <= 0) {
+            throw ValidationException::withMessages([
+                'qty' => 'Qty harus lebih dari 0',
+            ]);
+        }
+
+        $session = $this->ensureDraftSession();
+
+        DB::beginTransaction();
+        try {
+            $deltaQty = $qty;
+            $occurredAt = now();
+            $pickedDate = $session->started_at?->toDateString() ?? $occurredAt->toDateString();
+            $item = Item::findOrFail($itemId);
+            $sku = $item->sku ?? '';
+
+            $itemRow = PickerSessionItem::where('picker_session_id', $session->id)
+                ->where('item_id', $itemId)
+                ->lockForUpdate()
+                ->first();
+
+            if ($itemRow) {
+                $itemRow->qty += $deltaQty;
+                if (!empty($note)) {
+                    $itemRow->note = $note;
+                }
+                $itemRow->save();
+            } else {
+                PickerSessionItem::create([
+                    'picker_session_id' => $session->id,
+                    'item_id' => $itemId,
+                    'qty' => $deltaQty,
+                    'note' => $note,
+                ]);
+            }
+
+            $transitRow = PickerTransitItem::where('item_id', $itemId)
+                ->where('picked_date', $pickedDate)
+                ->lockForUpdate()
+                ->first();
+
+            if ($transitRow) {
+                $transitRow->qty += $deltaQty;
+                $transitRow->remaining_qty += $deltaQty;
+                $transitRow->picked_at = $occurredAt;
+                $transitRow->save();
+            } else {
+                PickerTransitItem::create([
+                    'item_id' => $itemId,
+                    'picked_date' => $pickedDate,
+                    'qty' => $deltaQty,
+                    'remaining_qty' => $deltaQty,
+                    'picked_at' => $occurredAt,
+                ]);
+            }
+
+            StockService::mutate([
+                'item_id' => $itemId,
+                'direction' => 'out',
+                'qty' => $deltaQty,
+                'source_type' => 'picker',
+                'source_subtype' => 'mobile',
+                'source_id' => $session->id,
+                'source_code' => $session->code,
+                'note' => $note,
+                'occurred_at' => $occurredAt,
+                'created_by' => auth()->id(),
+            ]);
+
+            $this->adjustPickingRemaining($pickedDate, $sku, $deltaQty);
+
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            throw $e;
+        }
+
+        $session->load('items.item');
+
+        return $session;
     }
 
     private function serializeSession(PickerSession $session): array

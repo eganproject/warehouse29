@@ -69,6 +69,7 @@ Route::middleware('auth')->prefix('picker')->as('picker.')->group(function () {
     Route::post('/items', [PickerSessionController::class, 'storeItem'])->name('items.store');
     Route::put('/items/{id}', [PickerSessionController::class, 'updateItem'])->name('items.update');
     Route::delete('/items/{id}', [PickerSessionController::class, 'destroyItem'])->name('items.destroy');
+    Route::post('/scan-item', [PickerSessionController::class, 'scanItem'])->name('scan-item');
     Route::post('/submit', [PickerSessionController::class, 'submit'])->name('submit');
 });
 
