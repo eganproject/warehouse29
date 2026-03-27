@@ -253,6 +253,11 @@
                     { data: null, orderable: false, searchable: false, className: 'text-end', render: (data, type, row) => {
                         const idPesanan = row.id_pesanan || '';
                         const noResi = row.no_resi || '';
+                        const hasPackerScan = !!row.has_packer_scan;
+                        const hasScanOut = !!row.has_scan_out;
+                        if (hasPackerScan || hasScanOut) {
+                            return '<span class="text-muted">-</span>';
+                        }
                         return `<button type="button" class="btn btn-sm btn-light-danger btn-cancel" data-id="${idPesanan}" data-resi="${noResi}">Cancel</button>`;
                     }},
                 ],

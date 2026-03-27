@@ -66,6 +66,16 @@ class ResiImportController extends Controller
 
         $query = Resi::query()
             ->select(['id', 'id_pesanan', 'no_resi', 'tanggal_pesanan', 'kurir_id'])
+            ->selectSub(function ($sub) {
+                $sub->from('packer_resi_scans')
+                    ->selectRaw('count(1)')
+                    ->whereColumn('packer_resi_scans.resi_id', 'resis.id');
+            }, 'packer_scan_count')
+            ->selectSub(function ($sub) {
+                $sub->from('packer_scan_outs')
+                    ->selectRaw('count(1)')
+                    ->whereColumn('packer_scan_outs.resi_id', 'resis.id');
+            }, 'scan_out_count')
             ->with(['details' => function ($q) {
                 $q->select(['id', 'resi_id', 'sku', 'qty']);
             }, 'kurir'])
@@ -89,6 +99,8 @@ class ResiImportController extends Controller
                 : '-';
             $skuList = $skuItems !== '' ? $skuItems : '-';
             $tanggalOrder = $row->tanggal_pesanan?->format('Y-m-d') ?? $row->tanggal_pesanan ?? '-';
+            $hasPackerScan = (int) ($row->packer_scan_count ?? 0) > 0;
+            $hasScanOut = (int) ($row->scan_out_count ?? 0) > 0;
             return [
                 'id' => $row->id,
                 'no_resi' => $row->no_resi ?? '-',
@@ -96,6 +108,8 @@ class ResiImportController extends Controller
                 'kurir' => $row->kurir?->name ?? '-',
                 'sku' => $skuList,
                 'tanggal_pesanan' => $tanggalOrder,
+                'has_packer_scan' => $hasPackerScan,
+                'has_scan_out' => $hasScanOut,
             ];
         });
 
