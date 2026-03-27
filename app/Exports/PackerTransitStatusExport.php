@@ -7,10 +7,12 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Carbon;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
+use Maatwebsite\Excel\Concerns\WithColumnFormatting;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
+use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
 
-class PackerTransitStatusExport implements FromCollection, WithHeadings, WithMapping, ShouldAutoSize
+class PackerTransitStatusExport implements FromCollection, WithHeadings, WithMapping, ShouldAutoSize, WithColumnFormatting
 {
     public function __construct(private array $filters = [])
     {
@@ -61,9 +63,17 @@ class PackerTransitStatusExport implements FromCollection, WithHeadings, WithMap
     {
         return [
             $row->created_at?->format('Y-m-d H:i') ?? '-',
-            $row->id_pesanan ?? '-',
-            $row->no_resi ?? '-',
+            (string) ($row->id_pesanan ?? '-'),
+            (string) ($row->no_resi ?? '-'),
             $row->status ?? '-',
+        ];
+    }
+
+    public function columnFormats(): array
+    {
+        return [
+            'B' => NumberFormat::FORMAT_TEXT,
+            'C' => NumberFormat::FORMAT_TEXT,
         ];
     }
 }
