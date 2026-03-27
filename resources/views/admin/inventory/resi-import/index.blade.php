@@ -97,6 +97,7 @@
                         <th>ID Pesanan</th>
                         <th>SKU</th>
                         <th>Tanggal Order</th>
+                        <th class="text-end">Aksi</th>
                     </tr>
                 </thead>
                 <tbody></tbody>
@@ -147,12 +148,53 @@
         </div>
     </div>
 @endif
+
+<div class="modal fade" id="modal_cancel_resi" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-500px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bolder">Batalkan Resi</h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <span class="svg-icon svg-icon-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                            <rect opacity="0.5" x="6" y="17.3137" width="16" height="2" rx="1" transform="rotate(-45 6 17.3137)" fill="black" />
+                            <rect x="7.41422" y="6" width="16" height="2" rx="1" transform="rotate(45 7.41422 6)" fill="black" />
+                        </svg>
+                    </span>
+                </div>
+            </div>
+            <div class="modal-body mx-5 mx-xl-15 my-7">
+                <form id="form_cancel_resi">
+                    @csrf
+                    <div class="fv-row mb-5">
+                        <label class="fs-6 fw-bold form-label mb-2">ID Pesanan</label>
+                        <input type="text" class="form-control form-control-solid" id="cancel_id_pesanan" name="id_pesanan" readonly />
+                    </div>
+                    <div class="fv-row mb-5">
+                        <label class="fs-6 fw-bold form-label mb-2">No Resi</label>
+                        <input type="text" class="form-control form-control-solid" id="cancel_no_resi" name="no_resi" readonly />
+                    </div>
+                    <div class="fv-row mb-7">
+                        <label class="fs-6 fw-bold form-label mb-2">Alasan Cancel</label>
+                        <textarea class="form-control form-control-solid" id="cancel_reason" name="reason" rows="3" placeholder="Tulis alasan cancel"></textarea>
+                        <div class="text-danger fs-7 mt-2" data-error="reason"></div>
+                    </div>
+                    <div class="text-end">
+                        <button type="button" class="btn btn-light me-3" data-bs-dismiss="modal">Batal</button>
+                        <button type="submit" class="btn btn-danger" id="btn_submit_cancel">Cancel Resi</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 @endsection
 
 @push('scripts')
 <script>
     const importUrl = '{{ $importUrl ?? '' }}';
     const dataUrl = '{{ $dataUrl ?? '' }}';
+    const cancelUrl = '{{ route('admin.inventory.resi-import.cancel') }}';
     const csrfToken = '{{ csrf_token() }}';
     const todayStr = '{{ $today ?? '' }}';
 
@@ -163,6 +205,12 @@
         const importInput = document.getElementById('import_resi_file');
         const importError = document.getElementById('error_import_resi_file');
         const importSubmit = document.getElementById('btn_import_resi_submit');
+        const cancelModalEl = document.getElementById('modal_cancel_resi');
+        const cancelForm = document.getElementById('form_cancel_resi');
+        const cancelModal = cancelModalEl ? new bootstrap.Modal(cancelModalEl) : null;
+        const cancelIdInput = document.getElementById('cancel_id_pesanan');
+        const cancelNoResiInput = document.getElementById('cancel_no_resi');
+        const cancelReasonInput = document.getElementById('cancel_reason');
         const loadingOverlay = document.getElementById('import_loading_overlay');
         const filterDateEl = document.getElementById('filter_date');
         const filterSearchEl = document.getElementById('filter_search');
@@ -202,6 +250,11 @@
                     { data: 'id_pesanan' },
                     { data: 'sku' },
                     { data: 'tanggal_pesanan' },
+                    { data: null, orderable: false, searchable: false, className: 'text-end', render: (data, type, row) => {
+                        const idPesanan = row.id_pesanan || '';
+                        const noResi = row.no_resi || '';
+                        return `<button type="button" class="btn btn-sm btn-light-danger btn-cancel" data-id="${idPesanan}" data-resi="${noResi}">Cancel</button>`;
+                    }},
                 ],
                 language: {
                     emptyTable: 'Belum ada data',
@@ -240,6 +293,77 @@
         importBtn?.addEventListener('click', () => {
             if (importInput) importInput.value = '';
             if (importError) importError.textContent = '';
+        });
+
+        const clearCancelErrors = () => {
+            cancelForm?.querySelectorAll('[data-error]').forEach((el) => { el.textContent = ''; });
+        };
+
+        tableEl.on('click', '.btn-cancel', function (e) {
+            e.preventDefault();
+            const id = this.getAttribute('data-id');
+            const resi = this.getAttribute('data-resi');
+            const openModal = () => {
+                if (cancelIdInput) cancelIdInput.value = id || '';
+                if (cancelNoResiInput) cancelNoResiInput.value = resi || '';
+                if (cancelReasonInput) cancelReasonInput.value = '';
+                clearCancelErrors();
+                cancelModal?.show();
+            };
+
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    title: 'Batalkan resi ini?',
+                    text: 'Resi yang dibatalkan tidak bisa diproses packing/scan out.',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Ya, cancel',
+                    cancelButtonText: 'Batal',
+                }).then((result) => {
+                    if (result.isConfirmed) openModal();
+                });
+            } else {
+                if (confirm('Batalkan resi ini?')) openModal();
+            }
+        });
+
+        cancelForm?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            clearCancelErrors();
+            const formData = new FormData(cancelForm);
+            try {
+                const res = await fetch(cancelUrl, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json',
+                    },
+                    body: formData,
+                });
+                const text = await res.text();
+                let json = null;
+                try { json = JSON.parse(text); } catch (err) { /* ignore */ }
+                if (!res.ok) {
+                    if (res.status === 422 && json?.errors) {
+                        Object.entries(json.errors).forEach(([field, messages]) => {
+                            const errEl = cancelForm.querySelector(`[data-error="${field}"]`);
+                            if (errEl) errEl.textContent = messages.join(', ');
+                        });
+                    } else if (typeof Swal !== 'undefined') {
+                        Swal.fire('Error', json?.message || 'Gagal cancel resi', 'error');
+                    }
+                    return;
+                }
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire('Berhasil', json?.message || 'Resi dibatalkan', 'success');
+                }
+                cancelModal?.hide();
+                reloadTable();
+            } catch (err) {
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire('Error', 'Gagal cancel resi', 'error');
+                }
+            }
         });
 
         const setLoading = (state) => {

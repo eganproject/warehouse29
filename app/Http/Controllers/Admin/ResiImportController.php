@@ -232,9 +232,14 @@ class ResiImportController extends Controller
 
         $hasPackerScan = PackerResiScan::where('resi_id', $resi->id)->exists();
         $hasScanOut = PackerScanOut::where('resi_id', $resi->id)->exists();
-        if ($hasPackerScan || $hasScanOut) {
+        if ($hasScanOut) {
             return response()->json([
-                'message' => 'Resi sudah dipacking/scan out, tidak bisa dibatalkan.',
+                'message' => 'Resi sudah scan out, tidak bisa dibatalkan.',
+            ], 422);
+        }
+        if ($hasPackerScan) {
+            return response()->json([
+                'message' => 'Resi sudah dipacking, tidak bisa dibatalkan.',
             ], 422);
         }
 
