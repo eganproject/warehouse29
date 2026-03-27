@@ -106,6 +106,13 @@
                         </tr>
                     </tbody>
                 </table>
+                <div class="d-flex align-items-center justify-content-between mt-3 flex-wrap gap-3" id="missing_pagination" style="display:none;">
+                    <div class="text-muted" id="missing_page_summary"></div>
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-sm btn-light" id="missing_prev">&larr; Sebelumnya</button>
+                        <button type="button" class="btn btn-sm btn-light" id="missing_next">Berikutnya &rarr;</button>
+                    </div>
+                </div>
             </div>
         </div>
         <div class="table-responsive">
@@ -153,6 +160,15 @@
         const comparisonScannedEl = document.getElementById('comparison_scanned_total');
         const comparisonMissingEl = document.getElementById('comparison_missing_total');
         const missingBody = document.getElementById('missing_transit_body');
+        const missingPagination = document.getElementById('missing_pagination');
+        const missingPrevBtn = document.getElementById('missing_prev');
+        const missingNextBtn = document.getElementById('missing_next');
+        const missingSummary = document.getElementById('missing_page_summary');
+        const comparisonState = {
+            samples: [],
+            page: 1,
+            perPage: 10,
+        };
         let fpFrom = null;
         let fpTo = null;
 
@@ -177,6 +193,47 @@
             if (summaryAvgHour) summaryAvgHour.textContent = avgHour.toFixed(2);
         };
 
+        const renderMissingRows = () => {
+            const samples = comparisonState.samples || [];
+            const total = samples.length;
+            const perPage = comparisonState.perPage;
+            const maxPage = Math.max(1, Math.ceil(total / perPage));
+            comparisonState.page = Math.min(Math.max(1, comparisonState.page), maxPage);
+            const start = (comparisonState.page - 1) * perPage;
+            const paginated = samples.slice(start, start + perPage);
+
+            if (!paginated.length) {
+                missingBody.innerHTML = `
+                    <tr>
+                        <td colspan="3" class="text-center text-muted py-6">Tidak ada data tertinggal.</td>
+                    </tr>
+                `;
+            } else {
+                missingBody.innerHTML = paginated.map((sample) => `
+                    <tr>
+                        <td>${sample.id_pesanan || '-'}</td>
+                        <td>${sample.no_resi || '-'}</td>
+                        <td>${sample.tanggal_upload || '-'}</td>
+                    </tr>
+                `).join('');
+            }
+
+            if (missingPagination) {
+                if (total <= perPage) {
+                    missingPagination.style.display = 'none';
+                } else {
+                    missingPagination.style.display = 'flex';
+                    if (missingSummary) {
+                        const from = total ? start + 1 : 0;
+                        const to = Math.min(total, start + paginated.length);
+                        missingSummary.textContent = `Menampilkan ${from} - ${to} dari ${total} data`;
+                    }
+                    if (missingPrevBtn) missingPrevBtn.disabled = comparisonState.page <= 1;
+                    if (missingNextBtn) missingNextBtn.disabled = comparisonState.page >= maxPage;
+                }
+            }
+        };
+
         const updateComparison = (comparison) => {
             const importTotal = Number(comparison?.import_total ?? 0);
             const scannedTotal = Number(comparison?.scanned_total ?? 0);
@@ -184,24 +241,11 @@
             if (comparisonImportEl) comparisonImportEl.textContent = importTotal.toLocaleString('id-ID');
             if (comparisonScannedEl) comparisonScannedEl.textContent = scannedTotal.toLocaleString('id-ID');
             if (comparisonMissingEl) comparisonMissingEl.textContent = missingTotal.toLocaleString('id-ID');
-            if (missingBody) {
-                const samples = Array.isArray(comparison?.missing_samples) ? comparison.missing_samples : [];
-                if (!samples.length) {
-                    missingBody.innerHTML = `
-                        <tr>
-                            <td colspan="3" class="text-center text-muted py-6">Tidak ada data tertinggal.</td>
-                        </tr>
-                    `;
-                } else {
-                    missingBody.innerHTML = samples.map((sample) => `
-                        <tr>
-                            <td>${sample.id_pesanan || '-'}</td>
-                            <td>${sample.no_resi || '-'}</td>
-                            <td>${sample.tanggal_upload || '-'}</td>
-                        </tr>
-                    `).join('');
-                }
-            }
+            comparisonState.samples = Array.isArray(comparison?.missing_samples)
+                ? comparison.missing_samples
+                : [];
+            comparisonState.page = 1;
+            renderMissingRows();
         };
 
         const dt = tableEl.DataTable({
@@ -255,6 +299,21 @@
             if (packerSelect) packerSelect.value = '';
             if (searchInput) searchInput.value = '';
             reloadTable();
+        });
+
+        missingPrevBtn?.addEventListener('click', () => {
+            if (comparisonState.page > 1) {
+                comparisonState.page -= 1;
+                renderMissingRows();
+            }
+        });
+
+        missingNextBtn?.addEventListener('click', () => {
+            const maxPage = Math.ceil((comparisonState.samples.length || 0) / comparisonState.perPage);
+            if (comparisonState.page < maxPage) {
+                comparisonState.page += 1;
+                renderMissingRows();
+            }
         });
     });
 </script>
