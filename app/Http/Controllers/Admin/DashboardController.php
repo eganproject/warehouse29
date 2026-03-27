@@ -17,6 +17,10 @@ class DashboardController extends Controller
 
         $totalResi = Resi::whereDate('tanggal_upload', $today)->count();
         $totalScanOut = PackerScanOut::whereDate('scan_date', $today)->count();
+        $totalResiUpdatedAt = Resi::whereDate('tanggal_upload', $today)->max('updated_at');
+        $totalScanUpdatedAt = PackerScanOut::whereDate('scan_date', $today)->max('scanned_at');
+        $totalResiUpdated = $totalResiUpdatedAt ? Carbon::parse($totalResiUpdatedAt)->format('H:i') : '-';
+        $totalScanUpdated = $totalScanUpdatedAt ? Carbon::parse($totalScanUpdatedAt)->format('H:i') : '-';
 
         $resiCounts = Resi::select('kurir_id', DB::raw('count(*) as total'))
             ->whereDate('tanggal_upload', $today)
@@ -67,6 +71,8 @@ class DashboardController extends Controller
             'today' => $today,
             'totalResi' => $totalResi,
             'totalScanOut' => $totalScanOut,
+            'totalResiUpdated' => $totalResiUpdated,
+            'totalScanUpdated' => $totalScanUpdated,
             'kurirs' => $kurirs,
         ]);
     }

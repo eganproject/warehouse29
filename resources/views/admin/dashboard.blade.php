@@ -113,12 +113,12 @@
             <div class="stat-card">
                 <div class="stat-label">Total Resi</div>
                 <div class="stat-value">{{ number_format($totalResi ?? 0) }}</div>
-                <div class="stat-meta">Resi diimport hari ini</div>
+                <div class="stat-meta">Update: {{ $totalResiUpdated ?? '-' }}</div>
             </div>
             <div class="stat-card">
                 <div class="stat-label">Total Scan Out</div>
                 <div class="stat-value">{{ number_format($totalScanOut ?? 0) }}</div>
-                <div class="stat-meta">Hasil scan out hari ini</div>
+                <div class="stat-meta">Update: {{ $totalScanUpdated ?? '-' }}</div>
             </div>
         </div>
     </div>
