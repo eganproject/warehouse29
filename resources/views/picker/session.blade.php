@@ -776,10 +776,11 @@
             scanSubmitting = true;
             setScanStatus('Menambahkan barang hasil scan...', 'pending');
             try {
+                const payload = new FormData();
+                payload.append('code', code);
                 const json = await fetchJson(routes.scanItem, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ code }),
+                    body: payload,
                 });
                 state.session = json.session;
                 renderSession();
