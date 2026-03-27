@@ -28,6 +28,7 @@
                 <button type="button" class="btn btn-light" id="filter_apply">Filter</button>
                 <button type="button" class="btn btn-light" id="filter_reset">Reset</button>
                 <button type="button" class="btn btn-light-primary" id="btn_export_picking_list">Export Excel</button>
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modal_add_picking_qty">Tambah Qty</button>
             </div>
         </div>
     </div>
@@ -93,6 +94,59 @@
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="modal_add_picking_qty" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-500px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bolder">Tambah Qty Picking List</h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <span class="svg-icon svg-icon-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                            <rect opacity="0.5" x="6" y="17.3137" width="16" height="2" rx="1" transform="rotate(-45 6 17.3137)" fill="black" />
+                            <rect x="7.41422" y="6" width="16" height="2" rx="1" transform="rotate(45 7.41422 6)" fill="black" />
+                        </svg>
+                    </span>
+                </div>
+            </div>
+            <div class="modal-body mx-5 mx-xl-15 my-7">
+                <form id="form_add_picking_qty">
+                    @csrf
+                    <div class="fv-row mb-7">
+                        <label class="required fs-6 fw-bold form-label mb-2">Tanggal Picking</label>
+                        <input type="text" class="form-control form-control-solid" id="add_qty_date" name="list_date" placeholder="YYYY-MM-DD" value="{{ $today ?? '' }}" />
+                        <div class="text-danger fs-7 mt-2" data-error="list_date"></div>
+                    </div>
+                    <div class="fv-row mb-7">
+                        <label class="required fs-6 fw-bold form-label mb-2">Jenis Penyesuaian</label>
+                        <select class="form-select form-select-solid" id="add_qty_mode" name="mode">
+                            <option value="add">Tambah Qty</option>
+                            <option value="reduce">Kurangi Qty</option>
+                        </select>
+                        <div class="text-danger fs-7 mt-2" data-error="mode"></div>
+                    </div>
+                    <div class="fv-row mb-7">
+                        <label class="required fs-6 fw-bold form-label mb-2">SKU</label>
+                        <input type="text" class="form-control form-control-solid" id="add_qty_sku" name="sku" placeholder="Masukkan SKU" />
+                        <div class="text-danger fs-7 mt-2" data-error="sku"></div>
+                    </div>
+                    <div class="fv-row mb-7">
+                        <label class="required fs-6 fw-bold form-label mb-2">Qty</label>
+                        <input type="number" min="1" class="form-control form-control-solid" id="add_qty_qty" name="qty" placeholder="Qty" />
+                        <div class="text-danger fs-7 mt-2" data-error="qty"></div>
+                    </div>
+                    <div class="text-muted fs-7 mb-7">
+                        Pilih tambah untuk menambahkan qty baru atau kurangi untuk mengurangi qty & remaining qty pada SKU dan tanggal yang sama. Jika belum ada, sistem akan membuat baris baru saat menambah.
+                    </div>
+                    <div class="text-end">
+                        <button type="button" class="btn btn-light me-3" data-bs-dismiss="modal">Batal</button>
+                        <button type="submit" class="btn btn-primary" id="btn_submit_add_qty">Simpan</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 @endsection
 
 @push('scripts')
@@ -100,7 +154,9 @@
     const dataUrl = '{{ $dataUrl }}';
     const dataUrlExceptions = '{{ $dataUrlExceptions }}';
     const exportUrl = '{{ route('admin.inventory.picking-list.export') }}';
+    const addQtyUrl = '{{ route('admin.inventory.picking-list.store-qty') }}';
     const todayStr = '{{ $today ?? '' }}';
+    const csrfToken = '{{ csrf_token() }}';
 
     document.addEventListener('DOMContentLoaded', () => {
         const tableEl = $('#picking_list_table');
@@ -111,9 +167,15 @@
         const filterApplyBtn = document.getElementById('filter_apply');
         const filterResetBtn = document.getElementById('filter_reset');
         const exportBtn = document.getElementById('btn_export_picking_list');
+        const addQtyModalEl = document.getElementById('modal_add_picking_qty');
+        const addQtyForm = document.getElementById('form_add_picking_qty');
+        const addQtyDateInput = document.getElementById('add_qty_date');
+        const addQtySkuInput = document.getElementById('add_qty_sku');
+        const addQtyModal = (typeof bootstrap !== 'undefined' && addQtyModalEl) ? new bootstrap.Modal(addQtyModalEl) : null;
         const summaryOngoingEl = document.getElementById('summary_ongoing');
         const summaryDoneEl = document.getElementById('summary_done');
         let fpDate = null;
+        let addQtyDatePicker = null;
         let dtList = null;
         let dtException = null;
 
@@ -126,7 +188,43 @@
             if (dateEl) {
                 fpDate = flatpickr(dateEl, { dateFormat: 'Y-m-d', allowInput: true });
             }
+            if (addQtyDateInput) {
+                addQtyDatePicker = flatpickr(addQtyDateInput, { dateFormat: 'Y-m-d', allowInput: true });
+            }
+        } else if (addQtyDateInput && todayStr) {
+            addQtyDateInput.value = todayStr;
         }
+
+        const resetAddQtyDate = () => {
+            if (addQtyDatePicker) {
+                if (todayStr) {
+                    addQtyDatePicker.setDate(todayStr, true);
+                } else {
+                    addQtyDatePicker.clear();
+                }
+            } else if (addQtyDateInput) {
+                addQtyDateInput.value = todayStr || '';
+            }
+        };
+        resetAddQtyDate();
+
+        const clearAddQtyErrors = () => {
+            addQtyForm?.querySelectorAll('[data-error]').forEach((el) => { el.textContent = ''; });
+        };
+
+        const resetAddQtyForm = () => {
+            addQtyForm?.reset();
+            resetAddQtyDate();
+        };
+
+        addQtyModalEl?.addEventListener('shown.bs.modal', () => {
+            setTimeout(() => addQtySkuInput?.focus(), 200);
+        });
+
+        addQtyModalEl?.addEventListener('hidden.bs.modal', () => {
+            clearAddQtyErrors();
+            resetAddQtyForm();
+        });
 
         dtList = tableEl.DataTable({
             processing: true,
@@ -213,6 +311,46 @@
             if (statusEl?.value) params.set('status', statusEl.value);
             const url = params.toString() ? `${exportUrl}?${params.toString()}` : exportUrl;
             window.location.href = url;
+        });
+
+        addQtyForm?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            clearAddQtyErrors();
+            const formData = new FormData(addQtyForm);
+            try {
+                const res = await fetch(addQtyUrl, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json',
+                    },
+                    body: formData,
+                });
+                const text = await res.text();
+                let json = null;
+                try { json = JSON.parse(text); } catch (err) { /* ignore */ }
+                if (!res.ok) {
+                    if (res.status === 422 && json?.errors) {
+                        Object.entries(json.errors).forEach(([field, messages]) => {
+                            const errEl = addQtyForm.querySelector(`[data-error="${field}"]`);
+                            if (errEl) errEl.textContent = messages.join(', ');
+                        });
+                    } else if (typeof Swal !== 'undefined') {
+                        Swal.fire('Error', json?.message || 'Gagal menyimpan data', 'error');
+                    }
+                    return;
+                }
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire('Berhasil', json?.message || 'Qty berhasil ditambahkan', 'success');
+                }
+                addQtyModal?.hide();
+                reloadAll();
+            } catch (err) {
+                console.error(err);
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire('Error', 'Gagal menyimpan data', 'error');
+                }
+            }
         });
     });
 </script>

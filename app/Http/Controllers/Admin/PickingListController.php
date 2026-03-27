@@ -8,6 +8,8 @@ use App\Models\PickingList;
 use App\Models\PickingListException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Maatwebsite\Excel\Facades\Excel;
 
 class PickingListController extends Controller
@@ -136,6 +138,78 @@ class PickingListController extends Controller
         $filename = "picking-list-{$date}-{$suffix}.xlsx";
 
         return Excel::download(new PickingListExport($filters), $filename);
+    }
+
+    public function storeQty(Request $request)
+    {
+        $validated = $request->validate([
+            'list_date' => ['required', 'date'],
+            'sku' => ['required', 'string', 'max:100'],
+            'qty' => ['required', 'integer', 'min:1'],
+            'mode' => ['required', 'in:add,reduce'],
+        ]);
+
+        $listDate = Carbon::parse($validated['list_date'])->toDateString();
+        $sku = trim($validated['sku']);
+        $qty = (int) $validated['qty'];
+        $mode = $validated['mode'];
+        $delta = $mode === 'reduce' ? -$qty : $qty;
+
+        try {
+            $row = DB::transaction(function () use ($listDate, $sku, $delta) {
+                $existing = PickingList::where('list_date', $listDate)
+                    ->where('sku', $sku)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($existing) {
+                    $existing->qty = max(0, (int) $existing->qty + $delta);
+                    $existing->remaining_qty = max(0, (int) $existing->remaining_qty + $delta);
+                    if ($existing->qty <= 0 && $existing->remaining_qty <= 0) {
+                        $existing->delete();
+                        return null;
+                    }
+                    $existing->save();
+                    return $existing;
+                }
+
+                if ($delta <= 0) {
+                    throw ValidationException::withMessages([
+                        'sku' => 'Data picking list tidak ditemukan untuk tanggal tersebut.',
+                    ]);
+                }
+
+                return PickingList::create([
+                    'list_date' => $listDate,
+                    'sku' => $sku,
+                    'qty' => $delta,
+                    'remaining_qty' => $delta,
+                ]);
+            });
+        } catch (ValidationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            report($e);
+            return response()->json([
+                'message' => 'Gagal menyimpan data.',
+            ], 500);
+        }
+
+        $message = $mode === 'reduce' ? 'Qty berhasil dikurangi.' : 'Qty berhasil ditambahkan.';
+        if (!$row && $mode === 'reduce') {
+            $message = 'Qty berhasil dikurangi dan baris picking list dihapus.';
+        }
+
+        return response()->json([
+            'message' => $message,
+            'data' => $row ? [
+                'id' => $row->id,
+                'sku' => $row->sku,
+                'list_date' => $row->list_date?->format('Y-m-d'),
+                'qty' => (int) $row->qty,
+                'remaining_qty' => (int) $row->remaining_qty,
+            ] : null,
+        ]);
     }
 
     private function applyDateFilter($query, Request $request): void
