@@ -119,6 +119,7 @@
             <table class="table align-middle table-row-dashed fs-6 gy-5" id="packer_report_table">
                 <thead>
                     <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
+                        <th width="5%">No</th>
                         <th>Tanggal</th>
                         <th>Packer</th>
                         <th class="text-end">Total Scan</th>
@@ -269,6 +270,12 @@
             },
             order: [[0, 'desc']],
             columns: [
+                {
+                    data: null,
+                    render: function(data, type, row, meta) {
+                        return meta.row + 1;
+                    },
+                },
                 { data: 'date' },
                 { data: 'packer' },
                 { data: 'total_scan', className: 'text-end' },
