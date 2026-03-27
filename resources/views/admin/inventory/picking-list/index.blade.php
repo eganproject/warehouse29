@@ -85,6 +85,7 @@
                                 <th>SKU</th>
                                 <th>Nama</th>
                                 <th class="text-end">Qty</th>
+                                <th class="text-end">Aksi</th>
                             </tr>
                         </thead>
                         <tbody></tbody>
@@ -147,6 +148,58 @@
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="modal_return_exception" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-500px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bolder">Kembalikan Stok</h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <span class="svg-icon svg-icon-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                            <rect opacity="0.5" x="6" y="17.3137" width="16" height="2" rx="1" transform="rotate(-45 6 17.3137)" fill="black" />
+                            <rect x="7.41422" y="6" width="16" height="2" rx="1" transform="rotate(45 7.41422 6)" fill="black" />
+                        </svg>
+                    </span>
+                </div>
+            </div>
+            <div class="modal-body mx-5 mx-xl-15 my-7">
+                <form id="form_return_exception">
+                    @csrf
+                    <div class="fv-row mb-5">
+                        <label class="fs-6 fw-bold form-label mb-2">Tanggal</label>
+                        <input type="text" class="form-control form-control-solid" id="return_exception_date" name="list_date" readonly />
+                    </div>
+                    <div class="fv-row mb-5">
+                        <label class="fs-6 fw-bold form-label mb-2">SKU</label>
+                        <input type="text" class="form-control form-control-solid" id="return_exception_sku" name="sku" readonly />
+                    </div>
+                    <div class="fv-row mb-5">
+                        <label class="fs-6 fw-bold form-label mb-2">Nama</label>
+                        <input type="text" class="form-control form-control-solid" id="return_exception_name" readonly />
+                    </div>
+                    <div class="fv-row mb-5">
+                        <label class="fs-6 fw-bold form-label mb-2">Qty Exception</label>
+                        <input type="text" class="form-control form-control-solid" id="return_exception_qty" readonly />
+                    </div>
+                    <div class="fv-row mb-7">
+                        <label class="required fs-6 fw-bold form-label mb-2">Qty Return</label>
+                        <input type="number" min="1" class="form-control form-control-solid" id="return_qty" name="qty" placeholder="Qty" />
+                        <div class="text-danger fs-7 mt-2" data-error="qty"></div>
+                    </div>
+                    <div class="text-muted fs-7 mb-7">
+                        Qty return tidak boleh melebihi jumlah exception.
+                    </div>
+                    <div class="text-end">
+                        <button type="button" class="btn btn-light me-3" data-bs-dismiss="modal">Batal</button>
+                        <button type="submit" class="btn btn-primary" id="btn_submit_return">Simpan</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 @endsection
 
 @push('scripts')
@@ -155,6 +208,7 @@
     const dataUrlExceptions = '{{ $dataUrlExceptions }}';
     const exportUrl = '{{ route('admin.inventory.picking-list.export') }}';
     const addQtyUrl = '{{ route('admin.inventory.picking-list.store-qty') }}';
+    const returnExceptionUrl = '{{ route('admin.inventory.picking-list.exception-return') }}';
     const todayStr = '{{ $today ?? '' }}';
     const csrfToken = '{{ csrf_token() }}';
 
@@ -168,6 +222,14 @@
         const filterResetBtn = document.getElementById('filter_reset');
         const exportBtn = document.getElementById('btn_export_picking_list');
         const addQtyModalEl = document.getElementById('modal_add_picking_qty');
+        const returnModalEl = document.getElementById('modal_return_exception');
+        const returnForm = document.getElementById('form_return_exception');
+        const returnModal = (typeof bootstrap !== 'undefined' && returnModalEl) ? new bootstrap.Modal(returnModalEl) : null;
+        const returnDateInput = document.getElementById('return_exception_date');
+        const returnSkuInput = document.getElementById('return_exception_sku');
+        const returnNameInput = document.getElementById('return_exception_name');
+        const returnExceptionQtyInput = document.getElementById('return_exception_qty');
+        const returnQtyInput = document.getElementById('return_qty');
         const addQtyForm = document.getElementById('form_add_picking_qty');
         const addQtyDateInput = document.getElementById('add_qty_date');
         const addQtySkuInput = document.getElementById('add_qty_sku');
@@ -272,6 +334,9 @@
                 { data: 'sku' },
                 { data: 'name' },
                 { data: 'qty', className: 'text-end' },
+                { data: null, orderable: false, searchable: false, className: 'text-end', render: (data, type, row) => {
+                    return `<button type="button" class="btn btn-sm btn-light-primary btn-return" data-date="${row.list_date || row.date}" data-sku="${row.sku}" data-name="${row.name}" data-qty="${row.qty}">Return</button>`;
+                }},
             ]
         });
 
@@ -349,6 +414,71 @@
                 console.error(err);
                 if (typeof Swal !== 'undefined') {
                     Swal.fire('Error', 'Gagal menyimpan data', 'error');
+                }
+            }
+        });
+
+        const clearReturnErrors = () => {
+            returnForm?.querySelectorAll('[data-error]').forEach((el) => { el.textContent = ''; });
+        };
+
+        const openReturnModal = (row) => {
+            if (returnDateInput) returnDateInput.value = row.date || '';
+            if (returnSkuInput) returnSkuInput.value = row.sku || '';
+            if (returnNameInput) returnNameInput.value = row.name || '';
+            if (returnExceptionQtyInput) returnExceptionQtyInput.value = row.qty ?? 0;
+            if (returnQtyInput) returnQtyInput.value = '';
+            clearReturnErrors();
+            returnModal?.show();
+        };
+
+        exceptionTableEl.on('click', '.btn-return', function (e) {
+            e.preventDefault();
+            const row = {
+                date: this.getAttribute('data-date'),
+                sku: this.getAttribute('data-sku'),
+                name: this.getAttribute('data-name'),
+                qty: this.getAttribute('data-qty'),
+            };
+            openReturnModal(row);
+        });
+
+        returnForm?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            clearReturnErrors();
+            const formData = new FormData(returnForm);
+            try {
+                const res = await fetch(returnExceptionUrl, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json',
+                    },
+                    body: formData,
+                });
+                const text = await res.text();
+                let json = null;
+                try { json = JSON.parse(text); } catch (err) { /* ignore */ }
+                if (!res.ok) {
+                    if (res.status === 422 && json?.errors) {
+                        Object.entries(json.errors).forEach(([field, messages]) => {
+                            const errEl = returnForm.querySelector(`[data-error="${field}"]`);
+                            if (errEl) errEl.textContent = messages.join(', ');
+                        });
+                    } else if (typeof Swal !== 'undefined') {
+                        Swal.fire('Error', json?.message || 'Gagal mengembalikan stok', 'error');
+                    }
+                    return;
+                }
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire('Berhasil', json?.message || 'Stok berhasil dikembalikan', 'success');
+                }
+                returnModal?.hide();
+                reloadAll();
+            } catch (err) {
+                console.error(err);
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire('Error', 'Gagal mengembalikan stok', 'error');
                 }
             }
         });

@@ -9,6 +9,7 @@ use App\Models\PickingList;
 use App\Models\PickingListException;
 use App\Models\PackerScanException;
 use App\Models\PickerTransitItem;
+use App\Support\StockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -118,6 +119,7 @@ class PickingListController extends Controller
             $item = $row->item;
             return [
                 'date' => $row->list_date?->format('Y-m-d') ?? '-',
+                'list_date' => $row->list_date?->format('Y-m-d') ?? null,
                 'sku' => $row->sku ?? '-',
                 'name' => $item?->name ?? '-',
                 'qty' => (int) $row->qty,
@@ -129,6 +131,104 @@ class PickingListController extends Controller
             'recordsTotal' => $recordsTotal,
             'recordsFiltered' => $recordsFiltered,
             'data' => $data,
+        ]);
+    }
+
+    public function returnException(Request $request)
+    {
+        $validated = $request->validate([
+            'list_date' => ['required', 'date'],
+            'sku' => ['required', 'string', 'max:100'],
+            'qty' => ['required', 'integer', 'min:1'],
+        ]);
+
+        $listDate = Carbon::parse($validated['list_date'])->toDateString();
+        $sku = trim($validated['sku']);
+        $qty = (int) $validated['qty'];
+
+        DB::beginTransaction();
+        try {
+            $exception = PickingListException::where('list_date', $listDate)
+                ->where('sku', $sku)
+                ->lockForUpdate()
+                ->first();
+
+            if (!$exception) {
+                throw ValidationException::withMessages([
+                    'sku' => 'Exception tidak ditemukan.',
+                ]);
+            }
+
+            $currentQty = (int) $exception->qty;
+            if ($qty > $currentQty) {
+                throw ValidationException::withMessages([
+                    'qty' => 'Qty melebihi jumlah exception.',
+                ]);
+            }
+
+            $item = Item::where('sku', $sku)->first();
+            if (!$item) {
+                throw ValidationException::withMessages([
+                    'sku' => 'SKU tidak ditemukan.',
+                ]);
+            }
+
+            $transit = PickerTransitItem::where('item_id', $item->id)
+                ->where('picked_date', $listDate)
+                ->lockForUpdate()
+                ->first();
+
+            $remainingTransit = (int) ($transit?->remaining_qty ?? 0);
+            if (!$transit || $remainingTransit < $qty) {
+                throw ValidationException::withMessages([
+                    'qty' => 'Sisa transit tidak mencukupi untuk retur.',
+                ]);
+            }
+
+            $exceptionId = $exception->id;
+
+            $exception->qty = $currentQty - $qty;
+            if ($exception->qty <= 0) {
+                $exception->delete();
+            } else {
+                $exception->save();
+            }
+
+            $transit->qty = max(0, (int) $transit->qty - $qty);
+            $transit->remaining_qty = max(0, (int) $transit->remaining_qty - $qty);
+            if ($transit->qty <= 0) {
+                $transit->delete();
+            } else {
+                $transit->save();
+            }
+
+            StockService::mutate([
+                'item_id' => $item->id,
+                'direction' => 'in',
+                'qty' => $qty,
+                'source_type' => 'picking_exception',
+                'source_subtype' => 'return',
+                'source_id' => $exceptionId,
+                'source_code' => $sku,
+                'note' => 'Retur dari picking exception',
+                'occurred_at' => now(),
+                'created_by' => auth()->id(),
+            ]);
+
+            DB::commit();
+        } catch (ValidationException $e) {
+            DB::rollBack();
+            throw $e;
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Gagal mengembalikan stok.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+
+        return response()->json([
+            'message' => 'Stok berhasil dikembalikan.',
         ]);
     }
 

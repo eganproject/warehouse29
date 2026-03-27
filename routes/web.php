@@ -179,6 +179,7 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         Route::get('/resi-import', [ResiImportController::class, 'index'])->name('resi-import.index');
         Route::get('/resi-import/data', [ResiImportController::class, 'data'])->name('resi-import.data');
         Route::post('/resi-import/import', [ResiImportController::class, 'import'])->name('resi-import.import');
+        Route::post('/resi-import/cancel', [ResiImportController::class, 'cancel'])->name('resi-import.cancel');
 
         // Picker Transit
         Route::get('/picker-transit', [PickerTransitController::class, 'index'])->name('picker-transit.index');
@@ -193,6 +194,7 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         Route::get('/picking-list/exceptions', [PickingListController::class, 'dataExceptions'])->name('picking-list.exceptions');
         Route::get('/picking-list/export', [PickingListController::class, 'export'])->name('picking-list.export');
         Route::post('/picking-list/add-qty', [PickingListController::class, 'storeQty'])->name('picking-list.store-qty');
+        Route::post('/picking-list/exception-return', [PickingListController::class, 'returnException'])->name('picking-list.exception-return');
     });
 
     Route::prefix('inbound')->as('inbound.')->group(function () {

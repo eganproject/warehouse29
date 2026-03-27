@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Imports\ResiImport;
 use App\Models\Item;
 use App\Models\Kurir;
+use App\Models\PackerResiScan;
+use App\Models\PackerScanOut;
 use App\Models\PickingList;
 use App\Models\PickingListException;
 use App\Models\PickerTransitItem;
@@ -198,6 +200,70 @@ class ResiImportController extends Controller
                 'error' => $e->getMessage(),
             ], 500);
         }
+    }
+
+    public function cancel(Request $request)
+    {
+        $validated = $request->validate([
+            'id_pesanan' => ['nullable', 'string', 'max:100', 'required_without:no_resi'],
+            'no_resi' => ['nullable', 'string', 'max:100', 'required_without:id_pesanan'],
+            'reason' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $resiQuery = Resi::query();
+        if (!empty($validated['id_pesanan'])) {
+            $resiQuery->where('id_pesanan', trim($validated['id_pesanan']));
+        } else {
+            $resiQuery->where('no_resi', trim((string) $validated['no_resi']));
+        }
+
+        $resi = $resiQuery->first();
+        if (!$resi) {
+            return response()->json([
+                'message' => 'Resi tidak ditemukan.',
+            ], 404);
+        }
+
+        if (($resi->status ?? 'active') === 'canceled') {
+            return response()->json([
+                'message' => 'Resi sudah dibatalkan sebelumnya.',
+            ]);
+        }
+
+        $hasPackerScan = PackerResiScan::where('resi_id', $resi->id)->exists();
+        $hasScanOut = PackerScanOut::where('resi_id', $resi->id)->exists();
+        if ($hasPackerScan || $hasScanOut) {
+            return response()->json([
+                'message' => 'Resi sudah dipacking/scan out, tidak bisa dibatalkan.',
+            ], 422);
+        }
+
+        DB::beginTransaction();
+        try {
+            $resi->status = 'canceled';
+            $resi->canceled_at = now();
+            $resi->canceled_by = auth()->id();
+            $resi->cancel_reason = $validated['reason'] ?? null;
+            $resi->save();
+
+            $details = ResiDetail::where('resi_id', $resi->id)->get(['sku', 'qty']);
+            $listDate = $resi->tanggal_upload?->format('Y-m-d') ?? now()->toDateString();
+            if ($details->isNotEmpty()) {
+                $this->adjustPickingList($listDate, $details, -1);
+            }
+
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Gagal membatalkan resi.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+
+        return response()->json([
+            'message' => 'Resi berhasil dibatalkan.',
+        ]);
     }
 
     private function parseTanggalPesanan($raw): ?string

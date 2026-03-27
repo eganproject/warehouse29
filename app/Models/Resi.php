@@ -15,12 +15,17 @@ class Resi extends Model
         'tanggal_upload',
         'no_resi',
         'kurir_id',
+        'status',
+        'canceled_at',
+        'canceled_by',
+        'cancel_reason',
         'uploader_id',
     ];
 
     protected $casts = [
         'tanggal_pesanan' => 'date',
         'tanggal_upload' => 'date',
+        'canceled_at' => 'datetime',
     ];
 
     public function details()
@@ -31,6 +36,11 @@ class Resi extends Model
     public function uploader()
     {
         return $this->belongsTo(User::class, 'uploader_id');
+    }
+
+    public function canceler()
+    {
+        return $this->belongsTo(User::class, 'canceled_by');
     }
 
     public function kurir()

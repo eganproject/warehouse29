@@ -55,6 +55,11 @@ class PackerScanController extends Controller
                 'message' => 'Resi tidak ditemukan.',
             ], 422);
         }
+        if (($resi->status ?? 'active') === 'canceled') {
+            return response()->json([
+                'message' => 'Resi sudah dibatalkan.',
+            ], 422);
+        }
 
         $details = ResiDetail::where('resi_id', $resi->id)
             ->get(['sku', 'qty']);
@@ -132,7 +137,9 @@ class PackerScanController extends Controller
                 }
 
                 $transitRow = PickerTransitItem::where('item_id', $item->id)
-                    ->where('picked_date', $scanDate)
+                    ->where('picked_date', '<=', $scanDate)
+                    ->where('remaining_qty', '>', 0)
+                    ->orderByDesc('picked_date')
                     ->lockForUpdate()
                     ->first();
 

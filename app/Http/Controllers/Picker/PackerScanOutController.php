@@ -119,6 +119,11 @@ class PackerScanOutController extends Controller
                 'message' => 'Resi tidak ditemukan.',
             ], 422);
         }
+        if (($resi->status ?? 'active') === 'canceled') {
+            return response()->json([
+                'message' => 'Resi sudah dibatalkan.',
+            ], 422);
+        }
 
         DB::beginTransaction();
         try {
