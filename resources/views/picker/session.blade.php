@@ -253,6 +253,12 @@
         scannerHint: document.getElementById('scanner_hint'),
     };
 
+    let updateScanStatusFn = null;
+    let syncScanControlsFn = null;
+    let lastScanSessionState = null;
+
+    const canUseScan = () => state.session && state.session.status === 'draft';
+
     const setSaveStatus = (text, pending = false) => {
         el.saveStatus.textContent = text;
         el.saveStatus.style.color = pending ? '#f97316' : '#6b7280';
@@ -315,6 +321,12 @@
             el.btnStart.textContent = 'Mulai Input';
             el.btnSubmit.classList.add('disabled');
             el.searchCard.classList.add('disabled');
+            el.scanCard?.classList.add('disabled');
+            syncScanControlsFn?.(false);
+            if (lastScanSessionState !== false) {
+                updateScanStatusFn?.('Mulai sesi terlebih dahulu sebelum scan.', 'error');
+                lastScanSessionState = false;
+            }
             renderItems([]);
             return;
         }
@@ -328,6 +340,14 @@
         el.btnStart.textContent = isDraft ? 'Lanjutkan Input' : 'Mulai Sesi Baru';
         el.btnSubmit.classList.toggle('disabled', !isDraft);
         el.searchCard.classList.toggle('disabled', !isDraft);
+        el.scanCard?.classList.toggle('disabled', !isDraft);
+        syncScanControlsFn?.(isDraft);
+        if (lastScanSessionState !== isDraft) {
+            lastScanSessionState = isDraft;
+            const message = isDraft ? 'Siap scan barcode SKU.' : 'Mulai sesi terlebih dahulu sebelum scan.';
+            const type = isDraft ? 'muted' : 'error';
+            updateScanStatusFn?.(message, type);
+        }
         renderItems(session.items || []);
     };
 
@@ -675,6 +695,18 @@
             };
             el.scanStatus.style.color = colors[type] || colors.muted;
         };
+        updateScanStatusFn = setScanStatus;
+
+        const syncScanControls = (enabled) => {
+            const controls = [el.scanCode, el.btnScan, el.btnOpenScanner, el.btnScanPhoto];
+            controls.forEach((control) => {
+                if (!control) return;
+                control.disabled = !enabled;
+            });
+            if (el.scanPhotoInput) el.scanPhotoInput.disabled = !enabled;
+        };
+        syncScanControlsFn = syncScanControls;
+        syncScanControls(canUseScan());
 
         const stopScanner = () => {
             scannerActive = false;
@@ -708,15 +740,35 @@
             if (el.scannerHint) el.scannerHint.textContent = 'Arahkan kamera ke barcode SKU.';
         };
 
+        const requireActiveSession = () => {
+            if (!canUseScan()) {
+                setScanStatus('Mulai sesi terlebih dahulu sebelum scan.', 'error');
+                return false;
+            }
+            return true;
+        };
+
+        const handleScannedCode = (rawCode) => {
+            const clean = (rawCode || '').trim();
+            if (!clean || !el.scanCode) return;
+            el.scanCode.value = clean;
+            el.scanCode.focus();
+            if (requireActiveSession()) {
+                submitScan();
+            }
+        };
+
         const submitScan = async () => {
             if (!el.scanCode || !routes.scanItem) return;
+            if (!requireActiveSession()) return;
             const code = el.scanCode.value.trim();
             if (!code) {
                 setScanStatus('Masukkan atau scan SKU terlebih dahulu.', 'error');
                 el.scanCode.focus();
                 return;
             }
-            if (el.btnScan) el.btnScan.disabled = true;
+            const btnInitiallyDisabled = el.btnScan ? el.btnScan.disabled : true;
+            if (el.btnScan && !btnInitiallyDisabled) el.btnScan.disabled = true;
             setScanStatus('Menambahkan barang hasil scan...', 'pending');
             try {
                 const json = await fetchJson(routes.scanItem, {
@@ -734,12 +786,13 @@
             } catch (err) {
                 setScanStatus(err.message || 'Gagal menambahkan hasil scan.', 'error');
             } finally {
-                if (el.btnScan) el.btnScan.disabled = false;
+                if (el.btnScan && !btnInitiallyDisabled) el.btnScan.disabled = false;
             }
         };
 
         const openScanner = async () => {
             getAudioCtx();
+            if (!requireActiveSession()) return;
             if (!window.isSecureContext) {
                 setScanStatus('Akses kamera perlu HTTPS atau localhost.', 'error');
                 return;
@@ -812,9 +865,8 @@
                         (decodedText) => {
                             if (decodedText) {
                                 playScanSound();
-                                el.scanCode.value = decodedText;
-                                el.scanCode.focus();
                                 closeScanner();
+                                handleScannedCode(decodedText);
                             }
                         },
                         () => {}
@@ -861,9 +913,8 @@
                     const code = barcodes[0].rawValue || '';
                     if (code) {
                         playScanSound();
-                        el.scanCode.value = code;
-                        el.scanCode.focus();
                         closeScanner();
+                        handleScannedCode(code);
                         return;
                     }
                 }
@@ -889,9 +940,7 @@
                 const decodedText = await photoScanner.scanFile(file, true);
                 await photoScanner.clear();
                 playScanSound();
-                el.scanCode.value = decodedText || '';
-                el.scanCode.focus();
-                setScanStatus('Hasil scan foto siap. Tekan Tambah via Scan.', 'success');
+                handleScannedCode(decodedText || '');
             } catch (error) {
                 setScanStatus('Gagal membaca barcode dari foto.', 'error');
             } finally {
