@@ -53,6 +53,17 @@
         font-size: 15px;
         margin-bottom: 8px;
     }
+    .kurir-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 8px;
+    }
+    .kurir-updated {
+        font-size: 11px;
+        color: #9ca3af;
+        white-space: nowrap;
+    }
     .kurir-ratio {
         font-size: 28px;
         font-weight: 800;
@@ -124,7 +135,10 @@
             <div class="kurir-grid">
                 @foreach($kurirs as $kurir)
                     <div class="stat-card">
-                        <div class="kurir-name">{{ $kurir['name'] }}</div>
+                        <div class="kurir-header">
+                            <div class="kurir-name">{{ $kurir['name'] }}</div>
+                            <div class="kurir-updated">Update: {{ $kurir['last_update'] }}</div>
+                        </div>
                         <div class="kurir-ratio">
                             <span class="ratio-resi">{{ number_format($kurir['resi_total']) }}</span>
                             <span class="ratio-sep">/</span>
