@@ -59,6 +59,55 @@
                 </div>
             </div>
         </div>
+        <div class="border border-dashed rounded-3 p-5 mb-8" id="comparison_card">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-4 mb-4">
+                <div>
+                    <div class="fs-4 fw-bold">Komparasi Import Resi vs Scan Out</div>
+                    <div class="text-muted">Memastikan seluruh ID Pesanan / No Resi hasil import telah terscan.</div>
+                </div>
+                <div class="text-muted">
+                    Menampilkan maksimal 50 data resi yang belum terscan.
+                </div>
+            </div>
+            <div class="row g-4 mb-4">
+                <div class="col-md-4">
+                    <div class="bg-light-primary rounded-3 px-4 py-3 h-100">
+                        <div class="text-muted">Total Import</div>
+                        <div class="fs-2 fw-bold" id="comparison_import_total">0</div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="bg-light-success rounded-3 px-4 py-3 h-100">
+                        <div class="text-muted">Sudah Scan Out</div>
+                        <div class="fs-2 fw-bold" id="comparison_scanned_total">0</div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="bg-light-warning rounded-3 px-4 py-3 h-100">
+                        <div class="text-muted">Sisa Belum Scan</div>
+                        <div class="fs-2 fw-bold" id="comparison_missing_total">0</div>
+                    </div>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-row-dashed align-middle">
+                    <thead>
+                        <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
+                            <th width="35%">ID Pesanan</th>
+                            <th width="35%">No Resi</th>
+                            <th width="30%">Tanggal Upload</th>
+                        </tr>
+                    </thead>
+                    <tbody id="missing_transit_body">
+                        <tr>
+                            <td colspan="3" class="text-center text-muted py-6" id="missing_transit_empty">
+                                Tidak ada data tertinggal.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
         <div class="table-responsive">
             <table class="table align-middle table-row-dashed fs-6 gy-5" id="packer_report_table">
                 <thead>
@@ -100,6 +149,10 @@
         const summaryTotalScan = document.getElementById('summary_total_scan');
         const summaryTotalPacker = document.getElementById('summary_total_packer');
         const summaryAvgHour = document.getElementById('summary_avg_hour');
+        const comparisonImportEl = document.getElementById('comparison_import_total');
+        const comparisonScannedEl = document.getElementById('comparison_scanned_total');
+        const comparisonMissingEl = document.getElementById('comparison_missing_total');
+        const missingBody = document.getElementById('missing_transit_body');
         let fpFrom = null;
         let fpTo = null;
 
@@ -124,6 +177,33 @@
             if (summaryAvgHour) summaryAvgHour.textContent = avgHour.toFixed(2);
         };
 
+        const updateComparison = (comparison) => {
+            const importTotal = Number(comparison?.import_total ?? 0);
+            const scannedTotal = Number(comparison?.scanned_total ?? 0);
+            const missingTotal = Number(comparison?.missing_total ?? 0);
+            if (comparisonImportEl) comparisonImportEl.textContent = importTotal.toLocaleString('id-ID');
+            if (comparisonScannedEl) comparisonScannedEl.textContent = scannedTotal.toLocaleString('id-ID');
+            if (comparisonMissingEl) comparisonMissingEl.textContent = missingTotal.toLocaleString('id-ID');
+            if (missingBody) {
+                const samples = Array.isArray(comparison?.missing_samples) ? comparison.missing_samples : [];
+                if (!samples.length) {
+                    missingBody.innerHTML = `
+                        <tr>
+                            <td colspan="3" class="text-center text-muted py-6">Tidak ada data tertinggal.</td>
+                        </tr>
+                    `;
+                } else {
+                    missingBody.innerHTML = samples.map((sample) => `
+                        <tr>
+                            <td>${sample.id_pesanan || '-'}</td>
+                            <td>${sample.no_resi || '-'}</td>
+                            <td>${sample.tanggal_upload || '-'}</td>
+                        </tr>
+                    `).join('');
+                }
+            }
+        };
+
         const dt = tableEl.DataTable({
             processing: true,
             serverSide: false,
@@ -133,6 +213,7 @@
                 dataSrc: function(json) {
                     const data = json?.data || [];
                     updateSummary(data);
+                    updateComparison(json?.comparison || null);
                     return data;
                 },
                 data: function(params) {

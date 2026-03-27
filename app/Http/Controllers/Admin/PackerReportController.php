@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\PackerScanOut;
+use App\Models\Resi;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -88,8 +89,11 @@ class PackerReportController extends Controller
             ];
         });
 
+        $comparison = $this->buildComparisonData($dateFrom, $dateTo);
+
         return response()->json([
             'data' => $data,
+            'comparison' => $comparison,
         ]);
     }
 
@@ -103,5 +107,53 @@ class PackerReportController extends Controller
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    private function buildComparisonData(?string $dateFrom, ?string $dateTo): array
+    {
+        $resiQuery = Resi::query();
+        if ($dateFrom) {
+            $resiQuery->whereDate('tanggal_upload', '>=', $dateFrom);
+        }
+        if ($dateTo) {
+            $resiQuery->whereDate('tanggal_upload', '<=', $dateTo);
+        }
+
+        $importTotal = (clone $resiQuery)->count();
+
+        $scannedTotal = 0;
+        if ($importTotal > 0) {
+            $scannedTotal = PackerScanOut::query()
+                ->whereIn('resi_id', (clone $resiQuery)->select('id'))
+                ->distinct('resi_id')
+                ->count('resi_id');
+        }
+
+        $missingBase = (clone $resiQuery)
+            ->leftJoin('packer_scan_outs as ps', 'ps.resi_id', '=', 'resis.id')
+            ->whereNull('ps.id')
+            ->select('resis.id_pesanan', 'resis.no_resi', 'resis.tanggal_upload');
+
+        $missingTotal = (clone $missingBase)->count();
+        $missingSamples = (clone $missingBase)
+            ->orderByDesc('resis.tanggal_upload')
+            ->limit(50)
+            ->get()
+            ->map(function ($row) {
+                return [
+                    'id_pesanan' => (string) ($row->id_pesanan ?? '-'),
+                    'no_resi' => (string) ($row->no_resi ?? '-'),
+                    'tanggal_upload' => $row->tanggal_upload
+                        ? Carbon::parse($row->tanggal_upload)->format('Y-m-d')
+                        : '-',
+                ];
+            });
+
+        return [
+            'import_total' => $importTotal,
+            'scanned_total' => $scannedTotal,
+            'missing_total' => $missingTotal,
+            'missing_samples' => $missingSamples,
+        ];
     }
 }
