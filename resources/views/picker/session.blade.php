@@ -269,6 +269,7 @@
                 'X-CSRF-TOKEN': csrfToken,
                 ...(options.headers || {}),
             },
+            credentials: 'same-origin',
             ...options,
         });
         const text = await res.text();
