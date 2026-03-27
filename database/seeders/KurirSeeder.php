@@ -17,18 +17,15 @@ class KurirSeeder extends Seeder
         $name = 'Tidak ditemukan kurir';
         $now = now();
 
-        $kurirId = DB::table('kurirs')->where('name', $name)->value('id');
-        if (!$kurirId) {
-            $kurirId = DB::table('kurirs')->insertGetId([
+        DB::table('kurirs')->updateOrInsert(
+            ['id' => 1],
+            [
                 'name' => $name,
                 'created_at' => $now,
                 'updated_at' => $now,
-            ]);
-        } else {
-            DB::table('kurirs')->where('id', $kurirId)->update([
-                'updated_at' => $now,
-            ]);
-        }
+            ]
+        );
+        $kurirId = 1;
 
         if (Schema::hasTable('resis') && Schema::hasColumn('resis', 'kurir_id')) {
             DB::table('resis')
