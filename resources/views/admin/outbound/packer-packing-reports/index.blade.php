@@ -214,6 +214,14 @@
         const missingPrevBtn = document.getElementById('missing_prev');
         const missingNextBtn = document.getElementById('missing_next');
         const missingSummary = document.getElementById('missing_page_summary');
+        const resiSearchInput = document.getElementById('resi_search_input');
+        const resiSearchBtn = document.getElementById('resi_search_btn');
+        const resiSearchResult = document.getElementById('resi_search_result');
+        const detailModalEl = document.getElementById('modal_packer_detail');
+        const detailModal = detailModalEl ? new bootstrap.Modal(detailModalEl) : null;
+        const detailTitle = document.getElementById('detail_title');
+        const detailSubtitle = document.getElementById('detail_subtitle');
+        const detailBody = document.getElementById('detail_body');
         const comparisonState = {
             samples: [],
             page: 1,
@@ -473,11 +481,3 @@
     });
 </script>
 @endpush
-        const resiSearchInput = document.getElementById('resi_search_input');
-        const resiSearchBtn = document.getElementById('resi_search_btn');
-        const resiSearchResult = document.getElementById('resi_search_result');
-        const detailModalEl = document.getElementById('modal_packer_detail');
-        const detailModal = detailModalEl ? new bootstrap.Modal(detailModalEl) : null;
-        const detailTitle = document.getElementById('detail_title');
-        const detailSubtitle = document.getElementById('detail_subtitle');
-        const detailBody = document.getElementById('detail_body');
