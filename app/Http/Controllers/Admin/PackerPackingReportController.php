@@ -80,6 +80,7 @@ class PackerPackingReportController extends Controller
 
             return [
                 'date' => Carbon::parse($row->scan_date)->format('Y-m-d'),
+                'packer_id' => (int) $row->scanned_by,
                 'packer' => $row->packer_name ?? '-',
                 'total_scan' => (int) $row->total_scan,
                 'unique_scan' => (int) $row->unique_scan,
@@ -94,6 +95,81 @@ class PackerPackingReportController extends Controller
         return response()->json([
             'data' => $data,
             'comparison' => $comparison,
+        ]);
+    }
+
+    public function detail(Request $request)
+    {
+        $validated = $request->validate([
+            'packer_id' => ['required', 'integer', 'exists:users,id'],
+            'date' => ['required', 'date'],
+        ]);
+
+        $rows = PackerResiScan::query()
+            ->with(['resi', 'scanner'])
+            ->where('scanned_by', (int) $validated['packer_id'])
+            ->whereDate('scan_date', $validated['date'])
+            ->orderByDesc('scanned_at')
+            ->limit(500)
+            ->get();
+
+        $data = $rows->map(function ($row) {
+            return [
+                'id_pesanan' => $row->resi?->id_pesanan ?? '-',
+                'no_resi' => $row->resi?->no_resi ?? '-',
+                'scan_type' => $row->scan_type ?? '-',
+                'scan_code' => $row->scan_code ?? '-',
+                'scanned_at' => $row->scanned_at
+                    ? Carbon::parse($row->scanned_at)->format('Y-m-d H:i')
+                    : '-',
+            ];
+        });
+
+        return response()->json([
+            'data' => $data,
+        ]);
+    }
+
+    public function searchResi(Request $request)
+    {
+        $validated = $request->validate([
+            'q' => ['required', 'string', 'max:100'],
+        ]);
+
+        $keyword = trim($validated['q']);
+        if ($keyword === '') {
+            return response()->json([
+                'message' => 'Nomor resi tidak boleh kosong.',
+            ], 422);
+        }
+
+        $scan = PackerResiScan::query()
+            ->with(['resi', 'scanner'])
+            ->whereHas('resi', function ($q) use ($keyword) {
+                $q->where('no_resi', $keyword)
+                    ->orWhere('id_pesanan', $keyword);
+            })
+            ->orderByDesc('scanned_at')
+            ->first();
+
+        if (!$scan) {
+            return response()->json([
+                'message' => 'Resi belum terpacking atau tidak ditemukan.',
+            ], 404);
+        }
+
+        return response()->json([
+            'data' => [
+                'packer' => $scan->scanner?->name ?? '-',
+                'scan_date' => $scan->scan_date
+                    ? Carbon::parse($scan->scan_date)->format('Y-m-d')
+                    : '-',
+                'scanned_at' => $scan->scanned_at
+                    ? Carbon::parse($scan->scanned_at)->format('Y-m-d H:i')
+                    : '-',
+                'id_pesanan' => $scan->resi?->id_pesanan ?? '-',
+                'no_resi' => $scan->resi?->no_resi ?? '-',
+            ],
         ]);
     }
 

@@ -289,6 +289,8 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         Route::get('/packer-reports/data', [PackerReportController::class, 'data'])->name('packer-reports.data');
         Route::get('/packer-packing-reports', [PackerPackingReportController::class, 'index'])->name('packer-packing-reports.index');
         Route::get('/packer-packing-reports/data', [PackerPackingReportController::class, 'data'])->name('packer-packing-reports.data');
+        Route::get('/packer-packing-reports/detail', [PackerPackingReportController::class, 'detail'])->name('packer-packing-reports.detail');
+        Route::get('/packer-packing-reports/search-resi', [PackerPackingReportController::class, 'searchResi'])->name('packer-packing-reports.search-resi');
         Route::get('/stock-opname', [StockOpnameReportController::class, 'index'])->name('stock-opname.index');
         Route::get('/stock-opname/data', [StockOpnameReportController::class, 'data'])->name('stock-opname.data');
         Route::get('/stock-opname/sku-diff', [StockOpnameReportController::class, 'diffSku'])->name('stock-opname.diff-sku');
