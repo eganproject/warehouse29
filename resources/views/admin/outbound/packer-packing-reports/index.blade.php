@@ -1,7 +1,7 @@
 @extends('layouts.admin')
 
-@section('title', 'Laporan Scan Out')
-@section('page_title', 'Laporan Scan Out')
+@section('title', 'Laporan Packer (Packing)')
+@section('page_title', 'Laporan Packer (Packing)')
 
 @section('content')
 <div class="card">
@@ -14,7 +14,7 @@
                         <path d="M11 19C6.55556 19 3 15.4444 3 11C3 6.55556 6.55556 3 11 3C15.4444 3 19 6.55556 19 11C19 15.4444 15.4444 19 11 19ZM11 5C7.53333 5 5 7.53333 5 11C5 14.4667 7.53333 17 11 17C14.4667 17 17 14.4667 17 11C17 7.53333 14.4667 5 11 5Z" fill="black" />
                     </svg>
                 </span>
-                <input type="text" class="form-control form-control-solid w-250px ps-14" placeholder="Cari Petugas / Tanggal" data-kt-filter="search" />
+                <input type="text" class="form-control form-control-solid w-250px ps-14" placeholder="Cari Packer / Tanggal" data-kt-filter="search" />
             </div>
         </div>
         <div class="card-toolbar">
@@ -22,7 +22,7 @@
                 <input type="text" class="form-control form-control-solid w-150px" id="filter_date_from" placeholder="Dari" value="{{ $today ?? '' }}">
                 <input type="text" class="form-control form-control-solid w-150px" id="filter_date_to" placeholder="Sampai" value="{{ $today ?? '' }}">
                 <select class="form-select form-select-solid w-200px" id="filter_packer">
-                    <option value="">Semua Petugas</option>
+                    <option value="">Semua Packer</option>
                     @foreach($packers as $packer)
                         <option value="{{ $packer->id }}">{{ $packer->name }}</option>
                     @endforeach
@@ -37,7 +37,7 @@
             <div class="col-md-4">
                 <div class="card card-flush h-100">
                     <div class="card-body">
-                        <div class="text-muted">Total Scan Out</div>
+                        <div class="text-muted">Total Packing</div>
                         <div class="fs-2 fw-bold" id="summary_total_scan">0</div>
                     </div>
                 </div>
@@ -45,7 +45,7 @@
             <div class="col-md-4">
                 <div class="card card-flush h-100">
                     <div class="card-body">
-                        <div class="text-muted">Total Petugas</div>
+                        <div class="text-muted">Total Packer</div>
                         <div class="fs-2 fw-bold" id="summary_total_packer">0</div>
                     </div>
                 </div>
@@ -53,7 +53,7 @@
             <div class="col-md-4">
                 <div class="card card-flush h-100">
                     <div class="card-body">
-                        <div class="text-muted">Rata-rata Scan Out / Jam</div>
+                        <div class="text-muted">Rata-rata Packing / Jam</div>
                         <div class="fs-2 fw-bold" id="summary_avg_hour">0</div>
                     </div>
                 </div>
@@ -62,11 +62,11 @@
         <div class="border border-dashed rounded-3 p-5 mb-8" id="comparison_card">
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-4 mb-4">
                 <div>
-                    <div class="fs-4 fw-bold">Komparasi Import Resi vs Scan Out</div>
-                    <div class="text-muted">Memastikan seluruh ID Pesanan / No Resi hasil import telah scan out.</div>
+                    <div class="fs-4 fw-bold">Komparasi Import Resi vs Packing</div>
+                    <div class="text-muted">Memastikan seluruh ID Pesanan / No Resi hasil import telah terpacking.</div>
                 </div>
                 <div class="text-muted">
-                    Menampilkan maksimal 50 data resi yang belum scan out.
+                    Menampilkan maksimal 50 data resi yang belum terpacking.
                 </div>
             </div>
             <div class="row g-4 mb-4">
@@ -78,13 +78,13 @@
                 </div>
                 <div class="col-md-4">
                     <div class="bg-light-success rounded-3 px-4 py-3 h-100">
-                        <div class="text-muted">Sudah Scan Out</div>
+                        <div class="text-muted">Sudah Packing</div>
                         <div class="fs-2 fw-bold" id="comparison_scanned_total">0</div>
                     </div>
                 </div>
                 <div class="col-md-4">
                     <div class="bg-light-warning rounded-3 px-4 py-3 h-100">
-                        <div class="text-muted">Sisa Belum Scan Out</div>
+                        <div class="text-muted">Sisa Belum Packing</div>
                         <div class="fs-2 fw-bold" id="comparison_missing_total">0</div>
                     </div>
                 </div>
@@ -121,8 +121,8 @@
                     <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
                         <th width="5%">No</th>
                         <th>Tanggal</th>
-                        <th>Petugas</th>
-                        <th class="text-end">Total Scan Out</th>
+                        <th>Packer</th>
+                        <th class="text-end">Total Packing</th>
                         <th class="text-end">Unik Resi</th>
                         <th class="text-end">Avg / Jam</th>
                         <th>Scan Pertama</th>
@@ -224,27 +224,29 @@
                     missingPagination.style.display = 'none';
                 } else {
                     missingPagination.style.display = 'flex';
-                    if (missingSummary) {
-                        const from = total ? start + 1 : 0;
-                        const to = Math.min(total, start + paginated.length);
-                        missingSummary.textContent = `Menampilkan ${from} - ${to} dari ${total} data`;
-                    }
-                    if (missingPrevBtn) missingPrevBtn.disabled = comparisonState.page <= 1;
-                    if (missingNextBtn) missingNextBtn.disabled = comparisonState.page >= maxPage;
                 }
+            }
+
+            if (missingSummary) {
+                missingSummary.textContent = `Halaman ${comparisonState.page} dari ${maxPage}`;
+            }
+
+            if (missingPrevBtn) {
+                missingPrevBtn.disabled = comparisonState.page <= 1;
+            }
+            if (missingNextBtn) {
+                missingNextBtn.disabled = comparisonState.page >= maxPage;
             }
         };
 
         const updateComparison = (comparison) => {
-            const importTotal = Number(comparison?.import_total ?? 0);
-            const scannedTotal = Number(comparison?.scanned_total ?? 0);
-            const missingTotal = Number(comparison?.missing_total ?? 0);
-            if (comparisonImportEl) comparisonImportEl.textContent = importTotal.toLocaleString('id-ID');
-            if (comparisonScannedEl) comparisonScannedEl.textContent = scannedTotal.toLocaleString('id-ID');
-            if (comparisonMissingEl) comparisonMissingEl.textContent = missingTotal.toLocaleString('id-ID');
-            comparisonState.samples = Array.isArray(comparison?.missing_samples)
-                ? comparison.missing_samples
-                : [];
+            if (!comparison) {
+                return;
+            }
+            if (comparisonImportEl) comparisonImportEl.textContent = (comparison.import_total || 0).toLocaleString('id-ID');
+            if (comparisonScannedEl) comparisonScannedEl.textContent = (comparison.scanned_total || 0).toLocaleString('id-ID');
+            if (comparisonMissingEl) comparisonMissingEl.textContent = (comparison.missing_total || 0).toLocaleString('id-ID');
+            comparisonState.samples = Array.isArray(comparison.missing_samples) ? comparison.missing_samples : [];
             comparisonState.page = 1;
             renderMissingRows();
         };
@@ -253,29 +255,20 @@
             processing: true,
             serverSide: false,
             searching: false,
+            ordering: false,
+            dom: 'rtip',
             ajax: {
                 url: dataUrl,
-                dataSrc: function(json) {
-                    const data = json?.data || [];
-                    updateSummary(data);
-                    updateComparison(json?.comparison || null);
-                    return data;
-                },
-                data: function(params) {
+                dataSrc: 'data',
+                data: function (params) {
+                    params.q = searchInput?.value || '';
                     params.date_from = dateFromEl?.value || '';
                     params.date_to = dateToEl?.value || '';
                     params.packer_id = packerSelect?.value || '';
-                    params.q = searchInput?.value || '';
                 }
             },
-            order: [[0, 'desc']],
             columns: [
-                {
-                    data: null,
-                    render: function(data, type, row, meta) {
-                        return meta.row + 1;
-                    },
-                },
+                { data: null, orderable: false, searchable: false, render: (data, type, row, meta) => meta.row + 1 },
                 { data: 'date' },
                 { data: 'packer' },
                 { data: 'total_scan', className: 'text-end' },
@@ -283,44 +276,47 @@
                 { data: 'avg_per_hour', className: 'text-end' },
                 { data: 'first_scan' },
                 { data: 'last_scan' },
-            ]
+            ],
+            language: {
+                emptyTable: 'Belum ada data',
+                processing: 'Memuat...',
+            },
+        });
+
+        tableEl.on('xhr.dt', function () {
+            const json = dt?.ajax?.json?.();
+            if (json?.data) {
+                updateSummary(json.data);
+            }
+            if (json?.comparison) {
+                updateComparison(json.comparison);
+            }
         });
 
         const reloadTable = () => dt.ajax.reload();
 
-        applyBtn?.addEventListener('click', () => {
-            reloadTable();
-        });
-
-        packerSelect?.addEventListener('change', reloadTable);
-
-        searchInput?.addEventListener('keyup', (e) => {
-            if (e.key === 'Enter') {
-                reloadTable();
-            }
-        });
-
+        applyBtn?.addEventListener('click', reloadTable);
         resetBtn?.addEventListener('click', () => {
-            if (fpFrom) fpFrom.clear(); else if (dateFromEl) dateFromEl.value = todayStr || '';
-            if (fpTo) fpTo.clear(); else if (dateToEl) dateToEl.value = todayStr || '';
+            if (dateFromEl && todayStr) dateFromEl.value = todayStr;
+            if (dateToEl && todayStr) dateToEl.value = todayStr;
+            if (fpFrom) fpFrom.setDate(todayStr);
+            if (fpTo) fpTo.setDate(todayStr);
             if (packerSelect) packerSelect.value = '';
             if (searchInput) searchInput.value = '';
             reloadTable();
         });
 
-        missingPrevBtn?.addEventListener('click', () => {
-            if (comparisonState.page > 1) {
-                comparisonState.page -= 1;
-                renderMissingRows();
-            }
+        searchInput?.addEventListener('keyup', () => {
+            reloadTable();
         });
 
+        missingPrevBtn?.addEventListener('click', () => {
+            comparisonState.page = Math.max(1, comparisonState.page - 1);
+            renderMissingRows();
+        });
         missingNextBtn?.addEventListener('click', () => {
-            const maxPage = Math.ceil((comparisonState.samples.length || 0) / comparisonState.perPage);
-            if (comparisonState.page < maxPage) {
-                comparisonState.page += 1;
-                renderMissingRows();
-            }
+            comparisonState.page += 1;
+            renderMissingRows();
         });
     });
 </script>

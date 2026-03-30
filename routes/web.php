@@ -16,6 +16,7 @@ use App\Http\Controllers\Admin\PickingListController;
 use App\Http\Controllers\Admin\PickerHistoryController;
 use App\Http\Controllers\Admin\PackerHistoryController;
 use App\Http\Controllers\Admin\PackerScanExceptionController;
+use App\Http\Controllers\Admin\PackerPackingReportController;
 use App\Http\Controllers\Admin\PackerReportController;
 use App\Http\Controllers\Admin\PackerScanOutHistoryController;
 use App\Http\Controllers\Admin\PickerReportController;
@@ -286,6 +287,8 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         Route::get('/activity-logs/{id}', [ActivityLogController::class, 'show'])->name('activity-logs.show');
         Route::get('/packer-reports', [PackerReportController::class, 'index'])->name('packer-reports.index');
         Route::get('/packer-reports/data', [PackerReportController::class, 'data'])->name('packer-reports.data');
+        Route::get('/packer-packing-reports', [PackerPackingReportController::class, 'index'])->name('packer-packing-reports.index');
+        Route::get('/packer-packing-reports/data', [PackerPackingReportController::class, 'data'])->name('packer-packing-reports.data');
         Route::get('/stock-opname', [StockOpnameReportController::class, 'index'])->name('stock-opname.index');
         Route::get('/stock-opname/data', [StockOpnameReportController::class, 'data'])->name('stock-opname.data');
         Route::get('/stock-opname/sku-diff', [StockOpnameReportController::class, 'diffSku'])->name('stock-opname.diff-sku');
