@@ -92,6 +92,7 @@ require __DIR__.'/auth.php';
 // Admin area
 Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as('admin.')->group(function () {
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/dashboard/kurir-detail', [DashboardController::class, 'kurirDetail'])->name('dashboard.kurir-detail');
 
     Route::prefix('masterdata')->as('masterdata.')->group(function () {
         // Users DataTables

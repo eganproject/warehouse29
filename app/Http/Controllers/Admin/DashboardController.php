@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Kurir;
 use App\Models\PackerScanOut;
 use App\Models\Resi;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -74,6 +75,64 @@ class DashboardController extends Controller
             'totalResiUpdated' => $totalResiUpdated,
             'totalScanUpdated' => $totalScanUpdated,
             'kurirs' => $kurirs,
+        ]);
+    }
+
+    public function kurirDetail(Request $request)
+    {
+        $validated = $request->validate([
+            'kurir_id' => ['required', 'integer', 'exists:kurirs,id'],
+            'date' => ['nullable', 'date'],
+        ]);
+
+        $date = Carbon::parse($validated['date'] ?? now())->toDateString();
+        $kurir = Kurir::query()->findOrFail((int) $validated['kurir_id'], ['id', 'name']);
+
+        $resis = Resi::query()
+            ->where('kurir_id', $kurir->id)
+            ->whereDate('tanggal_upload', $date)
+            ->orderByDesc('updated_at')
+            ->orderByDesc('id')
+            ->get(['id', 'id_pesanan', 'no_resi', 'tanggal_upload', 'status']);
+
+        $scanOuts = PackerScanOut::query()
+            ->with('scanner:id,name')
+            ->whereDate('scan_date', $date)
+            ->whereIn('resi_id', $resis->pluck('id'))
+            ->orderByDesc('scanned_at')
+            ->get(['id', 'resi_id', 'scan_type', 'scan_code', 'scanned_at', 'scanned_by'])
+            ->unique('resi_id')
+            ->keyBy('resi_id');
+
+        $data = $resis->map(function ($resi) use ($scanOuts) {
+            $scanOut = $scanOuts->get($resi->id);
+            $isCanceled = ($resi->status ?? 'active') === 'canceled';
+
+            return [
+                'id_pesanan' => $resi->id_pesanan ?? '-',
+                'no_resi' => $resi->no_resi ?? '-',
+                'status' => $isCanceled
+                    ? 'Canceled'
+                    : ($scanOut ? 'Sudah Scan Out' : 'Belum Scan Out'),
+                'scan_type' => $scanOut?->scan_type ?? '-',
+                'scan_code' => $scanOut?->scan_code ?? '-',
+                'scanned_at' => $scanOut?->scanned_at
+                    ? Carbon::parse($scanOut->scanned_at)->format('Y-m-d H:i')
+                    : '-',
+                'scanner_name' => $scanOut?->scanner?->name ?? '-',
+            ];
+        })->values();
+
+        return response()->json([
+            'meta' => [
+                'kurir_name' => $kurir->name,
+                'date' => $date,
+                'total_resi' => $data->count(),
+                'scanned_total' => $data->where('status', 'Sudah Scan Out')->count(),
+                'remaining_total' => $data->where('status', 'Belum Scan Out')->count(),
+                'canceled_total' => $data->where('status', 'Canceled')->count(),
+            ],
+            'data' => $data,
         ]);
     }
 }

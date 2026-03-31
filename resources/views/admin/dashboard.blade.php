@@ -98,6 +98,34 @@
         background: rgba(14, 116, 144, 0.12);
         color: #0e7490;
     }
+    .kurir-actions {
+        margin-top: 14px;
+    }
+    .kurir-summary {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+    .kurir-summary-item {
+        min-width: 120px;
+        padding: 10px 12px;
+        border-radius: 12px;
+        background: #f8fafc;
+        border: 1px solid var(--bs-gray-200);
+    }
+    .kurir-summary-label {
+        font-size: 11px;
+        color: #6b7280;
+        text-transform: uppercase;
+        font-weight: 700;
+        letter-spacing: .04em;
+    }
+    .kurir-summary-value {
+        font-size: 20px;
+        font-weight: 800;
+        margin-top: 4px;
+    }
 </style>
 
 <div class="card mb-8">
@@ -147,6 +175,17 @@
                         <div class="kurir-remaining">
                             Sisa resi: {{ number_format($kurir['remaining']) }}
                         </div>
+                        <div class="kurir-actions">
+                            <button
+                                type="button"
+                                class="btn btn-sm btn-light-primary btn-kurir-detail"
+                                data-kurir-id="{{ $kurir['id'] }}"
+                                data-kurir-name="{{ $kurir['name'] }}"
+                                data-date="{{ $today ?? '' }}"
+                            >
+                                Lihat Detail Resi
+                            </button>
+                        </div>
                     </div>
                 @endforeach
             </div>
@@ -155,4 +194,164 @@
         @endif
     </div>
 </div>
+
+<div class="modal fade" id="modal_kurir_detail" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title mb-1">Detail Resi Kurir</h5>
+                    <div class="text-muted fs-7" id="kurir_detail_subtitle">-</div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="kurir-summary">
+                    <div class="kurir-summary-item">
+                        <div class="kurir-summary-label">Total Resi</div>
+                        <div class="kurir-summary-value" id="kurir_detail_total">0</div>
+                    </div>
+                    <div class="kurir-summary-item">
+                        <div class="kurir-summary-label">Sudah Scan Out</div>
+                        <div class="kurir-summary-value text-success" id="kurir_detail_scanned">0</div>
+                    </div>
+                    <div class="kurir-summary-item">
+                        <div class="kurir-summary-label">Belum Scan Out</div>
+                        <div class="kurir-summary-value text-warning" id="kurir_detail_remaining">0</div>
+                    </div>
+                    <div class="kurir-summary-item">
+                        <div class="kurir-summary-label">Canceled</div>
+                        <div class="kurir-summary-value text-danger" id="kurir_detail_canceled">0</div>
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-row-dashed align-middle">
+                        <thead>
+                            <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
+                                <th width="18%">ID Pesanan</th>
+                                <th width="18%">No Resi</th>
+                                <th width="16%">Status</th>
+                                <th width="12%">Scan Type</th>
+                                <th width="16%">Scan Code</th>
+                                <th width="12%">Waktu Scan</th>
+                                <th width="8%">Scanner</th>
+                            </tr>
+                        </thead>
+                        <tbody id="kurir_detail_body">
+                            <tr>
+                                <td colspan="7" class="text-center text-muted py-6">Belum ada data.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 @endsection
+
+@push('scripts')
+<script>
+    const kurirDetailUrl = '{{ route('admin.dashboard.kurir-detail') }}';
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const detailModalEl = document.getElementById('modal_kurir_detail');
+        const detailModal = detailModalEl ? new bootstrap.Modal(detailModalEl) : null;
+        const detailSubtitle = document.getElementById('kurir_detail_subtitle');
+        const detailTotal = document.getElementById('kurir_detail_total');
+        const detailScanned = document.getElementById('kurir_detail_scanned');
+        const detailRemaining = document.getElementById('kurir_detail_remaining');
+        const detailCanceled = document.getElementById('kurir_detail_canceled');
+        const detailBody = document.getElementById('kurir_detail_body');
+
+        const setLoadingState = (kurirName, date) => {
+            if (detailSubtitle) {
+                detailSubtitle.textContent = `${kurirName || '-'} | Tanggal ${date || '-'}`;
+            }
+            if (detailTotal) detailTotal.textContent = '0';
+            if (detailScanned) detailScanned.textContent = '0';
+            if (detailRemaining) detailRemaining.textContent = '0';
+            if (detailCanceled) detailCanceled.textContent = '0';
+            if (detailBody) {
+                detailBody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-6">Memuat data...</td>
+                    </tr>
+                `;
+            }
+        };
+
+        const renderRows = (rows) => {
+            if (!detailBody) {
+                return;
+            }
+            if (!Array.isArray(rows) || !rows.length) {
+                detailBody.innerHTML = `
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-6">Tidak ada data resi.</td>
+                    </tr>
+                `;
+                return;
+            }
+
+            detailBody.innerHTML = rows.map((row) => `
+                <tr>
+                    <td>${row.id_pesanan || '-'}</td>
+                    <td>${row.no_resi || '-'}</td>
+                    <td>${row.status || '-'}</td>
+                    <td>${row.scan_type || '-'}</td>
+                    <td>${row.scan_code || '-'}</td>
+                    <td>${row.scanned_at || '-'}</td>
+                    <td>${row.scanner_name || '-'}</td>
+                </tr>
+            `).join('');
+        };
+
+        document.querySelectorAll('.btn-kurir-detail').forEach((button) => {
+            button.addEventListener('click', async () => {
+                const kurirId = button.getAttribute('data-kurir-id');
+                const kurirName = button.getAttribute('data-kurir-name') || '-';
+                const date = button.getAttribute('data-date') || '';
+
+                if (!kurirId || !detailModal) {
+                    return;
+                }
+
+                setLoadingState(kurirName, date);
+                detailModal.show();
+
+                try {
+                    const params = new URLSearchParams({
+                        kurir_id: kurirId,
+                        date,
+                    });
+                    const response = await fetch(`${kurirDetailUrl}?${params.toString()}`);
+                    const payload = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(payload?.message || 'Gagal memuat detail kurir.');
+                    }
+
+                    const meta = payload?.meta || {};
+                    if (detailSubtitle) {
+                        detailSubtitle.textContent = `${meta.kurir_name || kurirName} | Tanggal ${meta.date || date || '-'}`;
+                    }
+                    if (detailTotal) detailTotal.textContent = Number(meta.total_resi || 0).toLocaleString('id-ID');
+                    if (detailScanned) detailScanned.textContent = Number(meta.scanned_total || 0).toLocaleString('id-ID');
+                    if (detailRemaining) detailRemaining.textContent = Number(meta.remaining_total || 0).toLocaleString('id-ID');
+                    if (detailCanceled) detailCanceled.textContent = Number(meta.canceled_total || 0).toLocaleString('id-ID');
+                    renderRows(payload?.data || []);
+                } catch (error) {
+                    if (detailBody) {
+                        detailBody.innerHTML = `
+                            <tr>
+                                <td colspan="7" class="text-center text-danger py-6">${error.message || 'Gagal memuat detail kurir.'}</td>
+                            </tr>
+                        `;
+                    }
+                }
+            });
+        });
+    });
+</script>
+@endpush
