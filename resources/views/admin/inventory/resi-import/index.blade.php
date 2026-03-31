@@ -75,6 +75,11 @@
         </div>
         <div class="card-toolbar">
             <div class="d-flex align-items-center gap-2">
+                <select class="form-select form-select-solid w-175px" id="filter_status">
+                    <option value="">Semua Status</option>
+                    <option value="active" {{ ($filterStatus ?? '') === 'active' ? 'selected' : '' }}>Aktif</option>
+                    <option value="canceled" {{ ($filterStatus ?? '') === 'canceled' ? 'selected' : '' }}>Cancel</option>
+                </select>
                 <input type="text" class="form-control form-control-solid w-150px" id="filter_date" placeholder="Tanggal" value="{{ $filterDate ?? '' }}" />
                 <button type="button" class="btn btn-light" id="filter_apply">Filter</button>
                 <button type="button" class="btn btn-light" id="filter_reset">Reset</button>
@@ -97,6 +102,7 @@
                         <th>ID Pesanan</th>
                         <th>SKU</th>
                         <th>Tanggal Order</th>
+                        <th>Status</th>
                         <th class="text-end">Aksi</th>
                     </tr>
                 </thead>
@@ -195,6 +201,7 @@
     const importUrl = '{{ $importUrl ?? '' }}';
     const dataUrl = '{{ $dataUrl ?? '' }}';
     const cancelUrl = '{{ route('admin.inventory.resi-import.cancel') }}';
+    const uncancelUrl = '{{ route('admin.inventory.resi-import.uncancel') }}';
     const csrfToken = '{{ csrf_token() }}';
     const todayStr = '{{ $today ?? '' }}';
 
@@ -214,6 +221,7 @@
         const loadingOverlay = document.getElementById('import_loading_overlay');
         const filterDateEl = document.getElementById('filter_date');
         const filterSearchEl = document.getElementById('filter_search');
+        const filterStatusEl = document.getElementById('filter_status');
         const filterApplyBtn = document.getElementById('filter_apply');
         const filterResetBtn = document.getElementById('filter_reset');
         const summaryOrdersEl = document.getElementById('summary_orders');
@@ -239,6 +247,7 @@
                     data: function(params) {
                         params.q = filterSearchEl?.value || '';
                         params.date = filterDateEl?.value || '';
+                        params.status = filterStatusEl?.value || '';
                     }
                 },
                 columns: [
@@ -250,11 +259,21 @@
                     { data: 'id_pesanan' },
                     { data: 'sku' },
                     { data: 'tanggal_pesanan' },
+                    { data: 'status', render: (data) => {
+                        if (data === 'canceled') {
+                            return '<span class="badge badge-light-danger">Cancel</span>';
+                        }
+                        return '<span class="badge badge-light-success">Aktif</span>';
+                    }},
                     { data: null, orderable: false, searchable: false, className: 'text-end', render: (data, type, row) => {
                         const idPesanan = row.id_pesanan || '';
                         const noResi = row.no_resi || '';
+                        const status = row.status || 'active';
                         const hasPackerScan = !!row.has_packer_scan;
                         const hasScanOut = !!row.has_scan_out;
+                        if (status === 'canceled') {
+                            return `<button type="button" class="btn btn-sm btn-light-warning btn-uncancel" data-id="${idPesanan}" data-resi="${noResi}">Batal Cancel</button>`;
+                        }
                         if (hasPackerScan || hasScanOut) {
                             return '<span class="text-muted">-</span>';
                         }
@@ -285,6 +304,7 @@
         filterSearchEl?.addEventListener('keyup', (e) => {
             if (e.key === 'Enter') reloadTable();
         });
+        filterStatusEl?.addEventListener('change', reloadTable);
         filterResetBtn?.addEventListener('click', () => {
             if (fpDate && todayStr) {
                 fpDate.setDate(todayStr, true);
@@ -292,6 +312,7 @@
                 filterDateEl.value = todayStr;
             }
             if (filterSearchEl) filterSearchEl.value = '';
+            if (filterStatusEl) filterStatusEl.value = '';
             reloadTable();
         });
 
@@ -329,6 +350,63 @@
                 });
             } else {
                 if (confirm('Batalkan resi ini?')) openModal();
+            }
+        });
+
+        tableEl.on('click', '.btn-uncancel', async function (e) {
+            e.preventDefault();
+            const id = this.getAttribute('data-id') || '';
+            const resi = this.getAttribute('data-resi') || '';
+
+            const payload = new FormData();
+            if (id) payload.append('id_pesanan', id);
+            if (resi) payload.append('no_resi', resi);
+
+            const submitUncancel = async () => {
+                try {
+                    const res = await fetch(uncancelUrl, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': csrfToken,
+                            'Accept': 'application/json',
+                        },
+                        body: payload,
+                    });
+                    const text = await res.text();
+                    let json = null;
+                    try { json = JSON.parse(text); } catch (err) { /* ignore */ }
+
+                    if (!res.ok) {
+                        if (typeof Swal !== 'undefined') {
+                            Swal.fire('Error', json?.message || 'Gagal membatalkan status cancel', 'error');
+                        }
+                        return;
+                    }
+
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire('Berhasil', json?.message || 'Status cancel dibatalkan', 'success');
+                    }
+                    reloadTable();
+                } catch (err) {
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire('Error', 'Gagal membatalkan status cancel', 'error');
+                    }
+                }
+            };
+
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    title: 'Batalkan status cancel?',
+                    text: 'Resi akan aktif kembali dan masuk lagi ke picking list.',
+                    icon: 'question',
+                    showCancelButton: true,
+                    confirmButtonText: 'Ya, aktifkan lagi',
+                    cancelButtonText: 'Batal',
+                }).then((result) => {
+                    if (result.isConfirmed) submitUncancel();
+                });
+            } else if (confirm('Batalkan status cancel resi ini?')) {
+                submitUncancel();
             }
         });
 

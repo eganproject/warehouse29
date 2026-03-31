@@ -30,9 +30,11 @@ class ResiImportController extends Controller
             $filterDate = $today;
         }
         $search = trim((string) $request->input('q', ''));
+        $status = $this->normalizeStatusFilter($request->input('status'));
 
         $baseQuery = Resi::query()->whereDate('tanggal_upload', $filterDate);
         $this->applySearch($baseQuery, $search);
+        $this->applyStatusFilter($baseQuery, $status);
 
         $summaryOrders = (clone $baseQuery)->count();
         $summarySkus = ResiDetail::whereIn('resi_id', (clone $baseQuery)->select('id'))->count();
@@ -42,6 +44,7 @@ class ResiImportController extends Controller
             'dataUrl' => route('admin.inventory.resi-import.data'),
             'filterDate' => $filterDate,
             'filterSearch' => $search,
+            'filterStatus' => $status,
             'today' => $today,
             'summaryOrders' => $summaryOrders,
             'summarySkus' => $summarySkus,
@@ -56,16 +59,18 @@ class ResiImportController extends Controller
             $filterDate = $today;
         }
         $search = trim((string) $request->input('q', ''));
+        $status = $this->normalizeStatusFilter($request->input('status'));
 
         $filterQuery = Resi::query()->whereDate('tanggal_upload', $filterDate);
         $this->applySearch($filterQuery, $search);
+        $this->applyStatusFilter($filterQuery, $status);
 
         $recordsTotal = Resi::whereDate('tanggal_upload', $filterDate)->count();
         $summaryOrders = (clone $filterQuery)->count();
         $summarySkus = ResiDetail::whereIn('resi_id', (clone $filterQuery)->select('id'))->count();
 
         $query = Resi::query()
-            ->select(['id', 'id_pesanan', 'no_resi', 'tanggal_pesanan', 'kurir_id'])
+            ->select(['id', 'id_pesanan', 'no_resi', 'tanggal_pesanan', 'kurir_id', 'status'])
             ->selectSub(function ($sub) {
                 $sub->from('packer_resi_scans')
                     ->selectRaw('count(1)')
@@ -83,6 +88,7 @@ class ResiImportController extends Controller
             ->orderByDesc('id');
 
         $this->applySearch($query, $search);
+        $this->applyStatusFilter($query, $status);
 
         $start = (int) $request->input('start', 0);
         $length = (int) $request->input('length', 10);
@@ -108,6 +114,7 @@ class ResiImportController extends Controller
                 'kurir' => $row->kurir?->name ?? '-',
                 'sku' => $skuList,
                 'tanggal_pesanan' => $tanggalOrder,
+                'status' => $row->status ?? 'active',
                 'has_packer_scan' => $hasPackerScan,
                 'has_scan_out' => $hasScanOut,
             ];
@@ -218,20 +225,8 @@ class ResiImportController extends Controller
 
     public function cancel(Request $request)
     {
-        $validated = $request->validate([
-            'id_pesanan' => ['nullable', 'string', 'max:100', 'required_without:no_resi'],
-            'no_resi' => ['nullable', 'string', 'max:100', 'required_without:id_pesanan'],
-            'reason' => ['nullable', 'string', 'max:255'],
-        ]);
-
-        $resiQuery = Resi::query();
-        if (!empty($validated['id_pesanan'])) {
-            $resiQuery->where('id_pesanan', trim($validated['id_pesanan']));
-        } else {
-            $resiQuery->where('no_resi', trim((string) $validated['no_resi']));
-        }
-
-        $resi = $resiQuery->first();
+        $validated = $this->validateResiActionRequest($request, true);
+        $resi = $this->findResiForAction($validated);
         if (!$resi) {
             return response()->json([
                 'message' => 'Resi tidak ditemukan.',
@@ -263,6 +258,8 @@ class ResiImportController extends Controller
             $resi->canceled_at = now();
             $resi->canceled_by = auth()->id();
             $resi->cancel_reason = $validated['reason'] ?? null;
+            $resi->uncanceled_at = null;
+            $resi->uncanceled_by = null;
             $resi->save();
 
             $details = ResiDetail::where('resi_id', $resi->id)->get(['sku', 'qty']);
@@ -282,6 +279,61 @@ class ResiImportController extends Controller
 
         return response()->json([
             'message' => 'Resi berhasil dibatalkan.',
+        ]);
+    }
+
+    public function uncancel(Request $request)
+    {
+        $validated = $this->validateResiActionRequest($request, false);
+        $resi = $this->findResiForAction($validated);
+        if (!$resi) {
+            return response()->json([
+                'message' => 'Resi tidak ditemukan.',
+            ], 404);
+        }
+
+        if (($resi->status ?? 'active') !== 'canceled') {
+            return response()->json([
+                'message' => 'Resi tidak dalam status cancel.',
+            ], 422);
+        }
+
+        $hasPackerScan = PackerResiScan::where('resi_id', $resi->id)->exists();
+        $hasScanOut = PackerScanOut::where('resi_id', $resi->id)->exists();
+        if ($hasScanOut || $hasPackerScan) {
+            return response()->json([
+                'message' => 'Resi sudah memiliki proses packer/scan out, batal cancel tidak diizinkan.',
+            ], 422);
+        }
+
+        $details = ResiDetail::where('resi_id', $resi->id)->get(['sku', 'qty']);
+        if ($details->isEmpty()) {
+            return response()->json([
+                'message' => 'Detail resi tidak ditemukan, batal cancel tidak dapat diproses.',
+            ], 422);
+        }
+
+        DB::beginTransaction();
+        try {
+            $resi->status = 'active';
+            $resi->uncanceled_at = now();
+            $resi->uncanceled_by = auth()->id();
+            $resi->save();
+
+            $listDate = $resi->tanggal_upload?->format('Y-m-d') ?? now()->toDateString();
+            $this->adjustPickingList($listDate, $details, 1);
+
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Gagal membatalkan status cancel resi.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+
+        return response()->json([
+            'message' => 'Status cancel resi berhasil dibatalkan.',
         ]);
     }
 
@@ -427,6 +479,48 @@ class ResiImportController extends Controller
                     $detailQ->where('sku', 'like', "%{$search}%");
                 });
         });
+    }
+
+    private function validateResiActionRequest(Request $request, bool $withReason = false): array
+    {
+        $rules = [
+            'id_pesanan' => ['nullable', 'string', 'max:100', 'required_without:no_resi'],
+            'no_resi' => ['nullable', 'string', 'max:100', 'required_without:id_pesanan'],
+        ];
+
+        if ($withReason) {
+            $rules['reason'] = ['nullable', 'string', 'max:255'];
+        }
+
+        return $request->validate($rules);
+    }
+
+    private function findResiForAction(array $validated): ?Resi
+    {
+        $resiQuery = Resi::query();
+        if (!empty($validated['id_pesanan'])) {
+            $resiQuery->where('id_pesanan', trim((string) $validated['id_pesanan']));
+        } else {
+            $resiQuery->where('no_resi', trim((string) ($validated['no_resi'] ?? '')));
+        }
+
+        return $resiQuery->first();
+    }
+
+    private function applyStatusFilter($query, string $status): void
+    {
+        if ($status === '') {
+            return;
+        }
+
+        $query->where('status', $status);
+    }
+
+    private function normalizeStatusFilter($status): string
+    {
+        $status = trim((string) $status);
+
+        return in_array($status, ['active', 'canceled'], true) ? $status : '';
     }
 
     private function resolveDefaultKurirId(): ?int

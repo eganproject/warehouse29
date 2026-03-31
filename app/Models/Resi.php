@@ -19,6 +19,8 @@ class Resi extends Model
         'canceled_at',
         'canceled_by',
         'cancel_reason',
+        'uncanceled_at',
+        'uncanceled_by',
         'uploader_id',
     ];
 
@@ -26,6 +28,7 @@ class Resi extends Model
         'tanggal_pesanan' => 'date',
         'tanggal_upload' => 'date',
         'canceled_at' => 'datetime',
+        'uncanceled_at' => 'datetime',
     ];
 
     public function details()
@@ -41,6 +44,11 @@ class Resi extends Model
     public function canceler()
     {
         return $this->belongsTo(User::class, 'canceled_by');
+    }
+
+    public function uncanceler()
+    {
+        return $this->belongsTo(User::class, 'uncanceled_by');
     }
 
     public function kurir()

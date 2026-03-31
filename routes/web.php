@@ -182,6 +182,7 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         Route::get('/resi-import/data', [ResiImportController::class, 'data'])->name('resi-import.data');
         Route::post('/resi-import/import', [ResiImportController::class, 'import'])->name('resi-import.import');
         Route::post('/resi-import/cancel', [ResiImportController::class, 'cancel'])->name('resi-import.cancel');
+        Route::post('/resi-import/uncancel', [ResiImportController::class, 'uncancel'])->name('resi-import.uncancel');
 
         // Picker Transit
         Route::get('/picker-transit', [PickerTransitController::class, 'index'])->name('picker-transit.index');
