@@ -228,18 +228,15 @@
                     <table class="table table-row-dashed align-middle">
                         <thead>
                             <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
-                                <th width="18%">ID Pesanan</th>
-                                <th width="18%">No Resi</th>
-                                <th width="16%">Status</th>
-                                <th width="12%">Scan Type</th>
-                                <th width="16%">Scan Code</th>
-                                <th width="12%">Waktu Scan</th>
-                                <th width="8%">Scanner</th>
+                                <th width="28%">ID Pesanan</th>
+                                <th width="28%">No Resi</th>
+                                <th width="22%">Status</th>
+                                <th width="22%">Tanggal Upload</th>
                             </tr>
                         </thead>
                         <tbody id="kurir_detail_body">
                             <tr>
-                                <td colspan="7" class="text-center text-muted py-6">Belum ada data.</td>
+                                <td colspan="4" class="text-center text-muted py-6">Belum ada data.</td>
                             </tr>
                         </tbody>
                     </table>
@@ -275,7 +272,7 @@
             if (detailBody) {
                 detailBody.innerHTML = `
                     <tr>
-                        <td colspan="7" class="text-center text-muted py-6">Memuat data...</td>
+                        <td colspan="4" class="text-center text-muted py-6">Memuat data...</td>
                     </tr>
                 `;
             }
@@ -288,7 +285,7 @@
             if (!Array.isArray(rows) || !rows.length) {
                 detailBody.innerHTML = `
                     <tr>
-                        <td colspan="7" class="text-center text-muted py-6">Tidak ada data resi.</td>
+                        <td colspan="4" class="text-center text-muted py-6">Tidak ada data resi yang belum scan out.</td>
                     </tr>
                 `;
                 return;
@@ -299,10 +296,7 @@
                     <td>${row.id_pesanan || '-'}</td>
                     <td>${row.no_resi || '-'}</td>
                     <td>${row.status || '-'}</td>
-                    <td>${row.scan_type || '-'}</td>
-                    <td>${row.scan_code || '-'}</td>
-                    <td>${row.scanned_at || '-'}</td>
-                    <td>${row.scanner_name || '-'}</td>
+                    <td>${row.tanggal_upload || '-'}</td>
                 </tr>
             `).join('');
         };
@@ -345,7 +339,7 @@
                     if (detailBody) {
                         detailBody.innerHTML = `
                             <tr>
-                                <td colspan="7" class="text-center text-danger py-6">${error.message || 'Gagal memuat detail kurir.'}</td>
+                                <td colspan="4" class="text-center text-danger py-6">${error.message || 'Gagal memuat detail kurir.'}</td>
                             </tr>
                         `;
                     }

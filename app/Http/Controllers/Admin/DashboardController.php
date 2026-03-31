@@ -104,22 +104,22 @@ class DashboardController extends Controller
             ->unique('resi_id')
             ->keyBy('resi_id');
 
-        $data = $resis->map(function ($resi) use ($scanOuts) {
-            $scanOut = $scanOuts->get($resi->id);
-            $isCanceled = ($resi->status ?? 'active') === 'canceled';
+        $activeResis = $resis->filter(function ($resi) {
+            return ($resi->status ?? 'active') !== 'canceled';
+        })->values();
 
+        $pendingResis = $activeResis->filter(function ($resi) use ($scanOuts) {
+            return !$scanOuts->has($resi->id);
+        })->values();
+
+        $data = $pendingResis->map(function ($resi) {
             return [
                 'id_pesanan' => $resi->id_pesanan ?? '-',
                 'no_resi' => $resi->no_resi ?? '-',
-                'status' => $isCanceled
-                    ? 'Canceled'
-                    : ($scanOut ? 'Sudah Scan Out' : 'Belum Scan Out'),
-                'scan_type' => $scanOut?->scan_type ?? '-',
-                'scan_code' => $scanOut?->scan_code ?? '-',
-                'scanned_at' => $scanOut?->scanned_at
-                    ? Carbon::parse($scanOut->scanned_at)->format('Y-m-d H:i')
+                'status' => 'Belum Scan Out',
+                'tanggal_upload' => $resi->tanggal_upload
+                    ? Carbon::parse($resi->tanggal_upload)->format('Y-m-d')
                     : '-',
-                'scanner_name' => $scanOut?->scanner?->name ?? '-',
             ];
         })->values();
 
@@ -127,10 +127,10 @@ class DashboardController extends Controller
             'meta' => [
                 'kurir_name' => $kurir->name,
                 'date' => $date,
-                'total_resi' => $data->count(),
-                'scanned_total' => $data->where('status', 'Sudah Scan Out')->count(),
-                'remaining_total' => $data->where('status', 'Belum Scan Out')->count(),
-                'canceled_total' => $data->where('status', 'Canceled')->count(),
+                'total_resi' => $activeResis->count(),
+                'scanned_total' => $activeResis->count() - $pendingResis->count(),
+                'remaining_total' => $pendingResis->count(),
+                'canceled_total' => $resis->count() - $activeResis->count(),
             ],
             'data' => $data,
         ]);
