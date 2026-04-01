@@ -181,6 +181,7 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         // Resi Import
         Route::get('/resi-import', [ResiImportController::class, 'index'])->name('resi-import.index');
         Route::get('/resi-import/data', [ResiImportController::class, 'data'])->name('resi-import.data');
+        Route::get('/resi-import/summary', [ResiImportController::class, 'summary'])->name('resi-import.summary');
         Route::post('/resi-import/import', [ResiImportController::class, 'import'])->name('resi-import.import');
         Route::post('/resi-import/cancel', [ResiImportController::class, 'cancel'])->name('resi-import.cancel');
         Route::post('/resi-import/uncancel', [ResiImportController::class, 'uncancel'])->name('resi-import.uncancel');

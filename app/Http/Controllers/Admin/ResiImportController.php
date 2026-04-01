@@ -132,6 +132,50 @@ class ResiImportController extends Controller
         ]);
     }
 
+    public function summary(Request $request)
+    {
+        $today = now()->toDateString();
+        $filterDate = trim((string) $request->input('date', ''));
+        if ($filterDate === '') {
+            $filterDate = $today;
+        }
+        $status = $this->normalizeStatusFilter($request->input('status'));
+
+        $baseQuery = DB::table('resi_details as rd')
+            ->join('resis as r', 'r.id', '=', 'rd.resi_id')
+            ->whereDate('r.tanggal_upload', $filterDate);
+
+        if ($status !== '') {
+            $baseQuery->where('r.status', $status);
+        }
+
+        $rows = (clone $baseQuery)
+            ->select('rd.sku', DB::raw('SUM(rd.qty) as qty'))
+            ->groupBy('rd.sku')
+            ->orderByDesc('qty')
+            ->get();
+
+        $totalSku = $rows->count();
+        $totalQty = (int) $rows->sum('qty');
+
+        $data = $rows->map(function ($row) {
+            return [
+                'sku' => $row->sku ?? '-',
+                'qty' => (int) ($row->qty ?? 0),
+            ];
+        });
+
+        return response()->json([
+            'date' => $filterDate,
+            'status' => $status,
+            'summary' => [
+                'total_sku' => $totalSku,
+                'total_qty' => $totalQty,
+            ],
+            'data' => $data,
+        ]);
+    }
+
     public function import(Request $request)
     {
         $request->validate([

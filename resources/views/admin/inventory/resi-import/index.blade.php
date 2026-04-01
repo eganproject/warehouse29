@@ -83,6 +83,7 @@
                 <input type="text" class="form-control form-control-solid w-150px" id="filter_date" placeholder="Tanggal" value="{{ $filterDate ?? '' }}" />
                 <button type="button" class="btn btn-light" id="filter_apply">Filter</button>
                 <button type="button" class="btn btn-light" id="filter_reset">Reset</button>
+                <button type="button" class="btn btn-light-primary" id="btn_rekap_sku">Rekap SKU</button>
             </div>
         </div>
     </div>
@@ -194,12 +195,54 @@
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="modal_rekap_sku" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-700px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bolder">Rekap SKU Import Resi</h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <span class="svg-icon svg-icon-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                            <rect opacity="0.5" x="6" y="17.3137" width="16" height="2" rx="1" transform="rotate(-45 6 17.3137)" fill="black" />
+                            <rect x="7.41422" y="6" width="16" height="2" rx="1" transform="rotate(45 7.41422 6)" fill="black" />
+                        </svg>
+                    </span>
+                </div>
+            </div>
+            <div class="modal-body mx-5 mx-xl-15 my-7">
+                <div class="d-flex flex-wrap align-items-center gap-6 mb-4">
+                    <div class="fw-bold">Tanggal: <span id="rekap_date">-</span></div>
+                    <div class="fw-bold">Total SKU: <span id="rekap_total_sku">0</span></div>
+                    <div class="fw-bold">Total Qty: <span id="rekap_total_qty">0</span></div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-row-dashed align-middle">
+                        <thead>
+                            <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
+                                <th width="10%">No</th>
+                                <th>SKU</th>
+                                <th class="text-end">Qty</th>
+                            </tr>
+                        </thead>
+                        <tbody id="rekap_body">
+                            <tr>
+                                <td colspan="3" class="text-center text-muted py-6">Memuat data...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 @endsection
 
 @push('scripts')
 <script>
     const importUrl = '{{ $importUrl ?? '' }}';
     const dataUrl = '{{ $dataUrl ?? '' }}';
+    const summaryUrl = '{{ route('admin.inventory.resi-import.summary') }}';
     const cancelUrl = '{{ route('admin.inventory.resi-import.cancel') }}';
     const uncancelUrl = '{{ route('admin.inventory.resi-import.uncancel') }}';
     const csrfToken = '{{ csrf_token() }}';
@@ -224,6 +267,13 @@
         const filterStatusEl = document.getElementById('filter_status');
         const filterApplyBtn = document.getElementById('filter_apply');
         const filterResetBtn = document.getElementById('filter_reset');
+        const rekapBtn = document.getElementById('btn_rekap_sku');
+        const rekapModalEl = document.getElementById('modal_rekap_sku');
+        const rekapModal = rekapModalEl ? new bootstrap.Modal(rekapModalEl) : null;
+        const rekapDateEl = document.getElementById('rekap_date');
+        const rekapTotalSkuEl = document.getElementById('rekap_total_sku');
+        const rekapTotalQtyEl = document.getElementById('rekap_total_qty');
+        const rekapBodyEl = document.getElementById('rekap_body');
         const summaryOrdersEl = document.getElementById('summary_orders');
         const summarySkusEl = document.getElementById('summary_skus');
         const labelDateEl = document.getElementById('label_date');
@@ -314,6 +364,63 @@
             if (filterSearchEl) filterSearchEl.value = '';
             if (filterStatusEl) filterStatusEl.value = '';
             reloadTable();
+        });
+
+        rekapBtn?.addEventListener('click', async () => {
+            const dateValue = (filterDateEl?.value || todayStr || '').trim();
+            const statusValue = (filterStatusEl?.value || '').trim();
+            if (rekapDateEl) rekapDateEl.textContent = dateValue || '-';
+            if (rekapTotalSkuEl) rekapTotalSkuEl.textContent = '0';
+            if (rekapTotalQtyEl) rekapTotalQtyEl.textContent = '0';
+            if (rekapBodyEl) {
+                rekapBodyEl.innerHTML = `
+                    <tr>
+                        <td colspan="3" class="text-center text-muted py-6">Memuat data...</td>
+                    </tr>
+                `;
+            }
+            rekapModal?.show();
+            try {
+                const params = new URLSearchParams();
+                if (dateValue) params.set('date', dateValue);
+                if (statusValue) params.set('status', statusValue);
+                const res = await fetch(`${summaryUrl}?${params.toString()}`);
+                const json = await res.json();
+                if (!res.ok) {
+                    throw new Error(json?.message || 'Gagal memuat rekap.');
+                }
+                const rows = Array.isArray(json?.data) ? json.data : [];
+                if (rekapDateEl) rekapDateEl.textContent = json?.date || dateValue || '-';
+                if (rekapTotalSkuEl) rekapTotalSkuEl.textContent = json?.summary?.total_sku ?? 0;
+                if (rekapTotalQtyEl) rekapTotalQtyEl.textContent = json?.summary?.total_qty ?? 0;
+                if (!rows.length) {
+                    if (rekapBodyEl) {
+                        rekapBodyEl.innerHTML = `
+                            <tr>
+                                <td colspan="3" class="text-center text-muted py-6">Tidak ada data.</td>
+                            </tr>
+                        `;
+                    }
+                    return;
+                }
+                if (rekapBodyEl) {
+                    rekapBodyEl.innerHTML = rows.map((row, idx) => `
+                        <tr>
+                            <td>${idx + 1}</td>
+                            <td>${row.sku || '-'}</td>
+                            <td class="text-end">${row.qty ?? 0}</td>
+                        </tr>
+                    `).join('');
+                }
+            } catch (err) {
+                if (rekapBodyEl) {
+                    rekapBodyEl.innerHTML = `
+                        <tr>
+                            <td colspan="3" class="text-center text-danger py-6">Gagal memuat data rekap.</td>
+                        </tr>
+                    `;
+                }
+            }
         });
 
         importBtn?.addEventListener('click', () => {
