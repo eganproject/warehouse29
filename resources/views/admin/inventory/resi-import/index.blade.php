@@ -216,6 +216,10 @@
                     <div class="fw-bold">Total SKU: <span id="rekap_total_sku">0</span></div>
                     <div class="fw-bold">Total Qty: <span id="rekap_total_qty">0</span></div>
                 </div>
+                <div class="d-flex align-items-center gap-2 flex-wrap mb-4">
+                    <input type="text" class="form-control form-control-solid w-250px" id="rekap_search" placeholder="Cari SKU" />
+                    <button type="button" class="btn btn-light" id="rekap_search_btn">Search</button>
+                </div>
                 <div class="table-responsive">
                     <table class="table table-row-dashed align-middle">
                         <thead>
@@ -231,6 +235,13 @@
                             </tr>
                         </tbody>
                     </table>
+                    <div class="d-flex align-items-center justify-content-between mt-3 flex-wrap gap-3" id="rekap_pagination" style="display:none;">
+                        <div class="text-muted" id="rekap_page_summary"></div>
+                        <div class="btn-group">
+                            <button type="button" class="btn btn-sm btn-light" id="rekap_prev">&larr; Sebelumnya</button>
+                            <button type="button" class="btn btn-sm btn-light" id="rekap_next">Berikutnya &rarr;</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -274,6 +285,18 @@
         const rekapTotalSkuEl = document.getElementById('rekap_total_sku');
         const rekapTotalQtyEl = document.getElementById('rekap_total_qty');
         const rekapBodyEl = document.getElementById('rekap_body');
+        const rekapSearchInput = document.getElementById('rekap_search');
+        const rekapSearchBtn = document.getElementById('rekap_search_btn');
+        const rekapPaginationEl = document.getElementById('rekap_pagination');
+        const rekapPageSummaryEl = document.getElementById('rekap_page_summary');
+        const rekapPrevBtn = document.getElementById('rekap_prev');
+        const rekapNextBtn = document.getElementById('rekap_next');
+        const rekapState = {
+            rows: [],
+            page: 1,
+            perPage: 10,
+            keyword: '',
+        };
         const summaryOrdersEl = document.getElementById('summary_orders');
         const summarySkusEl = document.getElementById('summary_skus');
         const labelDateEl = document.getElementById('label_date');
@@ -379,6 +402,10 @@
                     </tr>
                 `;
             }
+            if (rekapSearchInput) rekapSearchInput.value = '';
+            rekapState.keyword = '';
+            rekapState.page = 1;
+            rekapState.rows = [];
             rekapModal?.show();
             try {
                 const params = new URLSearchParams();
@@ -393,25 +420,9 @@
                 if (rekapDateEl) rekapDateEl.textContent = json?.date || dateValue || '-';
                 if (rekapTotalSkuEl) rekapTotalSkuEl.textContent = json?.summary?.total_sku ?? 0;
                 if (rekapTotalQtyEl) rekapTotalQtyEl.textContent = json?.summary?.total_qty ?? 0;
-                if (!rows.length) {
-                    if (rekapBodyEl) {
-                        rekapBodyEl.innerHTML = `
-                            <tr>
-                                <td colspan="3" class="text-center text-muted py-6">Tidak ada data.</td>
-                            </tr>
-                        `;
-                    }
-                    return;
-                }
-                if (rekapBodyEl) {
-                    rekapBodyEl.innerHTML = rows.map((row, idx) => `
-                        <tr>
-                            <td>${idx + 1}</td>
-                            <td>${row.sku || '-'}</td>
-                            <td class="text-end">${row.qty ?? 0}</td>
-                        </tr>
-                    `).join('');
-                }
+                rekapState.rows = rows;
+                rekapState.page = 1;
+                renderRekapRows();
             } catch (err) {
                 if (rekapBodyEl) {
                     rekapBodyEl.innerHTML = `
@@ -420,7 +431,74 @@
                         </tr>
                     `;
                 }
+                if (rekapPaginationEl) rekapPaginationEl.style.display = 'none';
             }
+        });
+
+        const getRekapFilteredRows = () => {
+            const keyword = (rekapState.keyword || '').toLowerCase();
+            if (!keyword) {
+                return rekapState.rows;
+            }
+            return rekapState.rows.filter((row) => (row.sku || '').toLowerCase().includes(keyword));
+        };
+
+        const renderRekapRows = () => {
+            const rows = getRekapFilteredRows();
+            const total = rows.length;
+            const perPage = rekapState.perPage;
+            const maxPage = Math.max(1, Math.ceil(total / perPage));
+            rekapState.page = Math.min(Math.max(1, rekapState.page), maxPage);
+            const start = (rekapState.page - 1) * perPage;
+            const paginated = rows.slice(start, start + perPage);
+
+            if (!paginated.length) {
+                if (rekapBodyEl) {
+                    rekapBodyEl.innerHTML = `
+                        <tr>
+                            <td colspan="3" class="text-center text-muted py-6">Tidak ada data.</td>
+                        </tr>
+                    `;
+                }
+            } else if (rekapBodyEl) {
+                rekapBodyEl.innerHTML = paginated.map((row, idx) => `
+                    <tr>
+                        <td>${start + idx + 1}</td>
+                        <td>${row.sku || '-'}</td>
+                        <td class="text-end">${row.qty ?? 0}</td>
+                    </tr>
+                `).join('');
+            }
+
+            if (rekapPaginationEl) {
+                rekapPaginationEl.style.display = total > perPage ? 'flex' : 'none';
+            }
+            if (rekapPageSummaryEl) {
+                rekapPageSummaryEl.textContent = `Halaman ${rekapState.page} dari ${maxPage}`;
+            }
+            if (rekapPrevBtn) rekapPrevBtn.disabled = rekapState.page <= 1;
+            if (rekapNextBtn) rekapNextBtn.disabled = rekapState.page >= maxPage;
+        };
+
+        const applyRekapSearch = () => {
+            rekapState.keyword = (rekapSearchInput?.value || '').trim();
+            rekapState.page = 1;
+            renderRekapRows();
+        };
+
+        rekapSearchBtn?.addEventListener('click', applyRekapSearch);
+        rekapSearchInput?.addEventListener('keyup', (e) => {
+            if (e.key === 'Enter') {
+                applyRekapSearch();
+            }
+        });
+        rekapPrevBtn?.addEventListener('click', () => {
+            rekapState.page = Math.max(1, rekapState.page - 1);
+            renderRekapRows();
+        });
+        rekapNextBtn?.addEventListener('click', () => {
+            rekapState.page += 1;
+            renderRekapRows();
         });
 
         importBtn?.addEventListener('click', () => {
