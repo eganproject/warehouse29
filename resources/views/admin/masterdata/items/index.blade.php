@@ -76,7 +76,7 @@
             <table class="table align-middle table-row-dashed fs-6 gy-5" id="items_table">
                 <thead>
                     <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
-                        <th>ID</th>
+                        <th>No</th>
                         <th>SKU</th>
                         <th>Nama</th>
                         <th>Kategori</th>
@@ -344,7 +344,7 @@
                 }
             },
             columns: [
-                { data: 'id' },
+                { data: null, orderable: false, searchable: false, render: (data, type, row, meta) => meta.row + meta.settings._iDisplayStart + 1 },
                 { data: 'sku' },
                 { data: 'name' },
                 { data: 'category' },
