@@ -27,6 +27,7 @@
                 </select>
                 <button type="button" class="btn btn-light" id="filter_apply">Filter</button>
                 <button type="button" class="btn btn-light" id="filter_reset">Reset</button>
+                <button type="button" class="btn btn-light-warning" id="btn_recalculate_picking">Recalculate</button>
                 <button type="button" class="btn btn-light-primary" id="btn_export_picking_list">Export Excel</button>
                 <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modal_add_picking_qty">Tambah Qty</button>
             </div>
@@ -207,6 +208,7 @@
     const dataUrl = '{{ $dataUrl }}';
     const dataUrlExceptions = '{{ $dataUrlExceptions }}';
     const exportUrl = '{{ route('admin.inventory.picking-list.export') }}';
+    const recalcUrl = '{{ route('admin.inventory.picking-list.recalculate') }}';
     const addQtyUrl = '{{ route('admin.inventory.picking-list.store-qty') }}';
     const returnExceptionUrl = '{{ route('admin.inventory.picking-list.exception-return') }}';
     const todayStr = '{{ $today ?? '' }}';
@@ -220,7 +222,18 @@
         const statusEl = document.getElementById('filter_status');
         const filterApplyBtn = document.getElementById('filter_apply');
         const filterResetBtn = document.getElementById('filter_reset');
+        const recalcBtn = document.getElementById('btn_recalculate_picking');
         const exportBtn = document.getElementById('btn_export_picking_list');
+        const isSameDay = (value, compare) => {
+            const a = (value || '').trim();
+            const b = (compare || '').trim();
+            return a !== '' && b !== '' && a === b;
+        };
+        const updateRecalcState = () => {
+            if (!recalcBtn) return;
+            const selected = (dateEl?.value || '').trim();
+            recalcBtn.disabled = !isSameDay(selected, todayStr);
+        };
         const addQtyModalEl = document.getElementById('modal_add_picking_qty');
         const returnModalEl = document.getElementById('modal_return_exception');
         const returnForm = document.getElementById('form_return_exception');
@@ -256,6 +269,7 @@
         } else if (addQtyDateInput && todayStr) {
             addQtyDateInput.value = todayStr;
         }
+        updateRecalcState();
 
         const resetAddQtyDate = () => {
             if (addQtyDatePicker) {
@@ -356,6 +370,7 @@
             if (e.key === 'Enter') reloadAll();
         });
         filterApplyBtn?.addEventListener('click', reloadAll);
+        dateEl?.addEventListener('change', updateRecalcState);
         statusEl?.addEventListener('change', reloadAll);
         filterResetBtn?.addEventListener('click', () => {
             if (fpDate && todayStr) {
@@ -365,6 +380,7 @@
             }
             if (searchInput) searchInput.value = '';
             if (statusEl) statusEl.value = '';
+            updateRecalcState();
             reloadAll();
         });
 
@@ -376,6 +392,79 @@
             if (statusEl?.value) params.set('status', statusEl.value);
             const url = params.toString() ? `${exportUrl}?${params.toString()}` : exportUrl;
             window.location.href = url;
+        });
+
+        recalcBtn?.addEventListener('click', async () => {
+            const listDate = (dateEl?.value || todayStr || '').trim();
+            if (!listDate) {
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire('Error', 'Tanggal picking belum dipilih.', 'error');
+                }
+                return;
+            }
+            if (!isSameDay(listDate, todayStr)) {
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire('Tidak diizinkan', 'Recalculate hanya bisa dilakukan untuk tanggal hari ini.', 'warning');
+                }
+                return;
+            }
+
+            const runRecalc = async () => {
+                try {
+                    recalcBtn.disabled = true;
+                    const formData = new FormData();
+                    formData.append('list_date', listDate);
+                    const res = await fetch(recalcUrl, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': csrfToken,
+                            'Accept': 'application/json',
+                        },
+                        body: formData,
+                    });
+                    const text = await res.text();
+                    let json = null;
+                    try { json = JSON.parse(text); } catch (err) { /* ignore */ }
+                    if (!res.ok) {
+                        if (typeof Swal !== 'undefined') {
+                            Swal.fire('Error', json?.message || 'Gagal melakukan rekalkulasi', 'error');
+                        }
+                        return;
+                    }
+                    if (typeof Swal !== 'undefined') {
+                        const summary = json?.summary;
+                        const info = summary
+                            ? `Updated: ${summary.updated ?? 0}, Deleted: ${summary.deleted ?? 0}, Exceptions: ${summary.exceptions ?? 0}`
+                            : '';
+                        Swal.fire('Berhasil', `${json?.message || 'Rekalkulasi selesai.'} ${info}`.trim(), 'success');
+                    }
+                    reloadAll();
+                } catch (err) {
+                    console.error(err);
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire('Error', 'Gagal melakukan rekalkulasi', 'error');
+                    }
+                } finally {
+                    if (recalcBtn) recalcBtn.disabled = false;
+                }
+            };
+
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    title: 'Recalculate Picking List?',
+                    text: `Tanggal ${listDate} akan dihitung ulang berdasarkan resi dan transit.`,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Ya, recalculation',
+                    cancelButtonText: 'Batal',
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        runRecalc();
+                    }
+                });
+            } else {
+                runRecalc();
+            }
         });
 
         addQtyForm?.addEventListener('submit', async (e) => {

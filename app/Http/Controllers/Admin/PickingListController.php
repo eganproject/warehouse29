@@ -232,6 +232,150 @@ class PickingListController extends Controller
         ]);
     }
 
+    public function recalculate(Request $request)
+    {
+        $validated = $request->validate([
+            'list_date' => ['required', 'date'],
+        ]);
+
+        $listDate = Carbon::parse($validated['list_date'])->toDateString();
+        $today = now()->toDateString();
+        if ($listDate !== $today) {
+            return response()->json([
+                'message' => 'Recalculate hanya boleh untuk tanggal hari ini.',
+            ], 422);
+        }
+
+        DB::beginTransaction();
+        try {
+            $requiredRows = DB::table('resi_details as rd')
+                ->join('resis as r', 'r.id', '=', 'rd.resi_id')
+                ->whereDate('r.tanggal_upload', $listDate)
+                ->where(function ($q) {
+                    $q->whereNull('r.status')
+                        ->orWhere('r.status', '!=', 'canceled');
+                })
+                ->select('rd.sku', DB::raw('SUM(rd.qty) as qty'))
+                ->groupBy('rd.sku')
+                ->get();
+
+            $required = [];
+            foreach ($requiredRows as $row) {
+                $sku = trim((string) ($row->sku ?? ''));
+                $qty = (int) ($row->qty ?? 0);
+                if ($sku === '' || $qty <= 0) {
+                    continue;
+                }
+                $required[$sku] = $qty;
+            }
+
+            $pickedRows = DB::table('picker_transit_items as pt')
+                ->join('items as i', 'i.id', '=', 'pt.item_id')
+                ->whereDate('pt.picked_date', $listDate)
+                ->select('i.sku', DB::raw('SUM(pt.qty) as qty'))
+                ->groupBy('i.sku')
+                ->get();
+
+            $picked = [];
+            foreach ($pickedRows as $row) {
+                $sku = trim((string) ($row->sku ?? ''));
+                $qty = (int) ($row->qty ?? 0);
+                if ($sku === '' || $qty <= 0) {
+                    continue;
+                }
+                $picked[$sku] = $qty;
+            }
+
+            $existingListSkus = PickingList::where('list_date', $listDate)->pluck('sku')->all();
+            $existingExceptionSkus = PickingListException::where('list_date', $listDate)->pluck('sku')->all();
+
+            $allSkus = array_values(array_unique(array_merge(
+                array_keys($required),
+                array_keys($picked),
+                $existingListSkus,
+                $existingExceptionSkus
+            )));
+
+            $updated = 0;
+            $deleted = 0;
+            $exceptions = 0;
+
+            foreach ($allSkus as $sku) {
+                $sku = trim((string) $sku);
+                if ($sku === '') {
+                    continue;
+                }
+
+                $listQty = (int) ($required[$sku] ?? 0);
+                $pickedQty = (int) ($picked[$sku] ?? 0);
+                $remaining = max(0, $listQty - $pickedQty);
+                $exceptionQty = max(0, $pickedQty - $listQty);
+
+                $listRow = PickingList::where('list_date', $listDate)
+                    ->where('sku', $sku)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($listQty > 0) {
+                    if ($listRow) {
+                        $listRow->qty = $listQty;
+                        $listRow->remaining_qty = $remaining;
+                        $listRow->save();
+                    } else {
+                        PickingList::create([
+                            'list_date' => $listDate,
+                            'sku' => $sku,
+                            'qty' => $listQty,
+                            'remaining_qty' => $remaining,
+                        ]);
+                    }
+                    $updated++;
+                } elseif ($listRow) {
+                    $listRow->delete();
+                    $deleted++;
+                }
+
+                $exceptionRow = PickingListException::where('list_date', $listDate)
+                    ->where('sku', $sku)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($exceptionQty > 0) {
+                    if ($exceptionRow) {
+                        $exceptionRow->qty = $exceptionQty;
+                        $exceptionRow->save();
+                    } else {
+                        PickingListException::create([
+                            'list_date' => $listDate,
+                            'sku' => $sku,
+                            'qty' => $exceptionQty,
+                        ]);
+                    }
+                    $exceptions++;
+                } elseif ($exceptionRow) {
+                    $exceptionRow->delete();
+                }
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Rekalkulasi picking list selesai.',
+                'summary' => [
+                    'updated' => $updated,
+                    'deleted' => $deleted,
+                    'exceptions' => $exceptions,
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Gagal melakukan rekalkulasi picking list.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
     public function export(Request $request)
     {
         $filters = [

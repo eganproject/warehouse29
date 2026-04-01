@@ -195,6 +195,7 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         Route::get('/picking-list/exceptions', [PickingListController::class, 'dataExceptions'])->name('picking-list.exceptions');
         Route::get('/picking-list/export', [PickingListController::class, 'export'])->name('picking-list.export');
         Route::post('/picking-list/add-qty', [PickingListController::class, 'storeQty'])->name('picking-list.store-qty');
+        Route::post('/picking-list/recalculate', [PickingListController::class, 'recalculate'])->name('picking-list.recalculate');
         Route::post('/picking-list/exception-return', [PickingListController::class, 'returnException'])->name('picking-list.exception-return');
     });
 
