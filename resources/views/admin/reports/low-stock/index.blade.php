@@ -18,26 +18,37 @@
             </div>
         </div>
         <div class="card-toolbar">
-            <div class="d-flex align-items-center gap-2 flex-wrap">
-                <select id="filter_category" class="form-select form-select-solid w-200px">
-                    <option value="">Semua Kategori</option>
-                    <option value="0">Tanpa Kategori</option>
-                    @foreach($categories as $c)
-                        <option value="{{ $c->id }}">{{ $c->name }}</option>
-                    @endforeach
-                </select>
-                <select id="filter_status" class="form-select form-select-solid w-200px">
-                    <option value="">Semua Status</option>
-                    <option value="out">Out of Stock</option>
-                    <option value="low">Low Stock</option>
-                </select>
-                <select id="filter_limit" class="form-select form-select-solid w-100px">
-                    <option value="10" selected>10</option>
-                    <option value="25">25</option>
-                    <option value="50">50</option>
-                    <option value="100">100</option>
-                </select>
-                <button type="button" class="btn btn-light" id="filter_reset">Reset</button>
+            <div class="d-flex align-items-end gap-3 flex-wrap">
+                <div class="min-w-200px">
+                    <label class="text-muted fs-7 mb-1">Kategori</label>
+                    <select id="filter_category" class="form-select form-select-solid w-200px">
+                        <option value="">Semua Kategori</option>
+                        <option value="0">Tanpa Kategori</option>
+                        @foreach($categories as $c)
+                            <option value="{{ $c->id }}">{{ $c->name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="min-w-200px">
+                    <label class="text-muted fs-7 mb-1">Status</label>
+                    <select id="filter_status" class="form-select form-select-solid w-200px">
+                        <option value="">Semua Status</option>
+                        <option value="out">Out of Stock</option>
+                        <option value="low">Low Stock</option>
+                    </select>
+                </div>
+                <div class="min-w-100px">
+                    <label class="text-muted fs-7 mb-1">Limit</label>
+                    <select id="filter_limit" class="form-select form-select-solid w-100px">
+                        <option value="10" selected>10</option>
+                        <option value="25">25</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                    </select>
+                </div>
+                <div>
+                    <button type="button" class="btn btn-light" id="filter_reset">Reset</button>
+                </div>
             </div>
         </div>
     </div>
