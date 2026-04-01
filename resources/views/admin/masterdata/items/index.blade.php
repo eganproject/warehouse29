@@ -25,7 +25,13 @@
             </div>
         </div>
         <div class="card-toolbar">
-            <div class="d-flex justify-content-end" data-kt-user-table-toolbar="base">
+            <div class="d-flex justify-content-end align-items-center gap-2" data-kt-user-table-toolbar="base">
+                <select class="form-select form-select-solid w-100px" id="filter_items_limit" aria-label="Limit">
+                    <option value="10" selected>10</option>
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                </select>
                 <button type="button" class="btn btn-light-primary me-3" data-kt-menu-trigger="click" data-kt-menu-placement="bottom-end">
                     <span class="svg-icon svg-icon-2">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -234,6 +240,7 @@
         const searchInput = document.querySelector('[data-kt-filter="search"]');
         const applyBtn = document.getElementById('filter_items_apply');
         const resetBtn = document.getElementById('filter_items_reset');
+        const limitSelect = document.getElementById('filter_items_limit');
         const categoryFilter = document.getElementById('filter_item_category');
         const form = document.getElementById('item_form');
         const modalEl = document.getElementById('modal_item_form');
@@ -327,6 +334,7 @@
             serverSide: true,
             dom: 'rtip',
             order: [[0, 'desc']],
+            pageLength: Number(limitSelect?.value || 10),
             ajax: {
                 url: dataUrl,
                 dataSrc: 'data',
@@ -369,17 +377,25 @@
         refreshMenus();
         dt.on('draw', refreshMenus);
 
-        const reloadTable = () => dt.ajax.reload();
+        const reloadTable = (keepPage = false) => dt.ajax.reload(null, keepPage ? false : true);
 
         searchInput?.addEventListener('keyup', reloadTable);
         applyBtn?.addEventListener('click', reloadTable);
         categoryFilter?.addEventListener('change', reloadTable);
+        limitSelect?.addEventListener('change', () => {
+            const val = Number(limitSelect.value || 10);
+            dt.page.len(val).draw();
+        });
         resetBtn?.addEventListener('click', () => {
             if (categoryFilter) {
                 categoryFilter.value = '';
                 if (typeof $ !== 'undefined' && $(categoryFilter).data('select2')) {
                     $(categoryFilter).val('').trigger('change.select2');
                 }
+            }
+            if (limitSelect) {
+                limitSelect.value = '10';
+                dt.page.len(10).draw();
             }
             reloadTable();
         });
@@ -495,7 +511,7 @@
                 }
                 if (typeof Swal !== 'undefined') Swal.fire('Berhasil', json.message || 'Berhasil', 'success');
                 modal?.hide();
-                reloadTable();
+                reloadTable(true);
             } catch (err) {
                 console.error(err);
                 if (typeof Swal !== 'undefined') Swal.fire('Error', 'Gagal menyimpan item', 'error');
