@@ -46,6 +46,7 @@ class MenuSeeder extends Seeder
             ['name' => 'Laporan Picker', 'slug' => 'outbound-picker-report', 'route' => 'admin.outbound.picker-reports.index', 'icon' => 'fa-solid fa-file-lines', 'parent_slug' => 'reports', 'sort_order' => 1],
             ['name' => 'Laporan Scan Out', 'slug' => 'outbound-packer-report', 'route' => 'admin.reports.packer-reports.index', 'icon' => 'fa-solid fa-truck-ramp-box', 'parent_slug' => 'reports', 'sort_order' => 1.2],
             ['name' => 'Laporan Packer', 'slug' => 'outbound-packer-packing-report', 'route' => 'admin.reports.packer-packing-reports.index', 'icon' => 'fa-solid fa-box-archive', 'parent_slug' => 'reports', 'sort_order' => 1.15],
+            ['name' => 'Laporan Stok Pengaman', 'slug' => 'report-low-stock', 'route' => 'admin.reports.low-stock.index', 'icon' => 'fa-solid fa-triangle-exclamation', 'parent_slug' => 'reports', 'sort_order' => 1.25],
             ['name' => 'Aktivitas User', 'slug' => 'activity-logs', 'route' => 'admin.reports.activity-logs.index', 'icon' => 'fa-solid fa-clipboard-check', 'parent_slug' => 'reports', 'sort_order' => 2],
             ['name' => 'Laporan Stock Opname', 'slug' => 'report-stock-opname', 'route' => 'admin.reports.stock-opname.index', 'icon' => 'fa-solid fa-clipboard-list', 'parent_slug' => 'reports', 'sort_order' => 3],
         ];
