@@ -130,12 +130,24 @@
 
 <div class="card mb-8">
     <div class="card-body">
-        <div class="d-flex align-items-center justify-content-between mb-4">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
             <div>
-                <div class="fw-bold fs-4">Ringkasan Resi Hari Ini</div>
+                <div class="fw-bold fs-4">Ringkasan Resi</div>
                 <div class="text-muted">Tanggal {{ $today ?? '-' }}</div>
             </div>
-            <span class="kurir-badge">Perhari Berjalan</span>
+            <form class="d-flex flex-wrap align-items-center gap-2" method="GET" action="{{ url()->current() }}">
+                <span class="kurir-badge">Filter Tanggal</span>
+                <input
+                    type="date"
+                    name="date"
+                    class="form-control form-control-sm"
+                    value="{{ $today ?? '' }}"
+                />
+                <button type="submit" class="btn btn-sm btn-light-primary">Terapkan</button>
+                @if(request()->has('date'))
+                    <a href="{{ url()->current() }}" class="btn btn-sm btn-light">Reset</a>
+                @endif
+            </form>
         </div>
         <div class="stats-grid">
             <div class="stat-card">
@@ -156,7 +168,7 @@
     <div class="card-body">
         <div class="d-flex align-items-center justify-content-between mb-4">
             <div class="fw-bold fs-4">Per Kurir</div>
-            <div class="text-muted">Jumlah resi & hasil scan hari ini</div>
+            <div class="text-muted">Jumlah resi & hasil scan tanggal terpilih</div>
         </div>
 
         @if(isset($kurirs) && $kurirs->count())

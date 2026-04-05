@@ -12,39 +12,58 @@ use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $today = now()->toDateString();
+        $selectedDate = $today;
+        $dateInput = $request->query('date');
+        if ($dateInput) {
+            try {
+                $selectedDate = Carbon::parse($dateInput)->toDateString();
+            } catch (\Throwable) {
+                $selectedDate = $today;
+            }
+        }
 
-        $totalResi = Resi::whereDate('tanggal_upload', $today)->count();
-        $totalScanOut = PackerScanOut::whereDate('scan_date', $today)->count();
-        $totalResiUpdatedAt = Resi::whereDate('tanggal_upload', $today)->max('updated_at');
-        $totalScanUpdatedAt = PackerScanOut::whereDate('scan_date', $today)->max('scanned_at');
+        $resiBase = Resi::query()->whereDate('tanggal_upload', $selectedDate);
+
+        $totalResi = (clone $resiBase)->count();
+        $totalResiUpdatedAt = (clone $resiBase)->max('updated_at');
+        $totalScanOut = PackerScanOut::query()
+            ->whereIn('resi_id', (clone $resiBase)->select('id'))
+            ->count();
+        $totalScanUpdatedAt = PackerScanOut::query()
+            ->whereIn('resi_id', (clone $resiBase)->select('id'))
+            ->max('scanned_at');
         $totalResiUpdated = $totalResiUpdatedAt ? Carbon::parse($totalResiUpdatedAt)->format('H:i') : '-';
         $totalScanUpdated = $totalScanUpdatedAt ? Carbon::parse($totalScanUpdatedAt)->format('H:i') : '-';
 
         $resiCounts = Resi::select('kurir_id', DB::raw('count(*) as total'))
-            ->whereDate('tanggal_upload', $today)
+            ->whereDate('tanggal_upload', $selectedDate)
             ->groupBy('kurir_id')
             ->pluck('total', 'kurir_id')
             ->toArray();
 
-        $scanCounts = PackerScanOut::select('kurir_id', DB::raw('count(*) as total'))
-            ->whereDate('scan_date', $today)
-            ->groupBy('kurir_id')
-            ->pluck('total', 'kurir_id')
+        $scanCounts = PackerScanOut::query()
+            ->join('resis', 'resis.id', '=', 'packer_scan_outs.resi_id')
+            ->select('resis.kurir_id', DB::raw('count(*) as total'))
+            ->whereDate('resis.tanggal_upload', $selectedDate)
+            ->groupBy('resis.kurir_id')
+            ->pluck('total', 'resis.kurir_id')
             ->toArray();
 
         $resiLatest = Resi::select('kurir_id', DB::raw('max(updated_at) as latest'))
-            ->whereDate('tanggal_upload', $today)
+            ->whereDate('tanggal_upload', $selectedDate)
             ->groupBy('kurir_id')
             ->pluck('latest', 'kurir_id')
             ->toArray();
 
-        $scanLatest = PackerScanOut::select('kurir_id', DB::raw('max(scanned_at) as latest'))
-            ->whereDate('scan_date', $today)
-            ->groupBy('kurir_id')
-            ->pluck('latest', 'kurir_id')
+        $scanLatest = PackerScanOut::query()
+            ->join('resis', 'resis.id', '=', 'packer_scan_outs.resi_id')
+            ->select('resis.kurir_id', DB::raw('max(packer_scan_outs.scanned_at) as latest'))
+            ->whereDate('resis.tanggal_upload', $selectedDate)
+            ->groupBy('resis.kurir_id')
+            ->pluck('latest', 'resis.kurir_id')
             ->toArray();
 
         $kurirs = Kurir::orderBy('name')
@@ -69,7 +88,7 @@ class DashboardController extends Controller
             });
 
         return view('admin.dashboard', [
-            'today' => $today,
+            'today' => $selectedDate,
             'totalResi' => $totalResi,
             'totalScanOut' => $totalScanOut,
             'totalResiUpdated' => $totalResiUpdated,
@@ -97,7 +116,6 @@ class DashboardController extends Controller
 
         $scanOuts = PackerScanOut::query()
             ->with('scanner:id,name')
-            ->whereDate('scan_date', $date)
             ->whereIn('resi_id', $resis->pluck('id'))
             ->orderByDesc('scanned_at')
             ->get(['id', 'resi_id', 'scan_type', 'scan_code', 'scanned_at', 'scanned_by'])
