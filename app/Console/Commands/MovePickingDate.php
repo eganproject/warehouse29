@@ -56,6 +56,7 @@ class MovePickingDate extends Command
 
         $this->info("Transit ditemukan: {$totalRows} baris, qty {$totalQty}, remaining {$totalRemaining}.");
         $this->info("Dari {$from} -> {$to}".($skuFilter ? ' | SKU: '.implode(', ', $skuFilter) : ' | Semua SKU'));
+        $this->renderPreviewDetail($sourceRows);
 
         if (!$this->option('apply')) {
             $this->warn('Preview saja. Jalankan ulang dengan --apply untuk eksekusi.');
@@ -206,6 +207,54 @@ class MovePickingDate extends Command
             } elseif ($exceptionRow) {
                 $exceptionRow->delete();
             }
+        }
+    }
+
+    private function renderPreviewDetail(Collection $rows): void
+    {
+        if ($rows->isEmpty()) {
+            return;
+        }
+
+        $skuMap = Item::whereIn('id', $rows->pluck('item_id')->unique())
+            ->pluck('sku', 'id');
+
+        $grouped = [];
+        foreach ($rows as $row) {
+            $sku = $skuMap[$row->item_id] ?? 'UNKNOWN';
+            if (!isset($grouped[$sku])) {
+                $grouped[$sku] = [
+                    'sku' => $sku,
+                    'rows' => 0,
+                    'qty' => 0,
+                    'remaining' => 0,
+                ];
+            }
+            $grouped[$sku]['rows']++;
+            $grouped[$sku]['qty'] += (int) $row->qty;
+            $grouped[$sku]['remaining'] += (int) $row->remaining_qty;
+        }
+
+        $items = collect($grouped)
+            ->sortByDesc('qty')
+            ->values();
+
+        $limit = 50;
+        $preview = $items->take($limit);
+        $this->newLine();
+        $this->info('Detail Preview (per SKU):');
+        $this->table(
+            ['SKU', 'Rows', 'Qty', 'Remaining'],
+            $preview->map(fn ($row) => [
+                $row['sku'],
+                $row['rows'],
+                $row['qty'],
+                $row['remaining'],
+            ])->all()
+        );
+
+        if ($items->count() > $limit) {
+            $this->warn('Preview dipotong. Total SKU: '.$items->count());
         }
     }
 }
