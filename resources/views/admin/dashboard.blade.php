@@ -138,8 +138,9 @@
             <form class="d-flex flex-wrap align-items-center gap-2" method="GET" action="{{ url()->current() }}">
                 <span class="kurir-badge">Filter Tanggal</span>
                 <input
-                    type="date"
+                    type="text"
                     name="date"
+                    id="filter_date"
                     class="form-control form-control-sm"
                     value="{{ $today ?? '' }}"
                 />
@@ -264,6 +265,10 @@
     const kurirDetailUrl = '{{ route('admin.dashboard.kurir-detail') }}';
 
     document.addEventListener('DOMContentLoaded', () => {
+        const dateInput = document.getElementById('filter_date');
+        if (typeof flatpickr !== 'undefined' && dateInput) {
+            flatpickr(dateInput, { dateFormat: 'Y-m-d', allowInput: true });
+        }
         const detailModalEl = document.getElementById('modal_kurir_detail');
         const detailModal = detailModalEl ? new bootstrap.Modal(detailModalEl) : null;
         const detailSubtitle = document.getElementById('kurir_detail_subtitle');
