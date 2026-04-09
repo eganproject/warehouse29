@@ -101,6 +101,28 @@
     .kurir-actions {
         margin-top: 14px;
     }
+    .kurir-detail-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        color: var(--bs-primary);
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+        border-bottom: 1px solid transparent;
+        padding-bottom: 1px;
+        transition: color 0.15s ease, border-color 0.15s ease;
+    }
+    .kurir-detail-link:hover,
+    .kurir-detail-link:focus {
+        color: #1d4ed8;
+        border-bottom-color: currentColor;
+        text-decoration: none;
+    }
+    .kurir-detail-link:focus-visible {
+        outline: 2px solid rgba(37, 99, 235, 0.3);
+        outline-offset: 2px;
+    }
     .kurir-summary {
         display: flex;
         flex-wrap: wrap;
@@ -239,21 +261,20 @@
                         <div class="kurir-remaining">
                             Sisa resi aktif: {{ number_format($kurir['remaining']) }}
                         </div>
-                        @if(($kurir['canceled_total'] ?? 0) > 0)
-                            <div class="text-danger mt-1 fw-semibold" style="font-size: 12px;">
-                                Canceled: {{ number_format($kurir['canceled_total']) }}
-                            </div>
-                        @endif
+                        <div class="text-danger mt-1 fw-semibold" style="font-size: 12px;">
+                            Canceled: {{ number_format($kurir['canceled_total'] ?? 0) }}
+                        </div>
                         <div class="kurir-actions">
-                            <button
-                                type="button"
-                                class="btn btn-sm btn-light-primary btn-kurir-detail"
+                            <span
+                                role="button"
+                                tabindex="0"
+                                class="kurir-detail-link btn-kurir-detail"
                                 data-kurir-id="{{ $kurir['id'] }}"
                                 data-kurir-name="{{ $kurir['name'] }}"
                                 data-date="{{ $today ?? '' }}"
                             >
                                 Lihat Detail Resi
-                            </button>
+                            </span>
                         </div>
                     </div>
                 @endforeach
@@ -424,6 +445,12 @@
                             </tr>
                         `;
                     }
+                }
+            });
+            button.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    button.click();
                 }
             });
         });
