@@ -4,6 +4,23 @@
 @section('page_title', 'Laporan Scan Out')
 
 @section('content')
+<style>
+    .info-tip {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 16px;
+        height: 16px;
+        border-radius: 999px;
+        border: 1px solid var(--bs-gray-300);
+        color: #6b7280;
+        cursor: help;
+        vertical-align: middle;
+    }
+    .info-tip svg {
+        display: block;
+    }
+</style>
 <div class="card">
     <div class="card-header border-0 pt-6">
         <div class="card-title">
@@ -63,29 +80,74 @@
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-4 mb-4">
                 <div>
                     <div class="fs-4 fw-bold">Komparasi Import Resi vs Scan Out</div>
-                    <div class="text-muted">Memastikan seluruh ID Pesanan / No Resi hasil import telah scan out.</div>
+                    <div class="text-muted">Memastikan seluruh ID Pesanan / No Resi hasil import (aktif) telah scan out.</div>
+                    <div class="text-muted fs-7 mt-1">
+                        <span class="fw-semibold">Legenda:</span> Import aktif = status selain cancel; Sisa = aktif belum scan out; Resi cancel ditampilkan terpisah.
+                    </div>
                 </div>
                 <div class="text-muted">
                     Menampilkan maksimal 50 data resi yang belum scan out.
                 </div>
             </div>
             <div class="row g-4 mb-4">
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <div class="bg-light-primary rounded-3 px-4 py-3 h-100">
-                        <div class="text-muted">Total Import</div>
+                        <div class="text-muted">
+                            Total Import (Aktif)
+                            <span class="info-tip ms-1" data-bs-toggle="tooltip" data-bs-placement="top" title="Jumlah resi dengan status selain cancel pada rentang tanggal terpilih.">
+                                <svg width="8" height="12" viewBox="0 0 8 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                    <circle cx="4" cy="2" r="1" fill="currentColor"/>
+                                    <rect x="3" y="4" width="2" height="6" rx="1" fill="currentColor"/>
+                                </svg>
+                                <span class="visually-hidden">Info</span>
+                            </span>
+                        </div>
                         <div class="fs-2 fw-bold" id="comparison_import_total">0</div>
                     </div>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <div class="bg-light-success rounded-3 px-4 py-3 h-100">
-                        <div class="text-muted">Sudah Scan Out</div>
+                        <div class="text-muted">
+                            Sudah Scan Out
+                            <span class="info-tip ms-1" data-bs-toggle="tooltip" data-bs-placement="top" title="Jumlah resi aktif yang sudah scan out pada rentang tanggal terpilih.">
+                                <svg width="8" height="12" viewBox="0 0 8 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                    <circle cx="4" cy="2" r="1" fill="currentColor"/>
+                                    <rect x="3" y="4" width="2" height="6" rx="1" fill="currentColor"/>
+                                </svg>
+                                <span class="visually-hidden">Info</span>
+                            </span>
+                        </div>
                         <div class="fs-2 fw-bold" id="comparison_scanned_total">0</div>
                     </div>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <div class="bg-light-warning rounded-3 px-4 py-3 h-100">
-                        <div class="text-muted">Sisa Belum Scan Out</div>
+                        <div class="text-muted">
+                            Sisa Belum Scan Out
+                            <span class="info-tip ms-1" data-bs-toggle="tooltip" data-bs-placement="top" title="Resi aktif yang belum memiliki scan out.">
+                                <svg width="8" height="12" viewBox="0 0 8 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                    <circle cx="4" cy="2" r="1" fill="currentColor"/>
+                                    <rect x="3" y="4" width="2" height="6" rx="1" fill="currentColor"/>
+                                </svg>
+                                <span class="visually-hidden">Info</span>
+                            </span>
+                        </div>
                         <div class="fs-2 fw-bold" id="comparison_missing_total">0</div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="bg-light-danger rounded-3 px-4 py-3 h-100">
+                        <div class="text-muted">
+                            Resi Cancel
+                            <span class="info-tip ms-1" data-bs-toggle="tooltip" data-bs-placement="top" title="Jumlah resi dengan status cancel pada rentang tanggal terpilih.">
+                                <svg width="8" height="12" viewBox="0 0 8 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                    <circle cx="4" cy="2" r="1" fill="currentColor"/>
+                                    <rect x="3" y="4" width="2" height="6" rx="1" fill="currentColor"/>
+                                </svg>
+                                <span class="visually-hidden">Info</span>
+                            </span>
+                        </div>
+                        <div class="fs-2 fw-bold" id="comparison_canceled_total">0</div>
                     </div>
                 </div>
             </div>
@@ -142,6 +204,11 @@
     const todayStr = '{{ $today ?? '' }}';
 
     document.addEventListener('DOMContentLoaded', () => {
+        if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {
+            document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((el) => {
+                new bootstrap.Tooltip(el);
+            });
+        }
         const tableEl = $('#packer_report_table');
         if (!tableEl.length || !$.fn.DataTable) {
             console.error('DataTable unavailable');
@@ -160,6 +227,7 @@
         const comparisonImportEl = document.getElementById('comparison_import_total');
         const comparisonScannedEl = document.getElementById('comparison_scanned_total');
         const comparisonMissingEl = document.getElementById('comparison_missing_total');
+        const comparisonCanceledEl = document.getElementById('comparison_canceled_total');
         const missingBody = document.getElementById('missing_transit_body');
         const missingPagination = document.getElementById('missing_pagination');
         const missingPrevBtn = document.getElementById('missing_prev');
@@ -239,9 +307,11 @@
             const importTotal = Number(comparison?.import_total ?? 0);
             const scannedTotal = Number(comparison?.scanned_total ?? 0);
             const missingTotal = Number(comparison?.missing_total ?? 0);
+            const canceledTotal = Number(comparison?.canceled_total ?? 0);
             if (comparisonImportEl) comparisonImportEl.textContent = importTotal.toLocaleString('id-ID');
             if (comparisonScannedEl) comparisonScannedEl.textContent = scannedTotal.toLocaleString('id-ID');
             if (comparisonMissingEl) comparisonMissingEl.textContent = missingTotal.toLocaleString('id-ID');
+            if (comparisonCanceledEl) comparisonCanceledEl.textContent = canceledTotal.toLocaleString('id-ID');
             comparisonState.samples = Array.isArray(comparison?.missing_samples)
                 ? comparison.missing_samples
                 : [];

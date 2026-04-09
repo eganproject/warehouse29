@@ -126,6 +126,21 @@
         font-weight: 800;
         margin-top: 4px;
     }
+    .info-tip {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 16px;
+        height: 16px;
+        border-radius: 999px;
+        border: 1px solid var(--bs-gray-300);
+        color: #6b7280;
+        cursor: help;
+        vertical-align: middle;
+    }
+    .info-tip svg {
+        display: block;
+    }
 </style>
 
 <div class="card mb-8">
@@ -134,6 +149,9 @@
             <div>
                 <div class="fw-bold fs-4">Ringkasan Resi</div>
                 <div class="text-muted">Tanggal {{ $today ?? '-' }}</div>
+                <div class="text-muted fs-7 mt-1">
+                    <span class="fw-semibold">Legenda:</span> Resi aktif = status selain cancel; Rasio = resi aktif / scan out; Resi cancel tidak masuk perhitungan.
+                </div>
             </div>
             <form class="d-flex flex-wrap align-items-center gap-2" method="GET" action="{{ url()->current() }}">
                 <span class="kurir-badge">Filter Tanggal</span>
@@ -152,14 +170,46 @@
         </div>
         <div class="stats-grid">
             <div class="stat-card">
-                <div class="stat-label">Total Resi</div>
+                <div class="stat-label">
+                    Total Resi Aktif
+                    <span class="info-tip ms-1" data-bs-toggle="tooltip" data-bs-placement="top" title="Jumlah resi dengan status selain cancel pada tanggal ini.">
+                        <svg width="8" height="12" viewBox="0 0 8 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                            <circle cx="4" cy="2" r="1" fill="currentColor"/>
+                            <rect x="3" y="4" width="2" height="6" rx="1" fill="currentColor"/>
+                        </svg>
+                        <span class="visually-hidden">Info</span>
+                    </span>
+                </div>
                 <div class="stat-value">{{ number_format($totalResi ?? 0) }}</div>
                 <div class="stat-meta">Update: {{ $totalResiUpdated ?? '-' }}</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">Total Scan Out</div>
+                <div class="stat-label">
+                    Total Scan Out
+                    <span class="info-tip ms-1" data-bs-toggle="tooltip" data-bs-placement="top" title="Jumlah resi (berdasarkan tanggal upload) yang sudah scan out.">
+                        <svg width="8" height="12" viewBox="0 0 8 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                            <circle cx="4" cy="2" r="1" fill="currentColor"/>
+                            <rect x="3" y="4" width="2" height="6" rx="1" fill="currentColor"/>
+                        </svg>
+                        <span class="visually-hidden">Info</span>
+                    </span>
+                </div>
                 <div class="stat-value">{{ number_format($totalScanOut ?? 0) }}</div>
                 <div class="stat-meta">Update: {{ $totalScanUpdated ?? '-' }}</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">
+                    Total Resi Cancel
+                    <span class="info-tip ms-1" data-bs-toggle="tooltip" data-bs-placement="top" title="Jumlah resi yang dibatalkan pada tanggal ini.">
+                        <svg width="8" height="12" viewBox="0 0 8 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                            <circle cx="4" cy="2" r="1" fill="currentColor"/>
+                            <rect x="3" y="4" width="2" height="6" rx="1" fill="currentColor"/>
+                        </svg>
+                        <span class="visually-hidden">Info</span>
+                    </span>
+                </div>
+                <div class="stat-value text-danger">{{ number_format($totalResiCanceled ?? 0) }}</div>
+                <div class="stat-meta">Tidak termasuk resi aktif.</div>
             </div>
         </div>
     </div>
@@ -171,6 +221,7 @@
             <div class="fw-bold fs-4">Per Kurir</div>
             <div class="text-muted">Jumlah resi & hasil scan tanggal terpilih</div>
         </div>
+        <div class="text-muted fs-7 mb-4">Rasio menampilkan resi aktif / scan out per kurir.</div>
 
         @if(isset($kurirs) && $kurirs->count())
             <div class="kurir-grid">
@@ -186,8 +237,13 @@
                             <span class="ratio-scan">{{ number_format($kurir['scan_total']) }}</span>
                         </div>
                         <div class="kurir-remaining">
-                            Sisa resi: {{ number_format($kurir['remaining']) }}
+                            Sisa resi aktif: {{ number_format($kurir['remaining']) }}
                         </div>
+                        @if(($kurir['canceled_total'] ?? 0) > 0)
+                            <div class="text-danger mt-1 fw-semibold" style="font-size: 12px;">
+                                Canceled: {{ number_format($kurir['canceled_total']) }}
+                            </div>
+                        @endif
                         <div class="kurir-actions">
                             <button
                                 type="button"
@@ -221,7 +277,7 @@
             <div class="modal-body">
                 <div class="kurir-summary">
                     <div class="kurir-summary-item">
-                        <div class="kurir-summary-label">Total Resi</div>
+                        <div class="kurir-summary-label">Total Resi Aktif</div>
                         <div class="kurir-summary-value" id="kurir_detail_total">0</div>
                     </div>
                     <div class="kurir-summary-item">
@@ -236,6 +292,9 @@
                         <div class="kurir-summary-label">Canceled</div>
                         <div class="kurir-summary-value text-danger" id="kurir_detail_canceled">0</div>
                     </div>
+                </div>
+                <div class="text-muted fs-7 mb-3">
+                    Keterangan: total resi aktif = status selain cancel. Daftar di bawah menampilkan resi aktif yang belum scan out.
                 </div>
                 <div class="table-responsive">
                     <table class="table table-row-dashed align-middle">
@@ -265,6 +324,11 @@
     const kurirDetailUrl = '{{ route('admin.dashboard.kurir-detail') }}';
 
     document.addEventListener('DOMContentLoaded', () => {
+        if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {
+            document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((el) => {
+                new bootstrap.Tooltip(el);
+            });
+        }
         const dateInput = document.getElementById('filter_date');
         if (typeof flatpickr !== 'undefined' && dateInput) {
             flatpickr(dateInput, { dateFormat: 'Y-m-d', allowInput: true });

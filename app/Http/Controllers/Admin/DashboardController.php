@@ -26,9 +26,14 @@ class DashboardController extends Controller
         }
 
         $resiBase = Resi::query()->whereDate('tanggal_upload', $selectedDate);
+        $activeResiBase = (clone $resiBase)->where(function ($q) {
+            $q->whereNull('status')
+                ->orWhere('status', '!=', 'canceled');
+        });
 
-        $totalResi = (clone $resiBase)->count();
-        $totalResiUpdatedAt = (clone $resiBase)->max('updated_at');
+        $totalResiActive = (clone $activeResiBase)->count();
+        $totalResiCanceled = (clone $resiBase)->where('status', 'canceled')->count();
+        $totalResiUpdatedAt = (clone $activeResiBase)->max('updated_at');
         $totalScanOut = PackerScanOut::query()
             ->whereIn('resi_id', (clone $resiBase)->select('id'))
             ->count();
@@ -40,6 +45,17 @@ class DashboardController extends Controller
 
         $resiCounts = Resi::select('kurir_id', DB::raw('count(*) as total'))
             ->whereDate('tanggal_upload', $selectedDate)
+            ->where(function ($q) {
+                $q->whereNull('status')
+                    ->orWhere('status', '!=', 'canceled');
+            })
+            ->groupBy('kurir_id')
+            ->pluck('total', 'kurir_id')
+            ->toArray();
+
+        $canceledCounts = Resi::select('kurir_id', DB::raw('count(*) as total'))
+            ->whereDate('tanggal_upload', $selectedDate)
+            ->where('status', 'canceled')
             ->groupBy('kurir_id')
             ->pluck('total', 'kurir_id')
             ->toArray();
@@ -54,6 +70,10 @@ class DashboardController extends Controller
 
         $resiLatest = Resi::select('kurir_id', DB::raw('max(updated_at) as latest'))
             ->whereDate('tanggal_upload', $selectedDate)
+            ->where(function ($q) {
+                $q->whereNull('status')
+                    ->orWhere('status', '!=', 'canceled');
+            })
             ->groupBy('kurir_id')
             ->pluck('latest', 'kurir_id')
             ->toArray();
@@ -71,6 +91,7 @@ class DashboardController extends Controller
             ->map(function ($kurir) use ($resiCounts, $scanCounts, $resiLatest, $scanLatest) {
                 $resiTotal = (int) ($resiCounts[$kurir->id] ?? 0);
                 $scanTotal = (int) ($scanCounts[$kurir->id] ?? 0);
+                $canceledTotal = (int) ($canceledCounts[$kurir->id] ?? 0);
                 $latestResi = $resiLatest[$kurir->id] ?? null;
                 $latestScan = $scanLatest[$kurir->id] ?? null;
                 $latestRaw = $latestResi && $latestScan
@@ -83,13 +104,15 @@ class DashboardController extends Controller
                     'resi_total' => $resiTotal,
                     'scan_total' => $scanTotal,
                     'remaining' => max(0, $resiTotal - $scanTotal),
+                    'canceled_total' => $canceledTotal,
                     'last_update' => $latestTime,
                 ];
             });
 
         return view('admin.dashboard', [
             'today' => $selectedDate,
-            'totalResi' => $totalResi,
+            'totalResi' => $totalResiActive,
+            'totalResiCanceled' => $totalResiCanceled,
             'totalScanOut' => $totalScanOut,
             'totalResiUpdated' => $totalResiUpdated,
             'totalScanUpdated' => $totalScanUpdated,

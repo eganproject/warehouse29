@@ -119,17 +119,23 @@ class PackerReportController extends Controller
             $resiQuery->whereDate('tanggal_upload', '<=', $dateTo);
         }
 
-        $importTotal = (clone $resiQuery)->count();
+        $activeResiQuery = (clone $resiQuery)->where(function ($q) {
+            $q->whereNull('status')
+                ->orWhere('status', '!=', 'canceled');
+        });
+        $canceledTotal = (clone $resiQuery)->where('status', 'canceled')->count();
+
+        $importTotal = (clone $activeResiQuery)->count();
 
         $scannedTotal = 0;
         if ($importTotal > 0) {
             $scannedTotal = PackerScanOut::query()
-                ->whereIn('resi_id', (clone $resiQuery)->select('id'))
+                ->whereIn('resi_id', (clone $activeResiQuery)->select('id'))
                 ->distinct('resi_id')
                 ->count('resi_id');
         }
 
-        $missingBase = (clone $resiQuery)
+        $missingBase = (clone $activeResiQuery)
             ->leftJoin('packer_scan_outs as ps', 'ps.resi_id', '=', 'resis.id')
             ->whereNull('ps.id')
             ->select('resis.id_pesanan', 'resis.no_resi', 'resis.tanggal_upload');
@@ -153,6 +159,7 @@ class PackerReportController extends Controller
             'import_total' => $importTotal,
             'scanned_total' => $scannedTotal,
             'missing_total' => $missingTotal,
+            'canceled_total' => $canceledTotal,
             'missing_samples' => $missingSamples,
         ];
     }
