@@ -7,8 +7,10 @@ use App\Exports\PackerTransitStatusExport;
 use App\Exports\PickerTransitStatusExport;
 use App\Models\PackerTransitHistory;
 use App\Models\PickerTransitItem;
+use App\Models\Resi;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Facades\Excel;
 
 class PickerTransitController extends Controller
@@ -74,6 +76,55 @@ class PickerTransitController extends Controller
             'recordsFiltered' => $recordsFiltered,
             'summary' => $summary,
             'data' => $data,
+        ]);
+    }
+
+    public function pickerDetail(Request $request)
+    {
+        $validated = $request->validate([
+            'date' => ['required', 'date'],
+            'sku' => ['required', 'string', 'max:100'],
+        ]);
+
+        $date = Carbon::parse($validated['date'])->toDateString();
+        $sku = trim((string) $validated['sku']);
+
+        $rows = Resi::query()
+            ->join('resi_details as rd', 'rd.resi_id', '=', 'resis.id')
+            ->whereDate('resis.tanggal_upload', $date)
+            ->where('rd.sku', $sku)
+            ->where(function ($q) {
+                $q->whereNull('resis.status')
+                    ->orWhere('resis.status', '!=', 'canceled');
+            })
+            ->select([
+                'resis.id_pesanan',
+                'resis.no_resi',
+                DB::raw('SUM(rd.qty) as qty'),
+            ])
+            ->groupBy('resis.id_pesanan', 'resis.no_resi')
+            ->orderBy('resis.no_resi')
+            ->limit(1000)
+            ->get()
+            ->map(function ($row) {
+                return [
+                    'id_pesanan' => $row->id_pesanan ?? '-',
+                    'no_resi' => $row->no_resi ?? '-',
+                    'qty' => (int) ($row->qty ?? 0),
+                ];
+            })
+            ->values();
+
+        $totalQty = (int) $rows->sum('qty');
+
+        return response()->json([
+            'meta' => [
+                'date' => $date,
+                'sku' => $sku,
+                'total_resi' => (int) $rows->count(),
+                'total_qty' => $totalQty,
+            ],
+            'data' => $rows,
         ]);
     }
 

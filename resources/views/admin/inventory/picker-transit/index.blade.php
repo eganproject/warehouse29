@@ -103,7 +103,7 @@
                     <button type="button" class="btn btn-light" id="picker_filter_reset">Reset</button>
                 </div>
                 <div class="table-responsive">
-                    <table class="table align-middle table-row-dashed fs-6 gy-5" id="picker_transit_table">
+                                    <table class="table align-middle table-row-dashed fs-6 gy-5" id="picker_transit_table">
                         <thead>
                             <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
                                 <th>No</th>
@@ -113,6 +113,7 @@
                                 <th class="text-end">Qty Transit</th>
                                 <th class="text-end">Sisa Qty</th>
                                 <th>Last Picked</th>
+                                <th>Detail</th>
                             </tr>
                         </thead>
                         <tbody></tbody>
@@ -238,12 +239,50 @@
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="modal_picker_transit_detail" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title mb-1" id="picker_transit_detail_title">Detail Resi</h5>
+                    <div class="text-muted fs-7" id="picker_transit_detail_subtitle">-</div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="d-flex flex-wrap gap-3 mb-4">
+                    <div class="badge badge-light-primary">Total Resi: <span id="picker_transit_detail_total_resi">0</span></div>
+                    <div class="badge badge-light-success">Total Qty SKU: <span id="picker_transit_detail_total_qty">0</span></div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-row-dashed align-middle">
+                        <thead>
+                            <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
+                                <th width="10%">No</th>
+                                <th width="45%">ID Pesanan</th>
+                                <th width="30%">No Resi</th>
+                                <th width="15%" class="text-end">Qty</th>
+                            </tr>
+                        </thead>
+                        <tbody id="picker_transit_detail_body">
+                            <tr>
+                                <td colspan="4" class="text-center text-muted py-6">Belum ada data.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 @endsection
 
 @push('scripts')
 <script>
     const dataUrl = '{{ $dataUrl }}';
     const dataUrlPacker = '{{ $dataUrlPacker }}';
+    const pickerTransitDetailUrl = '{{ route('admin.inventory.picker-transit.detail') }}';
     const exportPickerUrl = '{{ route('admin.inventory.picker-transit.export-picker') }}';
     const exportPackerUrl = '{{ route('admin.inventory.picker-transit.export-packer') }}';
     const todayStr = '{{ $today ?? '' }}';
@@ -281,6 +320,14 @@
         let dtPackerStatus = null;
         let pickerStatusFilter = '';
         let packerStatusFilter = '';
+
+        const pickerTransitDetailModalEl = document.getElementById('modal_picker_transit_detail');
+        const pickerTransitDetailModal = pickerTransitDetailModalEl ? new bootstrap.Modal(pickerTransitDetailModalEl) : null;
+        const pickerTransitDetailTitleEl = document.getElementById('picker_transit_detail_title');
+        const pickerTransitDetailSubtitleEl = document.getElementById('picker_transit_detail_subtitle');
+        const pickerTransitDetailTotalResiEl = document.getElementById('picker_transit_detail_total_resi');
+        const pickerTransitDetailTotalQtyEl = document.getElementById('picker_transit_detail_total_qty');
+        const pickerTransitDetailBodyEl = document.getElementById('picker_transit_detail_body');
 
         if (!tableEl.length || !$.fn.DataTable) {
             console.error('DataTables unavailable');
@@ -331,6 +378,16 @@
                     return `<span class="badge ${badgeClass}">${value}</span>`;
                 }},
                 { data: 'picked_at' },
+                { data: null, orderable: false, searchable: false, render: (data, type, row) => {
+                    const date = row?.date || '';
+                    const sku = row?.sku || '';
+                    const disabled = !date || !sku ? 'disabled' : '';
+                    return `
+                        <button type="button" class="btn btn-sm btn-light-primary btn-picker-transit-detail" data-date="${date}" data-sku="${sku}" ${disabled}>
+                            Detail
+                        </button>
+                    `;
+                }},
             ]
         });
 
@@ -378,6 +435,74 @@
 
         const reloadPicker = () => dtPicker?.ajax?.reload();
         const reloadPacker = () => dtPacker?.ajax?.reload();
+
+        const setPickerTransitDetailLoading = (date, sku) => {
+            if (pickerTransitDetailTitleEl) pickerTransitDetailTitleEl.textContent = 'Detail Resi';
+            if (pickerTransitDetailSubtitleEl) pickerTransitDetailSubtitleEl.textContent = `${sku || '-'} | Tanggal ${date || '-'}`;
+            if (pickerTransitDetailTotalResiEl) pickerTransitDetailTotalResiEl.textContent = '0';
+            if (pickerTransitDetailTotalQtyEl) pickerTransitDetailTotalQtyEl.textContent = '0';
+            if (pickerTransitDetailBodyEl) {
+                pickerTransitDetailBodyEl.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="text-center text-muted py-6">Memuat data...</td>
+                    </tr>
+                `;
+            }
+        };
+
+        const renderPickerTransitDetailRows = (rows) => {
+            if (!pickerTransitDetailBodyEl) return;
+            if (!Array.isArray(rows) || rows.length === 0) {
+                pickerTransitDetailBodyEl.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="text-center text-muted py-6">Tidak ada resi untuk SKU ini.</td>
+                    </tr>
+                `;
+                return;
+            }
+            pickerTransitDetailBodyEl.innerHTML = rows.map((r, idx) => `
+                <tr>
+                    <td>${idx + 1}</td>
+                    <td>${r.id_pesanan || '-'}</td>
+                    <td>${r.no_resi || '-'}</td>
+                    <td class="text-end">${Number(r.qty || 0)}</td>
+                </tr>
+            `).join('');
+        };
+
+        tableEl.on('click', '.btn-picker-transit-detail', async function() {
+            const date = this.getAttribute('data-date') || '';
+            const sku = this.getAttribute('data-sku') || '';
+            if (!pickerTransitDetailModal || !date || !sku) return;
+
+            setPickerTransitDetailLoading(date, sku);
+            pickerTransitDetailModal.show();
+
+            try {
+                const params = new URLSearchParams({ date, sku });
+                const response = await fetch(`${pickerTransitDetailUrl}?${params.toString()}`);
+                const payload = await response.json();
+                if (!response.ok) {
+                    throw new Error(payload?.message || 'Gagal memuat detail resi.');
+                }
+
+                const meta = payload?.meta || {};
+                if (pickerTransitDetailSubtitleEl) {
+                    pickerTransitDetailSubtitleEl.textContent = `${meta.sku || sku} | Tanggal ${meta.date || date}`;
+                }
+                if (pickerTransitDetailTotalResiEl) pickerTransitDetailTotalResiEl.textContent = Number(meta.total_resi || 0).toLocaleString('id-ID');
+                if (pickerTransitDetailTotalQtyEl) pickerTransitDetailTotalQtyEl.textContent = Number(meta.total_qty || 0).toLocaleString('id-ID');
+                renderPickerTransitDetailRows(payload?.data || []);
+            } catch (e) {
+                if (pickerTransitDetailBodyEl) {
+                    pickerTransitDetailBodyEl.innerHTML = `
+                        <tr>
+                            <td colspan="4" class="text-center text-danger py-6">${e.message || 'Gagal memuat detail resi.'}</td>
+                        </tr>
+                    `;
+                }
+            }
+        });
 
         document.querySelectorAll('a[data-bs-toggle="tab"]').forEach((el) => {
             el.addEventListener('shown.bs.tab', () => {
