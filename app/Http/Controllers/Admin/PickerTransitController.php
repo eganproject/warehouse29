@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Exports\PackerTransitStatusExport;
 use App\Exports\PickerTransitStatusExport;
 use App\Models\PackerTransitHistory;
+use App\Models\PackerScanException;
 use App\Models\PickerTransitItem;
 use App\Models\Resi;
 use Illuminate\Http\Request;
@@ -202,6 +203,132 @@ class PickerTransitController extends Controller
                 'date' => $date,
                 'updated_rows' => $updated,
             ],
+        ]);
+    }
+
+    public function auditPickerRemaining(Request $request)
+    {
+        if ((auth()->user()->email ?? '') !== 'admin@gmail.com') {
+            abort(403);
+        }
+
+        $date = $request->query('date') ?: now()->toDateString();
+        try {
+            $date = Carbon::parse($date)->toDateString();
+        } catch (\Throwable) {
+            $date = now()->toDateString();
+        }
+
+        $transitRows = DB::table('picker_transit_items as pti')
+            ->join('items as i', 'i.id', '=', 'pti.item_id')
+            ->where('pti.picked_date', $date)
+            ->where('pti.remaining_qty', '>', 0)
+            ->select([
+                'pti.item_id',
+                'i.sku',
+                'i.name',
+                'pti.qty as picked_qty',
+                'pti.remaining_qty',
+            ])
+            ->orderByDesc('pti.remaining_qty')
+            ->limit(300)
+            ->get();
+
+        if ($transitRows->isEmpty()) {
+            return response()->json([
+                'meta' => [
+                    'date' => $date,
+                    'total' => 0,
+                ],
+                'data' => [],
+            ]);
+        }
+
+        $skus = $transitRows->pluck('sku')->filter()->values()->all();
+
+        $exceptionSkus = PackerScanException::query()
+            ->whereIn('sku', $skus)
+            ->pluck('sku')
+            ->map(fn ($sku) => strtolower(trim((string) $sku)))
+            ->filter()
+            ->values()
+            ->all();
+        $exceptionLookup = array_flip($exceptionSkus);
+
+        // Qty packed based on resi upload date (regardless of when the scan happened)
+        $packedByUpload = DB::table('resis as r')
+            ->join('packer_resi_scans as prs', 'prs.resi_id', '=', 'r.id')
+            ->join('resi_details as rd', 'rd.resi_id', '=', 'r.id')
+            ->whereDate('r.tanggal_upload', $date)
+            ->whereIn('rd.sku', $skus)
+            ->where(function ($q) {
+                $q->whereNull('r.status')
+                    ->orWhere('r.status', '!=', 'canceled');
+            })
+            ->select([
+                'rd.sku',
+                DB::raw('SUM(rd.qty) as qty'),
+            ])
+            ->groupBy('rd.sku')
+            ->get()
+            ->mapWithKeys(fn ($row) => [(string) ($row->sku ?? '') => (int) ($row->qty ?? 0)])
+            ->all();
+
+        // Qty packed scanned on this date
+        $packedByScanDate = DB::table('packer_resi_scans as prs')
+            ->join('resis as r', 'r.id', '=', 'prs.resi_id')
+            ->join('resi_details as rd', 'rd.resi_id', '=', 'r.id')
+            ->where('prs.scan_date', $date)
+            ->whereIn('rd.sku', $skus)
+            ->where(function ($q) {
+                $q->whereNull('r.status')
+                    ->orWhere('r.status', '!=', 'canceled');
+            })
+            ->select([
+                'rd.sku',
+                DB::raw('SUM(rd.qty) as qty'),
+            ])
+            ->groupBy('rd.sku')
+            ->get()
+            ->mapWithKeys(fn ($row) => [(string) ($row->sku ?? '') => (int) ($row->qty ?? 0)])
+            ->all();
+
+        $data = $transitRows->map(function ($row) use ($packedByUpload, $packedByScanDate, $exceptionLookup) {
+            $sku = (string) ($row->sku ?? '');
+            $skuKey = strtolower(trim($sku));
+            $pickedQty = (int) ($row->picked_qty ?? 0);
+            $remainingQty = (int) ($row->remaining_qty ?? 0);
+            $packedUploadQty = (int) ($packedByUpload[$sku] ?? 0);
+            $packedScanQty = (int) ($packedByScanDate[$sku] ?? 0);
+            $isException = $skuKey !== '' && isset($exceptionLookup[$skuKey]);
+
+            $suspect = 'Belum semua qty scanned packing';
+            if ($isException) {
+                $suspect = 'SKU ada di packer scan exception (di packer scan tidak mengurangi transit)';
+            } elseif ($packedUploadQty >= $pickedQty && $remainingQty > 0) {
+                $suspect = 'Semua resi batch tanggal ini sudah scanned, tapi remaining masih ada (mismatch alokasi tanggal/row transit)';
+            } elseif ($packedScanQty >= $pickedQty && $remainingQty > 0) {
+                $suspect = 'Scan hari ini sudah cukup, tapi remaining masih ada (kemungkinan transit tidak ter-reduce untuk sebagian SKU)';
+            }
+
+            return [
+                'sku' => $sku !== '' ? $sku : '-',
+                'name' => (string) ($row->name ?? '-'),
+                'picked_qty' => $pickedQty,
+                'remaining_qty' => $remainingQty,
+                'packed_qty_by_upload_date' => $packedUploadQty,
+                'packed_qty_by_scan_date' => $packedScanQty,
+                'is_exception' => $isException ? 1 : 0,
+                'suspect' => $suspect,
+            ];
+        })->values();
+
+        return response()->json([
+            'meta' => [
+                'date' => $date,
+                'total' => (int) $data->count(),
+            ],
+            'data' => $data,
         ]);
     }
 

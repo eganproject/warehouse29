@@ -103,6 +103,7 @@
                     <button type="button" class="btn btn-light" id="picker_filter_reset">Reset</button>
                     @if((auth()->user()->email ?? '') === 'admin@gmail.com')
                         <button type="button" class="btn btn-light-primary" id="picker_recalculate_today" title="Hitung ulang remaining picker transit untuk hari ini berdasarkan packer scan hari ini.">Recalculate Hari Ini</button>
+                        <button type="button" class="btn btn-light" id="picker_audit_remaining" title="Audit SKU yang masih remaining dan indikasi penyebabnya.">Audit Remaining</button>
                     @endif
                 </div>
                 <div class="table-responsive">
@@ -279,6 +280,43 @@
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="modal_picker_transit_audit" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title mb-1">Audit Remaining Picker Transit</h5>
+                    <div class="text-muted fs-7" id="picker_transit_audit_subtitle">-</div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="table-responsive">
+                    <table class="table table-row-dashed align-middle">
+                        <thead>
+                            <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
+                                <th>SKU</th>
+                                <th>Nama</th>
+                                <th class="text-end">Picked</th>
+                                <th class="text-end">Remaining</th>
+                                <th class="text-end">Packed (Upload Date)</th>
+                                <th class="text-end">Packed (Scan Date)</th>
+                                <th>Exception</th>
+                                <th>Indikasi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="picker_transit_audit_body">
+                            <tr>
+                                <td colspan="8" class="text-center text-muted py-6">Belum ada data.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 @endsection
 
 @push('scripts')
@@ -286,6 +324,7 @@
     const dataUrl = '{{ $dataUrl }}';
     const dataUrlPacker = '{{ $dataUrlPacker }}';
     const pickerTransitDetailUrl = '{{ route('admin.inventory.picker-transit.detail') }}';
+    const pickerTransitAuditUrl = '{{ route('admin.inventory.picker-transit.audit') }}';
     const pickerTransitRecalcTodayUrl = '{{ route('admin.inventory.picker-transit.recalculate-today') }}';
     const csrfToken = '{{ csrf_token() }}';
     const exportPickerUrl = '{{ route('admin.inventory.picker-transit.export-picker') }}';
@@ -302,6 +341,7 @@
         const pickerApplyBtn = document.getElementById('picker_filter_apply');
         const pickerResetBtn = document.getElementById('picker_filter_reset');
         const pickerRecalcBtn = document.getElementById('picker_recalculate_today');
+        const pickerAuditBtn = document.getElementById('picker_audit_remaining');
         const pickerStatusEl = document.getElementById('picker_filter_status');
         const packerSearchInput = document.getElementById('packer_filter_search');
         const packerDateEl = document.getElementById('packer_filter_date');
@@ -334,6 +374,11 @@
         const pickerTransitDetailTotalResiEl = document.getElementById('picker_transit_detail_total_resi');
         const pickerTransitDetailTotalQtyEl = document.getElementById('picker_transit_detail_total_qty');
         const pickerTransitDetailBodyEl = document.getElementById('picker_transit_detail_body');
+
+        const pickerTransitAuditModalEl = document.getElementById('modal_picker_transit_audit');
+        const pickerTransitAuditModal = pickerTransitAuditModalEl ? new bootstrap.Modal(pickerTransitAuditModalEl) : null;
+        const pickerTransitAuditSubtitleEl = document.getElementById('picker_transit_audit_subtitle');
+        const pickerTransitAuditBodyEl = document.getElementById('picker_transit_audit_body');
 
         if (!tableEl.length || !$.fn.DataTable) {
             console.error('DataTables unavailable');
@@ -470,6 +515,72 @@
             } finally {
                 pickerRecalcBtn.disabled = false;
                 pickerRecalcBtn.textContent = oldText || 'Recalculate Hari Ini';
+            }
+        });
+
+        const setAuditLoading = (date) => {
+            if (pickerTransitAuditSubtitleEl) pickerTransitAuditSubtitleEl.textContent = `Tanggal ${date || '-'}`;
+            if (pickerTransitAuditBodyEl) {
+                pickerTransitAuditBodyEl.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="text-center text-muted py-6">Memuat data...</td>
+                    </tr>
+                `;
+            }
+        };
+
+        const renderAuditRows = (rows) => {
+            if (!pickerTransitAuditBodyEl) return;
+            if (!Array.isArray(rows) || rows.length === 0) {
+                pickerTransitAuditBodyEl.innerHTML = `
+                    <tr>
+                        <td colspan="8" class="text-center text-muted py-6">Tidak ada remaining untuk tanggal ini.</td>
+                    </tr>
+                `;
+                return;
+            }
+
+            pickerTransitAuditBodyEl.innerHTML = rows.map((r) => {
+                const isExc = Number(r.is_exception || 0) > 0;
+                const excBadge = isExc ? '<span class="badge badge-light-danger">Ya</span>' : '<span class="badge badge-light-success">Tidak</span>';
+                return `
+                    <tr>
+                        <td>${r.sku || '-'}</td>
+                        <td>${r.name || '-'}</td>
+                        <td class="text-end">${Number(r.picked_qty || 0)}</td>
+                        <td class="text-end"><span class="badge badge-light-warning">${Number(r.remaining_qty || 0)}</span></td>
+                        <td class="text-end">${Number(r.packed_qty_by_upload_date || 0)}</td>
+                        <td class="text-end">${Number(r.packed_qty_by_scan_date || 0)}</td>
+                        <td>${excBadge}</td>
+                        <td style="min-width: 360px;">${r.suspect || '-'}</td>
+                    </tr>
+                `;
+            }).join('');
+        };
+
+        pickerAuditBtn?.addEventListener('click', async () => {
+            const date = pickerDateEl?.value || todayStr || '';
+            if (!pickerTransitAuditModal || !pickerTransitAuditUrl) return;
+
+            setAuditLoading(date);
+            pickerTransitAuditModal.show();
+
+            try {
+                const params = new URLSearchParams({ date });
+                const response = await fetch(`${pickerTransitAuditUrl}?${params.toString()}`);
+                const payload = await response.json();
+                if (!response.ok) {
+                    throw new Error(payload?.message || 'Gagal memuat audit.');
+                }
+                renderAuditRows(payload?.data || []);
+            } catch (e) {
+                if (pickerTransitAuditBodyEl) {
+                    pickerTransitAuditBodyEl.innerHTML = `
+                        <tr>
+                            <td colspan="8" class="text-center text-danger py-6">${e.message || 'Gagal memuat audit.'}</td>
+                        </tr>
+                    `;
+                }
             }
         });
 
