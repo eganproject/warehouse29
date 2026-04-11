@@ -130,6 +130,10 @@ class PickerTransitController extends Controller
 
     public function recalculateToday(Request $request)
     {
+        if ((auth()->user()->email ?? '') !== 'admin@gmail.com') {
+            abort(403);
+        }
+
         $date = now()->toDateString();
 
         DB::beginTransaction();

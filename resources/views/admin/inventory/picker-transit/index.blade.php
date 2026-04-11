@@ -101,7 +101,9 @@
                     </select>
                     <button type="button" class="btn btn-light" id="picker_filter_apply">Filter</button>
                     <button type="button" class="btn btn-light" id="picker_filter_reset">Reset</button>
-                    <button type="button" class="btn btn-light-primary" id="picker_recalculate_today" title="Hitung ulang remaining picker transit untuk hari ini berdasarkan packer scan hari ini.">Recalculate Hari Ini</button>
+                    @if((auth()->user()->email ?? '') === 'admin@gmail.com')
+                        <button type="button" class="btn btn-light-primary" id="picker_recalculate_today" title="Hitung ulang remaining picker transit untuk hari ini berdasarkan packer scan hari ini.">Recalculate Hari Ini</button>
+                    @endif
                 </div>
                 <div class="table-responsive">
                                     <table class="table align-middle table-row-dashed fs-6 gy-5" id="picker_transit_table">
