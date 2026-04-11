@@ -128,6 +128,79 @@ class PickerTransitController extends Controller
         ]);
     }
 
+    public function recalculateToday(Request $request)
+    {
+        $date = now()->toDateString();
+
+        DB::beginTransaction();
+        try {
+            $consumedRows = DB::table('packer_resi_scans as prs')
+                ->join('resis as r', 'r.id', '=', 'prs.resi_id')
+                ->join('resi_details as rd', 'rd.resi_id', '=', 'r.id')
+                ->join('items as i', 'i.sku', '=', 'rd.sku')
+                ->where('prs.scan_date', $date)
+                ->where(function ($q) {
+                    $q->whereNull('r.status')
+                        ->orWhere('r.status', '!=', 'canceled');
+                })
+                ->select([
+                    'i.id as item_id',
+                    DB::raw('SUM(rd.qty) as qty'),
+                ])
+                ->groupBy('i.id')
+                ->get();
+
+            $consumedByItemId = [];
+            foreach ($consumedRows as $row) {
+                $itemId = (int) ($row->item_id ?? 0);
+                if ($itemId <= 0) {
+                    continue;
+                }
+                $consumedByItemId[$itemId] = (int) ($row->qty ?? 0);
+            }
+
+            $pickedRows = PickerTransitItem::query()
+                ->where('picked_date', $date)
+                ->lockForUpdate()
+                ->get(['id', 'item_id', 'qty', 'remaining_qty']);
+
+            $updated = 0;
+            foreach ($pickedRows as $row) {
+                $pickedQty = (int) $row->qty;
+                $consumedQty = (int) ($consumedByItemId[(int) $row->item_id] ?? 0);
+                $newRemaining = $pickedQty - $consumedQty;
+                if ($newRemaining < 0) {
+                    $newRemaining = 0;
+                }
+                if ($newRemaining > $pickedQty) {
+                    $newRemaining = $pickedQty;
+                }
+
+                if ((int) $row->remaining_qty !== $newRemaining) {
+                    $row->remaining_qty = $newRemaining;
+                    $row->save();
+                    $updated++;
+                }
+            }
+
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Gagal menghitung ulang transit hari ini.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+
+        return response()->json([
+            'message' => 'Recalculate transit hari ini berhasil.',
+            'meta' => [
+                'date' => $date,
+                'updated_rows' => $updated,
+            ],
+        ]);
+    }
+
     public function dataPacker(Request $request)
     {
         $baseQuery = PackerTransitHistory::query()

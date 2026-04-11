@@ -101,6 +101,7 @@
                     </select>
                     <button type="button" class="btn btn-light" id="picker_filter_apply">Filter</button>
                     <button type="button" class="btn btn-light" id="picker_filter_reset">Reset</button>
+                    <button type="button" class="btn btn-light-primary" id="picker_recalculate_today" title="Hitung ulang remaining picker transit untuk hari ini berdasarkan packer scan hari ini.">Recalculate Hari Ini</button>
                 </div>
                 <div class="table-responsive">
                                     <table class="table align-middle table-row-dashed fs-6 gy-5" id="picker_transit_table">
@@ -283,6 +284,8 @@
     const dataUrl = '{{ $dataUrl }}';
     const dataUrlPacker = '{{ $dataUrlPacker }}';
     const pickerTransitDetailUrl = '{{ route('admin.inventory.picker-transit.detail') }}';
+    const pickerTransitRecalcTodayUrl = '{{ route('admin.inventory.picker-transit.recalculate-today') }}';
+    const csrfToken = '{{ csrf_token() }}';
     const exportPickerUrl = '{{ route('admin.inventory.picker-transit.export-picker') }}';
     const exportPackerUrl = '{{ route('admin.inventory.picker-transit.export-packer') }}';
     const todayStr = '{{ $today ?? '' }}';
@@ -296,6 +299,7 @@
         const pickerDateEl = document.getElementById('picker_filter_date');
         const pickerApplyBtn = document.getElementById('picker_filter_apply');
         const pickerResetBtn = document.getElementById('picker_filter_reset');
+        const pickerRecalcBtn = document.getElementById('picker_recalculate_today');
         const pickerStatusEl = document.getElementById('picker_filter_status');
         const packerSearchInput = document.getElementById('packer_filter_search');
         const packerDateEl = document.getElementById('packer_filter_date');
@@ -435,6 +439,37 @@
 
         const reloadPicker = () => dtPicker?.ajax?.reload();
         const reloadPacker = () => dtPacker?.ajax?.reload();
+
+        pickerRecalcBtn?.addEventListener('click', async () => {
+            if (!pickerTransitRecalcTodayUrl) return;
+            pickerRecalcBtn.disabled = true;
+            const oldText = pickerRecalcBtn.textContent;
+            pickerRecalcBtn.textContent = 'Memproses...';
+
+            try {
+                const response = await fetch(pickerTransitRecalcTodayUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json',
+                    },
+                    body: JSON.stringify({}),
+                });
+                const payload = await response.json();
+                if (!response.ok) {
+                    throw new Error(payload?.message || 'Gagal recalculate.');
+                }
+
+                reloadPicker();
+                dtPickerStatus?.ajax?.reload();
+            } catch (e) {
+                alert(e.message || 'Gagal recalculate.');
+            } finally {
+                pickerRecalcBtn.disabled = false;
+                pickerRecalcBtn.textContent = oldText || 'Recalculate Hari Ini';
+            }
+        });
 
         const setPickerTransitDetailLoading = (date, sku) => {
             if (pickerTransitDetailTitleEl) pickerTransitDetailTitleEl.textContent = 'Detail Resi';
