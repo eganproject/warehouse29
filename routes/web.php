@@ -186,6 +186,9 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         // Picker Transit
         Route::get('/picker-transit', [PickerTransitController::class, 'index'])->name('picker-transit.index');
         Route::get('/picker-transit/data', [PickerTransitController::class, 'data'])->name('picker-transit.data');
+        Route::get('/picker-transit/detail', [PickerTransitController::class, 'pickerDetail'])->name('picker-transit.detail');
+        Route::get('/picker-transit/audit', [PickerTransitController::class, 'auditPickerRemaining'])->name('picker-transit.audit');
+        Route::post('/picker-transit/recalculate-today', [PickerTransitController::class, 'recalculateToday'])->name('picker-transit.recalculate-today');
         Route::get('/picker-transit/packer-data', [PickerTransitController::class, 'dataPacker'])->name('picker-transit.packer-data');
         Route::get('/picker-transit/export-picker', [PickerTransitController::class, 'exportPickerStatus'])->name('picker-transit.export-picker');
         Route::get('/picker-transit/export-packer', [PickerTransitController::class, 'exportPackerStatus'])->name('picker-transit.export-packer');

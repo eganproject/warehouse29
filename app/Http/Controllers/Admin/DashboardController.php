@@ -88,7 +88,7 @@ class DashboardController extends Controller
 
         $kurirs = Kurir::orderBy('name')
             ->get(['id', 'name'])
-            ->map(function ($kurir) use ($resiCounts, $scanCounts, $resiLatest, $scanLatest) {
+            ->map(function ($kurir) use ($resiCounts, $canceledCounts, $scanCounts, $resiLatest, $scanLatest) {
                 $resiTotal = (int) ($resiCounts[$kurir->id] ?? 0);
                 $scanTotal = (int) ($scanCounts[$kurir->id] ?? 0);
                 $canceledTotal = (int) ($canceledCounts[$kurir->id] ?? 0);
