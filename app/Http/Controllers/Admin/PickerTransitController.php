@@ -17,7 +17,6 @@ class PickerTransitController extends Controller
     {
         return view('admin.inventory.picker-transit.index', [
             'dataUrl' => route('admin.inventory.picker-transit.data'),
-            'dataUrlPacker' => route('admin.inventory.picker-transit.packer-data'),
             'today' => now()->toDateString(),
         ]);
     }
@@ -139,7 +138,7 @@ class PickerTransitController extends Controller
 
         $date = $filters['date'] ?: now()->toDateString();
         $suffix = $filters['status'] ?: 'all';
-        $filename = "picker-transit-{$date}-{$suffix}.xlsx";
+        $filename = "qc-transit-{$date}-{$suffix}.xlsx";
 
         return Excel::download(new PickerTransitStatusExport($filters), $filename);
     }

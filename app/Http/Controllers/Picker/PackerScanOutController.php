@@ -3,10 +3,15 @@
 namespace App\Http\Controllers\Picker;
 
 use App\Http\Controllers\Controller;
+use App\Models\Item;
 use App\Models\Kurir;
+use App\Models\PackerResiScan;
+use App\Models\PackerScanException;
 use App\Models\PackerScanOut;
 use App\Models\PackerTransitHistory;
+use App\Models\PickerTransitItem;
 use App\Models\Resi;
+use App\Models\ResiDetail;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -125,6 +130,48 @@ class PackerScanOutController extends Controller
             ], 422);
         }
 
+        $scanDate = now()->toDateString();
+        $details = ResiDetail::where('resi_id', $resi->id)->get(['sku', 'qty']);
+        if ($details->isEmpty()) {
+            return response()->json([
+                'message' => 'Detail resi belum tersedia.',
+            ], 422);
+        }
+
+        $exceptionSkus = PackerScanException::query()
+            ->pluck('sku')
+            ->map(fn ($sku) => strtolower(trim((string) $sku)))
+            ->filter()
+            ->values()
+            ->all();
+        $exceptionLookup = array_flip($exceptionSkus);
+
+        $skuTotals = [];
+        $excludedTotals = [];
+        foreach ($details as $detail) {
+            $sku = trim((string) $detail->sku);
+            $qty = (int) $detail->qty;
+            if ($sku === '' || $qty <= 0) {
+                continue;
+            }
+            $skuKey = strtolower($sku);
+            if (isset($exceptionLookup[$skuKey])) {
+                $excludedTotals[$sku] = ($excludedTotals[$sku] ?? 0) + $qty;
+                continue;
+            }
+            $skuTotals[$sku] = ($skuTotals[$sku] ?? 0) + $qty;
+        }
+
+        if (empty($skuTotals) && empty($excludedTotals)) {
+            return response()->json([
+                'message' => 'Detail resi tidak valid.',
+            ], 422);
+        }
+
+        uksort($skuTotals, 'strcasecmp');
+        uksort($excludedTotals, 'strcasecmp');
+        $itemsPayload = $this->buildItemsPayload($skuTotals, $excludedTotals);
+
         DB::beginTransaction();
         try {
             $existingScan = PackerScanOut::where('resi_id', $resi->id)
@@ -137,44 +184,151 @@ class PackerScanOutController extends Controller
                 ], 422);
             }
 
-            $transit = PackerTransitHistory::where('resi_id', $resi->id)
-                ->lockForUpdate()
-                ->first();
+            $hasLegacyPacking = PackerResiScan::where('resi_id', $resi->id)->exists();
+            if ($hasLegacyPacking) {
+                $transit = PackerTransitHistory::where('resi_id', $resi->id)
+                    ->lockForUpdate()
+                    ->first();
 
-            if (!$transit) {
+                if ($transit && ($transit->status ?? '') === 'selesai') {
+                    DB::rollBack();
+                    return response()->json([
+                        'message' => 'Resi sudah selesai scan out.',
+                    ], 422);
+                }
+
+                $kurirId = $this->resolveKurirId($resi);
+
+                PackerScanOut::create([
+                    'resi_id' => $resi->id,
+                    'kurir_id' => $kurirId,
+                    'scan_type' => $type,
+                    'scan_code' => $code,
+                    'scan_date' => $scanDate,
+                    'scanned_at' => now(),
+                    'scanned_by' => auth()->id(),
+                ]);
+
+                if (!$transit) {
+                    PackerTransitHistory::create([
+                        'resi_id' => $resi->id,
+                        'id_pesanan' => $resi->id_pesanan,
+                        'no_resi' => $resi->no_resi,
+                        'status' => 'selesai',
+                    ]);
+                } else {
+                    $transit->status = 'selesai';
+                    if (empty($transit->no_resi) && !empty($resi->no_resi)) {
+                        $transit->no_resi = $resi->no_resi;
+                    }
+                    $transit->save();
+                }
+
+                DB::commit();
+
+                return response()->json([
+                    'message' => 'Scan out berhasil.',
+                    'resi' => [
+                        'id_pesanan' => $resi->id_pesanan,
+                        'no_resi' => $resi->no_resi,
+                        'tanggal_pesanan' => $resi->tanggal_pesanan?->format('Y-m-d'),
+                    ],
+                    'items' => $itemsPayload,
+                ]);
+            }
+
+            $items = collect();
+            if (!empty($skuTotals)) {
+                $items = Item::whereIn('sku', array_keys($skuTotals))
+                    ->get(['id', 'sku', 'name'])
+                    ->keyBy('sku');
+            }
+
+            $issues = [];
+            $allocations = [];
+
+            foreach ($skuTotals as $sku => $qty) {
+                $item = $items->get($sku);
+                if (!$item) {
+                    $issues[] = [
+                        'sku' => $sku,
+                        'required' => $qty,
+                        'reason' => 'SKU tidak ditemukan',
+                    ];
+                    continue;
+                }
+
+                $transitRows = PickerTransitItem::where('item_id', $item->id)
+                    ->where('picked_date', '<=', $scanDate)
+                    ->where('remaining_qty', '>', 0)
+                    ->orderBy('picked_date')
+                    ->orderBy('id')
+                    ->lockForUpdate()
+                    ->get();
+
+                if ($transitRows->isEmpty()) {
+                    $issues[] = [
+                        'sku' => $sku,
+                        'required' => $qty,
+                        'reason' => 'QC transit belum tersedia',
+                    ];
+                    continue;
+                }
+
+                $available = (int) $transitRows->sum('remaining_qty');
+                if ($available < $qty) {
+                    $issues[] = [
+                        'sku' => $sku,
+                        'required' => $qty,
+                        'available' => $available,
+                        'reason' => 'Sisa QC transit tidak mencukupi',
+                    ];
+                    continue;
+                }
+
+                $allocations[] = [
+                    'sku' => $sku,
+                    'qty' => $qty,
+                    'rows' => $transitRows,
+                ];
+            }
+
+            if (!empty($issues)) {
                 DB::rollBack();
                 return response()->json([
-                    'message' => 'Resi belum masuk transit packer.',
+                    'message' => 'Masih ada SKU dengan sisa QC transit tidak mencukupi.',
+                    'details' => $issues,
                 ], 422);
             }
 
-            if (($transit->status ?? '') === 'selesai') {
-                DB::rollBack();
-                return response()->json([
-                    'message' => 'Resi sudah selesai scan out.',
-                ], 422);
-            }
-
-            $kurirId = $resi->kurir_id;
-            if (!$kurirId) {
-                $kurirId = Kurir::where('name', 'Tidak ditemukan kurir')->value('id');
-                if (!$kurirId) {
-                    $kurirId = Kurir::create(['name' => 'Tidak ditemukan kurir'])->id;
+            foreach ($allocations as $allocation) {
+                $need = (int) $allocation['qty'];
+                foreach ($allocation['rows'] as $row) {
+                    if ($need <= 0) {
+                        break;
+                    }
+                    $rowRemaining = (int) $row->remaining_qty;
+                    if ($rowRemaining <= 0) {
+                        continue;
+                    }
+                    $take = min($rowRemaining, $need);
+                    $row->remaining_qty = max(0, $rowRemaining - $take);
+                    $row->save();
+                    $need -= $take;
                 }
             }
+
+            $kurirId = $this->resolveKurirId($resi);
 
             PackerScanOut::create([
                 'resi_id' => $resi->id,
                 'kurir_id' => $kurirId,
                 'scan_type' => $type,
                 'scan_code' => $code,
-                'scan_date' => now()->toDateString(),
+                'scan_date' => $scanDate,
                 'scanned_at' => now(),
                 'scanned_by' => auth()->id(),
             ]);
-
-            $transit->status = 'selesai';
-            $transit->save();
 
             DB::commit();
         } catch (\Throwable $e) {
@@ -190,7 +344,47 @@ class PackerScanOutController extends Controller
             'resi' => [
                 'id_pesanan' => $resi->id_pesanan,
                 'no_resi' => $resi->no_resi,
+                'tanggal_pesanan' => $resi->tanggal_pesanan?->format('Y-m-d'),
             ],
+            'items' => $itemsPayload,
         ]);
+    }
+
+    private function resolveKurirId(Resi $resi): int
+    {
+        $kurirId = $resi->kurir_id;
+        if ($kurirId) {
+            return (int) $kurirId;
+        }
+
+        $kurirId = Kurir::where('name', 'Tidak ditemukan kurir')->value('id');
+        if (!$kurirId) {
+            $kurirId = Kurir::create(['name' => 'Tidak ditemukan kurir'])->id;
+        }
+
+        return (int) $kurirId;
+    }
+
+    private function buildItemsPayload(array $skuTotals, array $excludedTotals): array
+    {
+        $payload = [];
+
+        foreach ($skuTotals as $sku => $qty) {
+            $payload[] = [
+                'sku' => $sku,
+                'qty' => (int) $qty,
+                'excluded' => false,
+            ];
+        }
+
+        foreach ($excludedTotals as $sku => $qty) {
+            $payload[] = [
+                'sku' => $sku,
+                'qty' => (int) $qty,
+                'excluded' => true,
+            ];
+        }
+
+        return $payload;
     }
 }

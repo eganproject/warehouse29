@@ -1,7 +1,7 @@
 @extends('layouts.admin')
 
-@section('title', 'History Picker')
-@section('page_title', 'History Picker')
+@section('title', 'History QC Scan')
+@section('page_title', 'History QC Scan')
 
 @section('content')
 <div class="card">
@@ -72,7 +72,7 @@
                     <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
                         <th>ID</th>
                         <th>Kode</th>
-                        <th>Picker</th>
+                        <th>QC</th>
                         <th>Status</th>
                         <th>Mulai</th>
                         <th>Selesai</th>
@@ -234,7 +234,7 @@
             if (!id) return;
             let confirmed = true;
             if (typeof AppSwal !== 'undefined' && AppSwal.confirm) {
-                confirmed = await AppSwal.confirm('Submit batch picker ini?', {
+                confirmed = await AppSwal.confirm('Submit batch QC scan ini?', {
                     confirmButtonText: 'Submit',
                 });
             } else if (typeof Swal !== 'undefined') {
@@ -253,7 +253,7 @@
                 });
                 confirmed = res.isConfirmed;
             } else {
-                confirmed = window.confirm('Submit batch picker ini?');
+                confirmed = window.confirm('Submit batch QC scan ini?');
             }
             if (!confirmed) return;
             try {

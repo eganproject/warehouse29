@@ -227,10 +227,14 @@ class StockMutationController extends Controller
                 }
                 break;
             case 'picker':
+            case 'qc':
+                $sessionLabel = $mutation->source_type === 'picker'
+                    ? 'Picker Mobile (Legacy)'
+                    : 'QC Scan Mobile';
                 $session = PickerSession::with('items.item', 'user')->find($mutation->source_id);
                 if ($session) {
                     $sourceSummary = [
-                        'label' => 'Picker Mobile',
+                        'label' => $sessionLabel,
                         'code' => $session->code,
                         'ref' => $session->user?->name ?? '-',
                         'date' => ($session->submitted_at ?? $session->started_at)?->format('Y-m-d H:i'),

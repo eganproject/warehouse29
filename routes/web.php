@@ -30,7 +30,6 @@ use App\Http\Controllers\Admin\DivisiController;
 use App\Http\Controllers\Admin\KurirController;
 use App\Http\Controllers\Mobile\StockOpnameMobileController;
 use App\Http\Controllers\Picker\PickerDashboardController;
-use App\Http\Controllers\Picker\PackerScanController;
 use App\Http\Controllers\Picker\PackerScanOutController;
 use App\Http\Controllers\Picker\PickingListMobileController;
 use App\Http\Controllers\Picker\PickerSessionController;
@@ -57,8 +56,6 @@ Route::middleware('auth')->group(function () {
 
 Route::middleware('auth')->prefix('picker')->as('picker.')->group(function () {
     Route::get('/dashboard', [PickerDashboardController::class, 'index'])->name('dashboard');
-    Route::get('/packer', [PackerScanController::class, 'index'])->name('packer.index');
-    Route::post('/packer/scan', [PackerScanController::class, 'scan'])->name('packer.scan');
     Route::get('/scan-out', [PackerScanOutController::class, 'index'])->name('scan-out.index');
     Route::post('/scan-out/scan', [PackerScanOutController::class, 'scan'])->name('scan-out.scan');
     Route::get('/scan-out/history', [PackerScanOutController::class, 'history'])->name('scan-out.history');

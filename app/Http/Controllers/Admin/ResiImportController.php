@@ -72,11 +72,6 @@ class ResiImportController extends Controller
         $query = Resi::query()
             ->select(['id', 'id_pesanan', 'no_resi', 'tanggal_pesanan', 'kurir_id', 'status'])
             ->selectSub(function ($sub) {
-                $sub->from('packer_resi_scans')
-                    ->selectRaw('count(1)')
-                    ->whereColumn('packer_resi_scans.resi_id', 'resis.id');
-            }, 'packer_scan_count')
-            ->selectSub(function ($sub) {
                 $sub->from('packer_scan_outs')
                     ->selectRaw('count(1)')
                     ->whereColumn('packer_scan_outs.resi_id', 'resis.id');
@@ -105,7 +100,6 @@ class ResiImportController extends Controller
                 : '-';
             $skuList = $skuItems !== '' ? $skuItems : '-';
             $tanggalOrder = $row->tanggal_pesanan?->format('Y-m-d') ?? $row->tanggal_pesanan ?? '-';
-            $hasPackerScan = (int) ($row->packer_scan_count ?? 0) > 0;
             $hasScanOut = (int) ($row->scan_out_count ?? 0) > 0;
             return [
                 'id' => $row->id,
@@ -115,7 +109,6 @@ class ResiImportController extends Controller
                 'sku' => $skuList,
                 'tanggal_pesanan' => $tanggalOrder,
                 'status' => $row->status ?? 'active',
-                'has_packer_scan' => $hasPackerScan,
                 'has_scan_out' => $hasScanOut,
             ];
         });
@@ -292,7 +285,7 @@ class ResiImportController extends Controller
         }
         if ($hasPackerScan) {
             return response()->json([
-                'message' => 'Resi sudah dipacking, tidak bisa dibatalkan.',
+                'message' => 'Resi sudah diproses, tidak bisa dibatalkan.',
             ], 422);
         }
 
@@ -346,7 +339,7 @@ class ResiImportController extends Controller
         $hasScanOut = PackerScanOut::where('resi_id', $resi->id)->exists();
         if ($hasScanOut || $hasPackerScan) {
             return response()->json([
-                'message' => 'Resi sudah memiliki proses packer/scan out, batal cancel tidak diizinkan.',
+                'message' => 'Resi sudah memiliki proses lanjutan, batal cancel tidak diizinkan.',
             ], 422);
         }
 

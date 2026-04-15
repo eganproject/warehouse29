@@ -329,33 +329,32 @@
                     }},
                     { data: 'no_resi' },
                     { data: 'kurir' },
-                    { data: 'id_pesanan' },
-                    { data: 'sku' },
-                    { data: 'tanggal_pesanan' },
-                    { data: 'status', render: (data) => {
-                        if (data === 'canceled') {
-                            return '<span class="badge badge-light-danger">Cancel</span>';
-                        }
-                        return '<span class="badge badge-light-success">Aktif</span>';
-                    }},
-                    { data: null, orderable: false, searchable: false, className: 'text-end', render: (data, type, row) => {
-                        const idPesanan = row.id_pesanan || '';
-                        const noResi = row.no_resi || '';
-                        const status = row.status || 'active';
-                        const hasPackerScan = !!row.has_packer_scan;
-                        const hasScanOut = !!row.has_scan_out;
-                        if (status === 'canceled') {
-                            return `<button type="button" class="btn btn-sm btn-light-warning btn-uncancel" data-id="${idPesanan}" data-resi="${noResi}">Batal Cancel</button>`;
-                        }
-                        if (hasPackerScan || hasScanOut) {
-                            return '<span class="text-muted">-</span>';
-                        }
-                        return `<button type="button" class="btn btn-sm btn-light-danger btn-cancel" data-id="${idPesanan}" data-resi="${noResi}">Cancel</button>`;
-                    }},
-                ],
-                language: {
-                    emptyTable: 'Belum ada data',
-                    processing: 'Memuat...',
+                        { data: 'id_pesanan' },
+                        { data: 'sku' },
+                        { data: 'tanggal_pesanan' },
+                        { data: 'status', render: (data) => {
+                            if (data === 'canceled') {
+                                return '<span class="badge badge-light-danger">Cancel</span>';
+                            }
+                            return '<span class="badge badge-light-success">Aktif</span>';
+                        }},
+                        { data: null, orderable: false, searchable: false, className: 'text-end', render: (data, type, row) => {
+                            const idPesanan = row.id_pesanan || '';
+                            const noResi = row.no_resi || '';
+                            const status = row.status || 'active';
+                            const hasScanOut = !!row.has_scan_out;
+                            if (status === 'canceled') {
+                                return `<button type="button" class="btn btn-sm btn-light-warning btn-uncancel" data-id="${idPesanan}" data-resi="${noResi}">Batal Cancel</button>`;
+                            }
+                            if (hasScanOut) {
+                                return '<span class="text-muted">-</span>';
+                            }
+                            return `<button type="button" class="btn btn-sm btn-light-danger btn-cancel" data-id="${idPesanan}" data-resi="${noResi}">Cancel</button>`;
+                        }},
+                    ],
+                    language: {
+                        emptyTable: 'Belum ada data',
+                        processing: 'Memuat...',
                 },
             });
 

@@ -128,7 +128,7 @@ class PickerSessionController extends Controller
                 $remainingTransit = (int) ($transitRow?->remaining_qty ?? 0);
                 if (abs($delta) > $remainingTransit) {
                     throw ValidationException::withMessages([
-                        'qty' => 'Qty tidak bisa dikurangi karena sudah dipacking.',
+                        'qty' => 'Qty tidak bisa dikurangi karena sudah scan out.',
                     ]);
                 }
             }
@@ -138,7 +138,7 @@ class PickerSessionController extends Controller
                     'item_id' => $itemRow->item_id,
                     'direction' => $delta > 0 ? 'out' : 'in',
                     'qty' => abs($delta),
-                    'source_type' => 'picker',
+                    'source_type' => 'qc',
                     'source_subtype' => 'mobile',
                     'source_id' => $session->id,
                     'source_code' => $session->code,
@@ -228,7 +228,7 @@ class PickerSessionController extends Controller
             $remainingTransit = (int) ($transitRow?->remaining_qty ?? 0);
             if ($qty > $remainingTransit) {
                 throw ValidationException::withMessages([
-                    'qty' => 'Qty tidak bisa dihapus karena sudah dipacking.',
+                    'qty' => 'Qty tidak bisa dihapus karena sudah scan out.',
                 ]);
             }
 
@@ -239,7 +239,7 @@ class PickerSessionController extends Controller
                     'item_id' => $itemRow->item_id,
                     'direction' => 'in',
                     'qty' => $qty,
-                    'source_type' => 'picker',
+                    'source_type' => 'qc',
                     'source_subtype' => 'mobile',
                     'source_id' => $session->id,
                     'source_code' => $session->code,
@@ -325,7 +325,7 @@ class PickerSessionController extends Controller
         }
 
         return response()->json([
-            'message' => 'Penginputan selesai',
+            'message' => 'QC scan selesai',
             'session' => $this->serializeSession($session->fresh('items.item')),
         ]);
     }
@@ -412,7 +412,7 @@ class PickerSessionController extends Controller
             }
 
             return PickerSession::create([
-                'code' => $this->generateCode('PKR'),
+                'code' => $this->generateCode('QC'),
                 'user_id' => auth()->id(),
                 'status' => 'draft',
                 'started_at' => now(),
@@ -482,7 +482,7 @@ class PickerSessionController extends Controller
                 'item_id' => $itemId,
                 'direction' => 'out',
                 'qty' => $deltaQty,
-                'source_type' => 'picker',
+                'source_type' => 'qc',
                 'source_subtype' => 'mobile',
                 'source_id' => $session->id,
                 'source_code' => $session->code,

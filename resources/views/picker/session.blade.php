@@ -1,6 +1,6 @@
 @extends('layouts.mobile')
 
-@section('title', 'Picker Mobile')
+@section('title', 'QC Scan')
 
 @section('content')
 <style>
@@ -129,7 +129,7 @@
     <div class="topbar">
         <div>
             <div class="brand">Gudang 29</div>
-            <div class="subtitle">Picker Mobile Input</div>
+            <div class="subtitle">QC Scan Input</div>
         </div>
         <div class="topbar-actions">
             <a href="{{ $routes['dashboard'] }}" class="logout">Dashboard</a>
@@ -147,7 +147,7 @@
             </div>
             <div class="code" id="session_code">-</div>
         </div>
-        <div class="muted" id="session_started">Mulai input untuk membuat sesi baru.</div>
+        <div class="muted" id="session_started">Mulai QC scan untuk membuat sesi baru.</div>
         <div style="margin-top: 12px;">
             <button type="button" class="primary-btn" id="btn_start">Mulai Input</button>
         </div>
@@ -155,7 +155,7 @@
 
     <div class="card" id="scan_card">
         <div class="section-title">Scan Barang</div>
-        <div class="muted">Gunakan kamera untuk menambah barang ke daftar dibawa berdasarkan barcode SKU.</div>
+        <div class="muted">Gunakan kamera untuk scan SKU (barang keluar rak) dan masuk ke QC Transit.</div>
         <div class="scan-actions">
             <div class="scan-row">
                 <input type="text" class="input" id="scan_code" placeholder="Scan SKU" autocomplete="off" />
@@ -178,7 +178,7 @@
 
     <div class="card">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
-            <div style="font-weight:700;">Daftar Barang Dibawa</div>
+            <div style="font-weight:700;">Daftar QC Transit</div>
             <div class="muted" id="total_items">0 item</div>
         </div>
         <div class="muted" id="items_empty">Belum ada barang ditambahkan.</div>
