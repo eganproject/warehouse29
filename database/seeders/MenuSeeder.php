@@ -106,5 +106,24 @@ class MenuSeeder extends Seeder
                 );
             }
         }
+
+        // Allow picker role to access QC Scan Input (admin desktop page) by default.
+        $pickerRole = DB::table('roles')->where('slug', 'picker')->first();
+        if ($pickerRole) {
+            $qcScanMenu = DB::table('menus')->where('slug', 'outbound-qc-scan')->first();
+            if ($qcScanMenu) {
+                DB::table('permission_menu')->updateOrInsert(
+                    ['role_id' => $pickerRole->id, 'menu_id' => $qcScanMenu->id],
+                    [
+                        'can_view' => true,
+                        'can_create' => false,
+                        'can_update' => false,
+                        'can_delete' => false,
+                        'updated_at' => now(),
+                        'created_at' => now(),
+                    ]
+                );
+            }
+        }
     }
 }

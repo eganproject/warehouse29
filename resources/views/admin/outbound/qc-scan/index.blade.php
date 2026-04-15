@@ -116,8 +116,8 @@
                 <div class="separator my-6"></div>
 
                 <div class="d-flex flex-wrap gap-2">
-                    <button type="button" class="btn btn-light-primary flex-grow-1" id="qc_btn_start">
-                        <i class="fa-solid fa-play me-2"></i>Mulai / Lanjutkan Sesi
+                    <button type="button" class="btn btn-light-primary flex-grow-1" id="qc_btn_start" title="Memuat sesi draft untuk tanggal hari ini. Jika belum ada, sistem akan membuat sesi baru.">
+                        <i class="fa-solid fa-arrows-rotate me-2"></i>Muat Sesi Draft Hari Ini
                     </button>
                     <button type="button" class="btn btn-success flex-grow-1" id="qc_btn_submit" disabled>
                         <i class="fa-solid fa-check me-2"></i>Selesaikan
@@ -125,6 +125,9 @@
                     <button type="button" class="btn btn-light flex-grow-1" id="qc_btn_focus">
                         <i class="fa-solid fa-crosshairs me-2"></i>Fokus Scanner
                     </button>
+                </div>
+                <div class="text-muted fs-8 mt-2">
+                    Jika belum ada sesi draft untuk tanggal <span class="fw-bold">{{ $today }}</span>, sistem akan membuat sesi baru otomatis.
                 </div>
             </div>
         </div>
@@ -177,6 +180,11 @@
                     <div class="qc-pill">
                         <span class="text-muted fs-8">Total Qty</span>
                         <span class="fw-bold" id="qc_total_qty">0</span>
+                    </div>
+                    <div class="qc-pill">
+                        <span class="text-muted fs-8">Akun</span>
+                        <span class="fw-bold">{{ auth()->user()->name ?? '-' }}</span>
+                        <span class="text-muted fs-8">{{ auth()->user()->email ?? '' }}</span>
                     </div>
                 </div>
 
@@ -366,16 +374,27 @@
     };
 
     const startSession = async () => {
+        if (state.session && state.session.status === 'draft') {
+            const code = state.session.code ? ` (${state.session.code})` : '';
+            setScanStatus(`Sesi draft sudah aktif${code}. Silakan scan SKU.`, 'ok');
+            focusScanner();
+            return true;
+        }
+
         setBusy(true);
-        setScanStatus('Membuat / melanjutkan sesi...', 'warn');
+        setScanStatus('Memuat sesi draft hari ini...', 'warn');
         try {
             const json = await fetchJson(routes.qcStart, { method: 'POST' });
             state.session = json.session || null;
             renderSession();
-            setScanStatus('Sesi siap. Silakan scan SKU.', 'ok');
+
+            const code = state.session?.code ? ` (${state.session.code})` : '';
+            setScanStatus(`Sesi draft siap${code}. Silakan scan SKU.`, 'ok');
+            return !!(state.session && state.session.status === 'draft');
         } catch (e) {
-            setScanStatus(e.message || 'Gagal memulai sesi.', 'err');
-            window.AppSwal?.error?.(e.message || 'Gagal memulai sesi.');
+            setScanStatus(e.message || 'Gagal memuat sesi draft.', 'err');
+            window.AppSwal?.error?.(e.message || 'Gagal memuat sesi draft.');
+            return false;
         } finally {
             setBusy(false);
             focusScanner();
@@ -393,7 +412,8 @@
         }
 
         if (!state.session || state.session.status !== 'draft') {
-            await startSession();
+            const ok = await startSession();
+            if (!ok) return;
         }
 
         setBusy(true);
@@ -570,7 +590,12 @@
         setScanStatus('Memuat sesi...', 'warn');
         try {
             await refreshSession();
-            setScanStatus('Siap scan SKU.', 'ok');
+            if (state.session && state.session.status === 'draft') {
+                const code = state.session.code ? ` (${state.session.code})` : '';
+                setScanStatus(`Sesi draft aktif${code}. Silakan scan SKU.`, 'ok');
+            } else {
+                setScanStatus('Belum ada sesi draft hari ini. Scan SKU untuk membuat sesi otomatis, atau klik "Muat Sesi Draft Hari Ini".', 'warn');
+            }
         } catch (e) {
             setScanStatus('Gagal memuat sesi.', 'err');
         } finally {
@@ -628,4 +653,3 @@
     });
 </script>
 @endpush
-

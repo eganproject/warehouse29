@@ -43,9 +43,18 @@ class RestrictPickerAccess
             && !$isDashboardRoute;
         $isOpnameRoute = str_starts_with($routeName, 'opname.') || str_starts_with($path, 'opname');
         $isLogoutRoute = $routeName === 'logout';
+        $isAdminQcScanRoute = $routeName === 'admin.outbound.qc-scan.index' || $path === 'admin/outbound/qc-scan';
 
         if ($hasPicker || $hasPacker) {
-            if ($isPickerRoute || $isPackerRoute || $isScanOutRoute || $isOpnameRoute || $isLogoutRoute || $isDashboardRoute) {
+            if (
+                ($hasPicker && $isAdminQcScanRoute)
+                || $isPickerRoute
+                || $isPackerRoute
+                || $isScanOutRoute
+                || $isOpnameRoute
+                || $isLogoutRoute
+                || $isDashboardRoute
+            ) {
                 return $next($request);
             }
         }
