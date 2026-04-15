@@ -88,6 +88,13 @@
                     Scan out resi nantinya akan mengurangi qty di QC Transit.
                     <span class="d-inline-block ms-1">Tanggal kerja: <span class="fw-bold">{{ $today }}</span></span>
                 </div>
+                <div class="alert alert-light-info d-flex align-items-start gap-3 py-3 px-4 mb-5">
+                    <i class="fa-solid fa-users mt-1"></i>
+                    <div class="fs-8 text-gray-700">
+                        Sesi draft dipisahkan per akun login.
+                        Beberapa akun QC bisa scan bersamaan, tetapi validasi qty tetap mengikuti sisa <strong>picking list</strong> real-time.
+                    </div>
+                </div>
 
                 <div class="mb-4">
                     <label class="form-label fw-bold">Scan SKU</label>
@@ -223,6 +230,11 @@
         busy: false,
     };
 
+    const audioState = {
+        context: null,
+        enabled: false,
+    };
+
     const el = {
         scanCode: document.getElementById('qc_scan_code'),
         scanQty: document.getElementById('qc_scan_qty'),
@@ -264,6 +276,57 @@
         if (!el.scanCode) return;
         el.scanCode.focus();
         el.scanCode.select?.();
+    };
+
+    const ensureAudioReady = async () => {
+        if (typeof window === 'undefined') return null;
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return null;
+
+        if (!audioState.context) {
+            audioState.context = new AudioCtx();
+        }
+
+        if (audioState.context.state === 'suspended') {
+            await audioState.context.resume();
+        }
+
+        audioState.enabled = true;
+        return audioState.context;
+    };
+
+    const playFeedbackSound = async (kind) => {
+        try {
+            const ctx = await ensureAudioReady();
+            if (!ctx) return;
+
+            const tones = kind === 'success'
+                ? [
+                    { freq: 880, at: 0, duration: 0.07 },
+                    { freq: 1174, at: 0.09, duration: 0.09 },
+                ]
+                : [
+                    { freq: 320, at: 0, duration: 0.12 },
+                    { freq: 240, at: 0.12, duration: 0.16 },
+                ];
+
+            const startAt = ctx.currentTime + 0.01;
+            tones.forEach((tone) => {
+                const oscillator = ctx.createOscillator();
+                const gain = ctx.createGain();
+                oscillator.type = kind === 'success' ? 'sine' : 'triangle';
+                oscillator.frequency.setValueAtTime(tone.freq, startAt + tone.at);
+                gain.gain.setValueAtTime(0.0001, startAt + tone.at);
+                gain.gain.exponentialRampToValueAtTime(0.035, startAt + tone.at + 0.01);
+                gain.gain.exponentialRampToValueAtTime(0.0001, startAt + tone.at + tone.duration);
+                oscillator.connect(gain);
+                gain.connect(ctx.destination);
+                oscillator.start(startAt + tone.at);
+                oscillator.stop(startAt + tone.at + tone.duration);
+            });
+        } catch (err) {
+            // Ignore audio failures; scan flow must still work.
+        }
     };
 
     const fetchJson = async (url, options = {}) => {
@@ -373,6 +436,16 @@
         renderSession();
     };
 
+    const fetchPickingListRow = async (sku) => {
+        const code = String(sku || '').trim();
+        if (!code) return null;
+
+        const params = new URLSearchParams({ date: todayStr, q: code });
+        const json = await fetchJson(`${routes.pickingListData}?${params.toString()}`);
+        const items = Array.isArray(json?.items) ? json.items : [];
+        return items.find((row) => String(row.sku || '').toLowerCase() === code.toLowerCase()) || null;
+    };
+
     const startSession = async () => {
         if (state.session && state.session.status === 'draft') {
             const code = state.session.code ? ` (${state.session.code})` : '';
@@ -411,6 +484,39 @@
             return;
         }
 
+        setBusy(true);
+        try {
+            const pickingRow = await fetchPickingListRow(code);
+            if (!pickingRow) {
+                const message = `SKU ${code} tidak ada di picking list tanggal ${todayStr}.`;
+                setScanStatus(message, 'err');
+                playFeedbackSound('error');
+                window.AppSwal?.error?.(message);
+                setBusy(false);
+                focusScanner();
+                return;
+            }
+
+            const remainingQty = Number(pickingRow.remaining_qty) || 0;
+            if (qty > remainingQty) {
+                const message = `Qty ${qty} melebihi sisa picking list ${remainingQty} untuk SKU ${code}.`;
+                setScanStatus(message, 'err');
+                playFeedbackSound('error');
+                window.AppSwal?.error?.(message);
+                setBusy(false);
+                focusScanner();
+                return;
+            }
+        } catch (e) {
+            const message = e.message || 'Gagal memeriksa sisa picking list.';
+            setScanStatus(message, 'err');
+            playFeedbackSound('error');
+            window.AppSwal?.error?.(message);
+            setBusy(false);
+            focusScanner();
+            return;
+        }
+
         if (!state.session || state.session.status !== 'draft') {
             const ok = await startSession();
             if (!ok) return;
@@ -431,10 +537,12 @@
             state.session = json.session || null;
             renderSession();
             setScanStatus(`OK: ${code} +${qty}`, 'ok');
+            playFeedbackSound('success');
             if (el.scanCode) el.scanCode.value = '';
             if (el.scanQty) el.scanQty.value = '1';
         } catch (e) {
             setScanStatus(e.message || 'Gagal memproses scan.', 'err');
+            playFeedbackSound('error');
             window.AppSwal?.error?.(e.message || 'Gagal memproses scan.');
         } finally {
             setBusy(false);
@@ -457,6 +565,11 @@
             setScanStatus('Qty tersimpan.', 'ok');
         } catch (e) {
             setScanStatus(e.message || 'Gagal update qty.', 'err');
+            try {
+                await refreshSession();
+            } catch (refreshError) {
+                // Keep showing the original error even if reload fails.
+            }
             window.AppSwal?.error?.(e.message || 'Gagal update qty.');
         } finally {
             setBusy(false);
@@ -603,13 +716,23 @@
         }
 
         el.btnStart?.addEventListener('click', startSession);
-        el.btnSubmit?.addEventListener('click', submitSession);
-        el.btnFocus?.addEventListener('click', focusScanner);
-        el.scanBtn?.addEventListener('click', scanSku);
-        el.scanCode?.addEventListener('keydown', (e) => {
+        el.btnSubmit?.addEventListener('click', async () => {
+            await ensureAudioReady();
+            await submitSession();
+        });
+        el.btnFocus?.addEventListener('click', async () => {
+            await ensureAudioReady();
+            focusScanner();
+        });
+        el.scanBtn?.addEventListener('click', async () => {
+            await ensureAudioReady();
+            await scanSku();
+        });
+        el.scanCode?.addEventListener('keydown', async (e) => {
             if (e.key === 'Enter') {
                 e.preventDefault();
-                scanSku();
+                await ensureAudioReady();
+                await scanSku();
             }
         });
         el.pickingLookup?.addEventListener('keydown', (e) => {

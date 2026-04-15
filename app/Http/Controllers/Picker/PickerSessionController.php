@@ -119,6 +119,10 @@ class PickerSessionController extends Controller
             $pickedDate = $session->started_at?->toDateString() ?? $occurredAt->toDateString();
             $sku = Item::where('id', $itemRow->item_id)->value('sku') ?? '';
 
+            if ($delta > 0) {
+                $this->ensurePickingListCapacity($pickedDate, $sku, $delta);
+            }
+
             $transitRow = PickerTransitItem::where('item_id', $itemRow->item_id)
                 ->where('picked_date', $pickedDate)
                 ->lockForUpdate()
@@ -438,6 +442,8 @@ class PickerSessionController extends Controller
             $item = Item::findOrFail($itemId);
             $sku = $item->sku ?? '';
 
+            $this->ensurePickingListCapacity($pickedDate, $sku, $deltaQty);
+
             $itemRow = PickerSessionItem::where('picker_session_id', $session->id)
                 ->where('item_id', $itemId)
                 ->lockForUpdate()
@@ -614,6 +620,37 @@ class PickerSessionController extends Controller
                 'list_date' => $date,
                 'sku' => $sku,
                 'qty' => $deltaPicked,
+            ]);
+        }
+    }
+
+    private function ensurePickingListCapacity(string $date, string $sku, int $requiredQty): void
+    {
+        if ($requiredQty <= 0) {
+            return;
+        }
+
+        if ($sku === '') {
+            throw ValidationException::withMessages([
+                'code' => 'SKU tidak valid.',
+            ]);
+        }
+
+        $row = PickingList::where('list_date', $date)
+            ->where('sku', $sku)
+            ->lockForUpdate()
+            ->first();
+
+        if (!$row) {
+            throw ValidationException::withMessages([
+                'code' => ["SKU {$sku} tidak ada di picking list tanggal {$date}."],
+            ]);
+        }
+
+        $remainingQty = (int) $row->remaining_qty;
+        if ($remainingQty < $requiredQty) {
+            throw ValidationException::withMessages([
+                'qty' => ["Qty scan melebihi sisa picking list. SKU {$sku} tersisa {$remainingQty}, diminta {$requiredQty}."],
             ]);
         }
     }
