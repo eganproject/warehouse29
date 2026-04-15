@@ -20,6 +20,8 @@ class PickerTransitController extends Controller
     {
         return view('admin.inventory.picker-transit.index', [
             'dataUrl' => route('admin.inventory.picker-transit.data'),
+            // Backward compatible: some legacy views/scripts expect this variable.
+            'dataUrlPacker' => route('admin.inventory.picker-transit.packer-data'),
             'today' => now()->toDateString(),
         ]);
     }

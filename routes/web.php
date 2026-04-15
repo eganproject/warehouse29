@@ -28,6 +28,7 @@ use App\Http\Controllers\Admin\MenuController;
 use App\Http\Controllers\Admin\PermissionController;
 use App\Http\Controllers\Admin\DivisiController;
 use App\Http\Controllers\Admin\KurirController;
+use App\Http\Controllers\Admin\QcScanInputController;
 use App\Http\Controllers\Mobile\StockOpnameMobileController;
 use App\Http\Controllers\Picker\PickerDashboardController;
 use App\Http\Controllers\Picker\PackerScanOutController;
@@ -269,6 +270,8 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         Route::get('/picker-sessions/data', [PickerHistoryController::class, 'data'])->name('picker-sessions.data');
         Route::post('/picker-sessions/{id}/submit', [PickerHistoryController::class, 'submit'])->name('picker-sessions.submit');
         Route::delete('/picker-sessions/{id}', [PickerHistoryController::class, 'destroy'])->name('picker-sessions.destroy');
+
+        Route::get('/qc-scan', [QcScanInputController::class, 'index'])->name('qc-scan.index');
 
         Route::get('/packer-history', [PackerHistoryController::class, 'index'])->name('packer-history.index');
         Route::get('/packer-history/data', [PackerHistoryController::class, 'data'])->name('packer-history.data');

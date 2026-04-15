@@ -39,6 +39,7 @@ class MenuSeeder extends Seeder
             // ['name' => 'Picker', 'slug' => 'outbound-picker', 'route' => 'admin.outbound.pickers.index', 'icon' => 'fa-solid fa-people-carry-box', 'parent_slug' => 'outbound', 'sort_order' => 10],
             ['name' => 'Manual', 'slug' => 'outbound-manual', 'route' => 'admin.outbound.manuals.index', 'icon' => 'fa-solid fa-pen-to-square', 'parent_slug' => 'outbound', 'sort_order' => 11],
             ['name' => 'Retur', 'slug' => 'outbound-return', 'route' => 'admin.outbound.returns.index', 'icon' => 'fa-solid fa-rotate-left', 'parent_slug' => 'outbound', 'sort_order' => 12],
+            ['name' => 'QC Scan Input', 'slug' => 'outbound-qc-scan', 'route' => 'admin.outbound.qc-scan.index', 'icon' => 'fa-solid fa-barcode', 'parent_slug' => 'outbound', 'sort_order' => 12.5],
             ['name' => 'History QC Scan', 'slug' => 'outbound-picker-history', 'route' => 'admin.outbound.picker-sessions.index', 'icon' => 'fa-solid fa-clipboard-list', 'parent_slug' => 'outbound', 'sort_order' => 13],
             ['name' => 'History Packing (Legacy)', 'slug' => 'outbound-packer-history', 'route' => 'admin.outbound.packer-history.index', 'icon' => 'fa-solid fa-box-archive', 'parent_slug' => 'outbound', 'sort_order' => 13.5, 'is_active' => false],
             ['name' => 'History Scan Out', 'slug' => 'outbound-packer-scan-outs', 'route' => 'admin.outbound.packer-scan-outs.index', 'icon' => 'fa-solid fa-truck-ramp-box', 'parent_slug' => 'outbound', 'sort_order' => 13.7],
