@@ -1,7 +1,7 @@
 @extends('layouts.admin')
 
-@section('title', 'Laporan Picker')
-@section('page_title', 'Laporan Picker')
+@section('title', 'Laporan QC Scan')
+@section('page_title', 'Laporan QC Scan')
 
 @section('content')
 <style>
@@ -166,8 +166,8 @@
                     <div class="brand-sub">Warehouse Operations Report</div>
                 </div>
                 <div>
-                    <div class="report-title">Laporan Picker Harian</div>
-                    <div class="report-meta">Ringkasan aktivitas picking per orang per hari</div>
+                    <div class="report-title">Laporan QC Scan Harian</div>
+                    <div class="report-meta">Ringkasan aktivitas QC scan per petugas per hari</div>
                 </div>
             </div>
             <div class="report-meta-grid">
@@ -192,7 +192,7 @@
                             <path d="M11 19C6.55556 19 3 15.4444 3 11C3 6.55556 6.55556 3 11 3C15.4444 3 19 6.55556 19 11C19 15.4444 15.4444 19 11 19ZM11 5C7.53333 5 5 7.53333 5 11C5 14.4667 7.53333 17 11 17C14.4667 17 17 14.4667 17 11C17 7.53333 14.4667 5 11 5Z" fill="black" />
                         </svg>
                     </span>
-                    <input type="text" class="form-control form-control-solid w-200px ps-14" placeholder="Cari picker" data-kt-filter="search" />
+                    <input type="text" class="form-control form-control-solid w-200px ps-14" placeholder="Cari petugas QC" data-kt-filter="search" />
                 </div>
                 <select id="filter_divisi" class="form-select form-select-solid w-180px" data-control="select2" data-placeholder="Semua divisi">
                     <option value="">Semua Divisi</option>
@@ -210,7 +210,7 @@
     <div class="card-body py-6">
         <ul class="nav nav-tabs nav-line-tabs mb-6" role="tablist">
             <li class="nav-item" role="presentation">
-                <a class="nav-link active" data-bs-toggle="tab" href="#tab_report_picker" role="tab">Ringkasan Picker</a>
+                <a class="nav-link active" data-bs-toggle="tab" href="#tab_report_picker" role="tab">Ringkasan QC</a>
             </li>
             <li class="nav-item" role="presentation">
                 <a class="nav-link" data-bs-toggle="tab" href="#tab_report_sku" role="tab">Ringkasan SKU</a>
@@ -223,17 +223,17 @@
                         <thead>
                             <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
                                 <th data-bs-toggle="tooltip" data-bs-placement="top" title="Tanggal laporan berdasarkan waktu submit batch.">Tanggal</th>
-                                <th data-bs-toggle="tooltip" data-bs-placement="top" title="Nama picker yang melakukan picking.">Picker</th>
-                                <th data-bs-toggle="tooltip" data-bs-placement="top" title="Jumlah batch yang disubmit pada tanggal tersebut.">Batch</th>
-                                <th data-bs-toggle="tooltip" data-bs-placement="top" title="Jumlah SKU unik yang dipick pada tanggal tersebut.">SKU</th>
-                                <th data-bs-toggle="tooltip" data-bs-placement="top" title="Total qty semua item yang dipick.">Qty</th>
+                                <th data-bs-toggle="tooltip" data-bs-placement="top" title="Nama petugas QC yang melakukan scan SKU.">Petugas QC</th>
+                                <th data-bs-toggle="tooltip" data-bs-placement="top" title="Jumlah batch QC scan yang disubmit pada tanggal tersebut.">Batch</th>
+                                <th data-bs-toggle="tooltip" data-bs-placement="top" title="Jumlah SKU unik yang masuk QC transit pada tanggal tersebut.">SKU</th>
+                                <th data-bs-toggle="tooltip" data-bs-placement="top" title="Total qty semua item yang discan ke QC transit.">Qty</th>
                                 <th data-bs-toggle="tooltip" data-bs-placement="top" title="Total qty dibagi jumlah batch.">Rata-rata Qty/Batch</th>
                                 <th data-bs-toggle="tooltip" data-bs-placement="top" title="Total SKU unik dibagi jumlah batch.">Rata-rata SKU/Batch</th>
                                 <th data-bs-toggle="tooltip" data-bs-placement="top" title="Rata-rata durasi per batch (started hingga submitted).">Rata-rata Durasi</th>
                                 <th data-bs-toggle="tooltip" data-bs-placement="top" title="Akumulasi durasi seluruh batch pada tanggal tersebut.">Total Durasi</th>
                                 <th data-bs-toggle="tooltip" data-bs-placement="top" title="Produktivitas = total qty / total durasi (qty/jam).">Produktivitas</th>
                                 <th data-bs-toggle="tooltip" data-bs-placement="top" title="Rentang waktu kerja: mulai batch pertama hingga submit terakhir.">Jam Kerja</th>
-                                <th class="text-end" data-bs-toggle="tooltip" data-bs-placement="top" title="Lihat detail item per picker per tanggal.">Aksi</th>
+                                <th class="text-end" data-bs-toggle="tooltip" data-bs-placement="top" title="Lihat detail item per petugas QC per tanggal.">Aksi</th>
                             </tr>
                         </thead>
                         <tbody></tbody>
@@ -256,13 +256,13 @@
                     <table class="table align-middle table-row-dashed fs-6 gy-5 report-table" id="picker_sku_table">
                         <thead>
                             <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
-                                <th data-bs-toggle="tooltip" data-bs-placement="top" title="Kode SKU yang dipick.">SKU</th>
+                                <th data-bs-toggle="tooltip" data-bs-placement="top" title="Kode SKU yang discan ke QC transit.">SKU</th>
                                 <th data-bs-toggle="tooltip" data-bs-placement="top" title="Nama item/produk.">Nama</th>
                                 <th data-bs-toggle="tooltip" data-bs-placement="top" title="Total qty dari SKU tersebut.">Total Qty</th>
-                                <th data-bs-toggle="tooltip" data-bs-placement="top" title="Jumlah batch yang mengandung SKU tersebut.">Jumlah Batch</th>
-                                <th data-bs-toggle="tooltip" data-bs-placement="top" title="Jumlah picker unik yang mengambil SKU ini.">Jumlah Picker</th>
+                                <th data-bs-toggle="tooltip" data-bs-placement="top" title="Jumlah batch QC scan yang mengandung SKU tersebut.">Jumlah Batch</th>
+                                <th data-bs-toggle="tooltip" data-bs-placement="top" title="Jumlah petugas QC unik yang menangani SKU ini.">Jumlah Petugas QC</th>
                                 <th data-bs-toggle="tooltip" data-bs-placement="top" title="Total qty dibagi jumlah batch.">Rata-rata Qty/Batch</th>
-                                <th data-bs-toggle="tooltip" data-bs-placement="top" title="Daftar picker yang mengambil SKU ini beserta qtynya.">Picker (Qty)</th>
+                                <th data-bs-toggle="tooltip" data-bs-placement="top" title="Daftar petugas QC yang menangani SKU ini beserta qtynya.">Petugas QC (Qty)</th>
                             </tr>
                         </thead>
                         <tbody></tbody>
@@ -290,7 +290,7 @@
     <div class="modal-dialog modal-dialog-centered mw-900px">
         <div class="modal-content">
             <div class="modal-header">
-                <h2 class="fw-bolder">Detail Item Picker</h2>
+                <h2 class="fw-bolder">Detail Item QC Scan</h2>
                 <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
                     <span class="svg-icon svg-icon-1">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -307,7 +307,7 @@
                         <strong id="detail_date">-</strong>
                     </div>
                     <div class="detail-card">
-                        <span>Picker</span>
+                        <span>Petugas QC</span>
                         <strong id="detail_picker">-</strong>
                     </div>
                     <div class="detail-card">

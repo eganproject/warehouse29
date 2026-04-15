@@ -56,7 +56,7 @@ class PickerTransitStatusExport implements FromCollection, WithHeadings, WithMap
 
     public function headings(): array
     {
-        return ['Tanggal', 'SKU', 'Qty Transit', 'Sisa Qty', 'Last Picked'];
+        return ['Tanggal', 'SKU', 'Qty Transit', 'Sisa Qty', 'Last QC'];
     }
 
     public function map($row): array

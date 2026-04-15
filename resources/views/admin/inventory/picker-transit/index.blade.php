@@ -189,7 +189,7 @@
                             <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
                                 <th>SKU</th>
                                 <th>Nama</th>
-                                <th class="text-end">Scanned</th>
+                                <th class="text-end">Qty QC</th>
                                 <th class="text-end">Remaining</th>
                                 <th>Exception</th>
                                 <th>Indikasi</th>

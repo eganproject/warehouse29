@@ -20,7 +20,7 @@ class OutboundController extends Controller
 {
     public function pickers()
     {
-        return $this->index('picker', 'Outbound - Picker', 'pickers');
+        return $this->index('picker', 'Outbound - QC Scan', 'pickers');
     }
 
     public function manuals()
@@ -80,7 +80,7 @@ class OutboundController extends Controller
 
     public function pickersDetail(int $id)
     {
-        return $this->detail('picker', 'Outbound - Picker', 'pickers', $id);
+        return $this->detail('picker', 'Outbound - QC Scan', 'pickers', $id);
     }
 
     public function manualsDetail(int $id)
@@ -726,7 +726,7 @@ class OutboundController extends Controller
     private function typeOptions(): array
     {
         return [
-            'picker' => 'Picker',
+            'picker' => 'QC Scan',
             'manual' => 'Manual',
             'return' => 'Retur',
         ];

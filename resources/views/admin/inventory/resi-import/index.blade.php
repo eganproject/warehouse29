@@ -524,7 +524,7 @@
             if (typeof Swal !== 'undefined') {
                 Swal.fire({
                     title: 'Batalkan resi ini?',
-                    text: 'Resi yang dibatalkan tidak bisa diproses packing/scan out.',
+                    text: 'Resi yang dibatalkan tidak bisa diproses QC scan maupun scan out.',
                     icon: 'warning',
                     showCancelButton: true,
                     confirmButtonText: 'Ya, cancel',

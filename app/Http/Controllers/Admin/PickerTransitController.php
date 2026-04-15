@@ -140,11 +140,11 @@ class PickerTransitController extends Controller
 
         DB::beginTransaction();
         try {
-            $consumedRows = DB::table('packer_resi_scans as prs')
-                ->join('resis as r', 'r.id', '=', 'prs.resi_id')
+            $consumedRows = DB::table('packer_scan_outs as pso')
+                ->join('resis as r', 'r.id', '=', 'pso.resi_id')
                 ->join('resi_details as rd', 'rd.resi_id', '=', 'r.id')
                 ->join('items as i', 'i.sku', '=', 'rd.sku')
-                ->where('prs.scan_date', $date)
+                ->where('pso.scan_date', $date)
                 ->where(function ($q) {
                     $q->whereNull('r.status')
                         ->orWhere('r.status', '!=', 'canceled');
@@ -256,9 +256,9 @@ class PickerTransitController extends Controller
             ->all();
         $exceptionLookup = array_flip($exceptionSkus);
 
-        // Qty packed based on resi upload date (regardless of when the scan happened)
-        $packedByUpload = DB::table('resis as r')
-            ->join('packer_resi_scans as prs', 'prs.resi_id', '=', 'r.id')
+        // Qty scan out berdasarkan tanggal upload resi (tanpa peduli kapan scan out dilakukan)
+        $scannedOutByUpload = DB::table('resis as r')
+            ->join('packer_scan_outs as pso', 'pso.resi_id', '=', 'r.id')
             ->join('resi_details as rd', 'rd.resi_id', '=', 'r.id')
             ->whereDate('r.tanggal_upload', $date)
             ->whereIn('rd.sku', $skus)
@@ -275,11 +275,11 @@ class PickerTransitController extends Controller
             ->mapWithKeys(fn ($row) => [(string) ($row->sku ?? '') => (int) ($row->qty ?? 0)])
             ->all();
 
-        // Qty packed scanned on this date
-        $packedByScanDate = DB::table('packer_resi_scans as prs')
-            ->join('resis as r', 'r.id', '=', 'prs.resi_id')
+        // Qty scan out yang benar-benar discan pada tanggal ini
+        $scannedOutByScanDate = DB::table('packer_scan_outs as pso')
+            ->join('resis as r', 'r.id', '=', 'pso.resi_id')
             ->join('resi_details as rd', 'rd.resi_id', '=', 'r.id')
-            ->where('prs.scan_date', $date)
+            ->where('pso.scan_date', $date)
             ->whereIn('rd.sku', $skus)
             ->where(function ($q) {
                 $q->whereNull('r.status')
@@ -294,22 +294,22 @@ class PickerTransitController extends Controller
             ->mapWithKeys(fn ($row) => [(string) ($row->sku ?? '') => (int) ($row->qty ?? 0)])
             ->all();
 
-        $data = $transitRows->map(function ($row) use ($packedByUpload, $packedByScanDate, $exceptionLookup) {
+        $data = $transitRows->map(function ($row) use ($scannedOutByUpload, $scannedOutByScanDate, $exceptionLookup) {
             $sku = (string) ($row->sku ?? '');
             $skuKey = strtolower(trim($sku));
             $pickedQty = (int) ($row->picked_qty ?? 0);
             $remainingQty = (int) ($row->remaining_qty ?? 0);
-            $packedUploadQty = (int) ($packedByUpload[$sku] ?? 0);
-            $packedScanQty = (int) ($packedByScanDate[$sku] ?? 0);
+            $scannedOutUploadQty = (int) ($scannedOutByUpload[$sku] ?? 0);
+            $scannedOutScanQty = (int) ($scannedOutByScanDate[$sku] ?? 0);
             $isException = $skuKey !== '' && isset($exceptionLookup[$skuKey]);
 
-            $suspect = 'Belum semua qty scanned packing';
+            $suspect = 'Belum semua qty selesai scan out';
             if ($isException) {
-                $suspect = 'SKU ada di packer scan exception (di packer scan tidak mengurangi transit)';
-            } elseif ($packedUploadQty >= $pickedQty && $remainingQty > 0) {
-                $suspect = 'Semua resi batch tanggal ini sudah scanned, tapi remaining masih ada (mismatch alokasi tanggal/row transit)';
-            } elseif ($packedScanQty >= $pickedQty && $remainingQty > 0) {
-                $suspect = 'Scan hari ini sudah cukup, tapi remaining masih ada (kemungkinan transit tidak ter-reduce untuk sebagian SKU)';
+                $suspect = 'SKU ada di exception scan out, sehingga tidak mengurangi QC transit';
+            } elseif ($scannedOutUploadQty >= $pickedQty && $remainingQty > 0) {
+                $suspect = 'Semua resi batch tanggal ini sudah scan out, tapi remaining masih ada (indikasi mismatch alokasi tanggal/row transit)';
+            } elseif ($scannedOutScanQty >= $pickedQty && $remainingQty > 0) {
+                $suspect = 'Scan out hari ini sudah cukup, tapi remaining masih ada (indikasi QC transit belum ter-reduce penuh)';
             }
 
             return [
@@ -317,8 +317,8 @@ class PickerTransitController extends Controller
                 'name' => (string) ($row->name ?? '-'),
                 'picked_qty' => $pickedQty,
                 'remaining_qty' => $remainingQty,
-                'packed_qty_by_upload_date' => $packedUploadQty,
-                'packed_qty_by_scan_date' => $packedScanQty,
+                'packed_qty_by_upload_date' => $scannedOutUploadQty,
+                'packed_qty_by_scan_date' => $scannedOutScanQty,
                 'is_exception' => $isException ? 1 : 0,
                 'suspect' => $suspect,
             ];

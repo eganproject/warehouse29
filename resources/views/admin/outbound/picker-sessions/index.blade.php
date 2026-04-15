@@ -14,7 +14,7 @@
                         <path d="M11 19C6.55556 19 3 15.4444 3 11C3 6.55556 6.55556 3 11 3C15.4444 3 19 6.55556 19 11C19 15.4444 15.4444 19 11 19ZM11 5C7.53333 5 5 7.53333 5 11C5 14.4667 7.53333 17 11 17C14.4667 17 17 14.4667 17 11C17 7.53333 14.4667 5 11 5Z" fill="black" />
                     </svg>
                 </span>
-                <input type="text" class="form-control form-control-solid w-250px ps-14" placeholder="Search" data-kt-filter="search" />
+                <input type="text" class="form-control form-control-solid w-250px ps-14" placeholder="Cari kode / SKU / petugas QC" data-kt-filter="search" />
             </div>
         </div>
         <div class="card-toolbar">
@@ -35,12 +35,12 @@
                 </button>
                 <div class="menu menu-sub menu-sub-dropdown w-300px w-md-325px" data-kt-menu="true">
                     <div class="px-7 py-5">
-                        <div class="fs-5 text-dark fw-bolder">Filter Options</div>
+                        <div class="fs-5 text-dark fw-bolder">Filter QC Scan</div>
                     </div>
                     <div class="separator border-gray-200"></div>
                     <div class="px-7 py-5">
                         <div class="mb-10">
-                            <label class="form-label fs-6 fw-bold">User:</label>
+                            <label class="form-label fs-6 fw-bold">Petugas QC:</label>
                             <select id="filter_picker_user" class="form-select form-select-solid fw-bolder" data-control="select2" data-placeholder="Select option" data-allow-clear="true">
                                 <option value="">Semua</option>
                                 @foreach($users as $u)
@@ -49,7 +49,7 @@
                             </select>
                         </div>
                         <div class="mb-10">
-                            <label class="form-label fs-6 fw-bold">Status:</label>
+                            <label class="form-label fs-6 fw-bold">Status Sesi:</label>
                             <select id="filter_picker_status" class="form-select form-select-solid fw-bolder" data-control="select2" data-placeholder="Select option" data-allow-clear="true">
                                 <option value="">Semua</option>
                                 <option value="draft">Draft</option>
@@ -58,7 +58,7 @@
                         </div>
                         <div class="d-flex justify-content-end">
                             <button type="button" class="btn btn-light btn-active-light-primary me-2" id="filter_picker_reset">Reset</button>
-                            <button type="button" class="btn btn-primary" id="filter_picker_apply">Apply</button>
+                            <button type="button" class="btn btn-primary" id="filter_picker_apply">Terapkan</button>
                         </div>
                     </div>
                 </div>

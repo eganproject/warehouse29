@@ -14,7 +14,7 @@
                         <path d="M11 19C6.55556 19 3 15.4444 3 11C3 6.55556 6.55556 3 11 3C15.4444 3 19 6.55556 19 11C19 15.4444 15.4444 19 11 19ZM11 5C7.53333 5 5 7.53333 5 11C5 14.4667 7.53333 17 11 17C14.4667 17 17 14.4667 17 11C17 7.53333 14.4667 5 11 5Z" fill="black" />
                     </svg>
                 </span>
-                <input type="text" class="form-control form-control-solid w-250px ps-14" placeholder="Search" data-kt-filter="search" />
+                <input type="text" class="form-control form-control-solid w-250px ps-14" placeholder="Cari resi / petugas scan out" data-kt-filter="search" />
             </div>
         </div>
         <div class="card-toolbar">
@@ -34,7 +34,7 @@
                         <th>No</th>
                         <th>Tanggal</th>
                         <th>Jam Scan</th>
-                        <th>Packer</th>
+                        <th>Petugas</th>
                         <th>Jenis Scan</th>
                         <th>Kode Scan</th>
                         <th>ID Pesanan</th>
