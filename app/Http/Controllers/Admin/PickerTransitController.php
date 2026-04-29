@@ -7,8 +7,8 @@ use App\Exports\PackerTransitStatusExport;
 use App\Exports\PickerTransitStatusExport;
 use App\Models\PackerTransitHistory;
 use App\Models\PackerScanException;
-use App\Models\PickerTransitItem;
-use App\Models\Resi;
+use App\Models\QcScanResi;
+use App\Models\QcTransitItem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -28,26 +28,37 @@ class PickerTransitController extends Controller
 
     public function data(Request $request)
     {
-        $baseQuery = PickerTransitItem::query()
-            ->with('item')
-            ->orderBy('picked_date', 'desc')
+        $baseQuery = QcScanResi::query()
+            ->with(['session.user', 'resi', 'items.item'])
+            ->whereHas('resi', function ($q) {
+                $q->whereNull('status')
+                    ->orWhere('status', '!=', 'canceled');
+            })
+            ->orderBy('scanned_at', 'desc')
             ->orderBy('id', 'desc');
 
         $search = trim((string) $request->input('q', ''));
         if ($search !== '') {
-            $baseQuery->whereHas('item', function ($itemQ) use ($search) {
-                $itemQ->where('sku', 'like', "%{$search}%")
-                    ->orWhere('name', 'like', "%{$search}%");
+            $baseQuery->where(function ($q) use ($search) {
+                $q->whereHas('resi', function ($resiQ) use ($search) {
+                    $resiQ->where('no_resi', 'like', "%{$search}%")
+                        ->orWhere('id_pesanan', 'like', "%{$search}%");
+                })
+                    ->orWhereHas('session', fn ($sessionQ) => $sessionQ->where('code', 'like', "%{$search}%"))
+                    ->orWhereHas('items', function ($itemQ) use ($search) {
+                        $itemQ->where('sku', 'like', "%{$search}%")
+                            ->orWhereHas('item', fn ($masterQ) => $masterQ->where('name', 'like', "%{$search}%"));
+                    });
             });
         }
 
         $this->applyDateFilter($baseQuery, $request);
 
-        $recordsTotal = PickerTransitItem::count();
+        $recordsTotal = (clone $baseQuery)->count();
         $summaryQuery = clone $baseQuery;
         $summary = [
-            'ongoing' => (clone $summaryQuery)->where('remaining_qty', '>', 0)->count(),
-            'done' => (clone $summaryQuery)->where('remaining_qty', '<=', 0)->count(),
+            'ongoing' => $this->applyPickerStatusFilter(clone $summaryQuery, 'ongoing')->count(),
+            'done' => $this->applyPickerStatusFilter(clone $summaryQuery, 'done')->count(),
         ];
 
         $query = clone $baseQuery;
@@ -61,14 +72,38 @@ class PickerTransitController extends Controller
         }
 
         $data = $query->get()->map(function ($row) {
-            $item = $row->item;
+            $requiredQty = (int) $row->items->sum('required_qty');
+            $scannedQty = (int) $row->items->sum('scanned_qty');
+            $progress = $requiredQty > 0 ? (int) floor(min(100, ($scannedQty / $requiredQty) * 100)) : 0;
+            $scanOut = DB::table('packer_scan_outs')
+                ->where('resi_id', $row->resi_id)
+                ->orderByDesc('scanned_at')
+                ->first(['scanned_at']);
+            $skuSummary = $row->items->map(function ($item) {
+                return sprintf(
+                    '%s (%d/%d)',
+                    $item->sku,
+                    (int) $item->scanned_qty,
+                    (int) $item->required_qty
+                );
+            })->implode(', ');
+
             return [
-                'date' => $row->picked_date?->format('Y-m-d') ?? '-',
-                'sku' => $item?->sku ?? '-',
-                'name' => $item?->name ?? '-',
-                'qty' => (int) $row->qty,
-                'remaining_qty' => (int) $row->remaining_qty,
-                'picked_at' => $row->picked_at?->format('Y-m-d H:i') ?? '-',
+                'id' => $row->id,
+                'date' => $row->scanned_at?->format('Y-m-d') ?? '-',
+                'id_pesanan' => $row->resi?->id_pesanan ?? '-',
+                'no_resi' => $row->resi?->no_resi ?? '-',
+                'session_code' => $row->session?->code ?? '-',
+                'scanner_name' => $row->session?->user?->name ?? '-',
+                'sku_count' => $row->items->count(),
+                'sku_summary' => $skuSummary ?: '-',
+                'qc_required_qty' => $requiredQty,
+                'qc_scanned_qty' => $scannedQty,
+                'qc_progress' => $progress,
+                'qc_status' => $row->status,
+                'scan_out_status' => $scanOut ? 'done' : 'ongoing',
+                'scan_out_at' => $scanOut?->scanned_at ? Carbon::parse($scanOut->scanned_at)->format('Y-m-d H:i') : '-',
+                'picked_at' => $row->scanned_at?->format('Y-m-d H:i') ?? '-',
             ];
         });
 
@@ -84,49 +119,60 @@ class PickerTransitController extends Controller
     public function pickerDetail(Request $request)
     {
         $validated = $request->validate([
-            'date' => ['required', 'date'],
-            'sku' => ['required', 'string', 'max:100'],
+            'qc_resi_id' => ['required', 'integer', 'exists:qc_scan_resis,id'],
+            'q' => ['nullable', 'string', 'max:100'],
         ]);
 
-        $date = Carbon::parse($validated['date'])->toDateString();
-        $sku = trim((string) $validated['sku']);
+        $search = strtolower(trim((string) ($validated['q'] ?? '')));
+        $qcResi = QcScanResi::with(['session.user', 'resi', 'items.item'])
+            ->findOrFail((int) $validated['qc_resi_id']);
 
-        $rows = Resi::query()
-            ->join('resi_details as rd', 'rd.resi_id', '=', 'resis.id')
-            ->whereDate('resis.tanggal_upload', $date)
-            ->where('rd.sku', $sku)
-            ->where(function ($q) {
-                $q->whereNull('resis.status')
-                    ->orWhere('resis.status', '!=', 'canceled');
-            })
-            ->select([
-                'resis.id_pesanan',
-                'resis.no_resi',
-                DB::raw('SUM(rd.qty) as qty'),
-            ])
-            ->groupBy('resis.id_pesanan', 'resis.no_resi')
-            ->orderBy('resis.no_resi')
-            ->limit(1000)
-            ->get()
-            ->map(function ($row) {
-                return [
-                    'id_pesanan' => $row->id_pesanan ?? '-',
-                    'no_resi' => $row->no_resi ?? '-',
-                    'qty' => (int) ($row->qty ?? 0),
-                ];
-            })
-            ->values();
+        $items = $qcResi->items;
+        if ($search !== '') {
+            $items = $items->filter(function ($item) use ($search) {
+                return str_contains(strtolower((string) $item->sku), $search)
+                    || str_contains(strtolower((string) ($item->item?->name ?? '')), $search);
+            })->values();
+        }
 
-        $totalQty = (int) $rows->sum('qty');
+        $mapped = $items->map(function ($row) use ($qcResi) {
+            $requiredQty = (int) $row->required_qty;
+            $scannedQty = (int) $row->scanned_qty;
+            $qcStatus = $scannedQty >= $requiredQty ? 'completed' : 'in_progress';
+            $progress = $requiredQty > 0 ? (int) floor(min(100, ($scannedQty / $requiredQty) * 100)) : 0;
+
+            return [
+                'sku' => $row->sku,
+                'name' => $row->item?->name ?? '-',
+                'required_qty' => $requiredQty,
+                'scanned_qty' => $scannedQty,
+                'progress' => $progress,
+                'qc_status' => $qcStatus,
+                'session_code' => $qcResi->session?->code ?? '-',
+                'scanner_name' => $qcResi->session?->user?->name ?? '-',
+                'scanned_at' => $qcResi->scanned_at ? Carbon::parse($qcResi->scanned_at)->format('Y-m-d H:i') : '-',
+                'completed_at' => $qcResi->completed_at ? Carbon::parse($qcResi->completed_at)->format('Y-m-d H:i') : '-',
+            ];
+        })->values();
+
+        $qcScannedCount = (int) $mapped->where('qc_status', 'completed')->count();
+        $qcInProgressCount = (int) $mapped->where('qc_status', 'in_progress')->count();
+        $totalRequiredQty = (int) $mapped->sum('required_qty');
+        $totalScannedQty = (int) $mapped->sum('scanned_qty');
 
         return response()->json([
             'meta' => [
-                'date' => $date,
-                'sku' => $sku,
-                'total_resi' => (int) $rows->count(),
-                'total_qty' => $totalQty,
+                'date'          => $qcResi->scanned_at?->format('Y-m-d') ?? '-',
+                'id_pesanan'    => $qcResi->resi?->id_pesanan ?? '-',
+                'no_resi'       => $qcResi->resi?->no_resi ?? '-',
+                'qc_status'     => $qcResi->status,
+                'total_sku'     => (int) $mapped->count(),
+                'qc_scanned'    => $qcScannedCount,
+                'qc_in_progress' => $qcInProgressCount,
+                'qc_required_qty' => $totalRequiredQty,
+                'qc_scanned_qty' => $totalScannedQty,
             ],
-            'data' => $rows,
+            'data' => $mapped,
         ]);
     }
 
@@ -165,8 +211,8 @@ class PickerTransitController extends Controller
                 $consumedByItemId[$itemId] = (int) ($row->qty ?? 0);
             }
 
-            $pickedRows = PickerTransitItem::query()
-                ->where('picked_date', $date)
+            $pickedRows = QcTransitItem::query()
+                ->where('transit_date', $date)
                 ->lockForUpdate()
                 ->get(['id', 'item_id', 'qty', 'remaining_qty']);
 
@@ -220,9 +266,9 @@ class PickerTransitController extends Controller
             $date = now()->toDateString();
         }
 
-        $transitRows = DB::table('picker_transit_items as pti')
+        $transitRows = DB::table('qc_transit_items as pti')
             ->join('items as i', 'i.id', '=', 'pti.item_id')
-            ->where('pti.picked_date', $date)
+            ->where('pti.transit_date', $date)
             ->where('pti.remaining_qty', '>', 0)
             ->select([
                 'pti.item_id',
@@ -422,11 +468,59 @@ class PickerTransitController extends Controller
         try {
             if ($date) {
                 $target = Carbon::parse($date)->toDateString();
-                $query->where('picked_date', $target);
+                $query->whereDate('scanned_at', $target);
             }
         } catch (\Throwable) {
             // ignore invalid date filters
         }
+    }
+
+    private function qcLedgerStatsForSkuDate(string $sku, string $date): array
+    {
+        $sku = trim($sku);
+        if ($sku === '' || $date === '') {
+            return [
+                'required_qty' => 0,
+                'scanned_qty' => 0,
+                'resi_count' => 0,
+                'completed_resi_count' => 0,
+                'in_progress_resi_count' => 0,
+                'progress' => 0,
+            ];
+        }
+
+        $rows = DB::table('qc_scan_resi_items as qsri')
+            ->join('qc_scan_resis as qsr', 'qsr.id', '=', 'qsri.qc_scan_resi_id')
+            ->join('resis as r', 'r.id', '=', 'qsr.resi_id')
+            ->where('qsri.sku', $sku)
+            ->whereDate('r.tanggal_upload', $date)
+            ->where(function ($q) {
+                $q->whereNull('r.status')
+                    ->orWhere('r.status', '!=', 'canceled');
+            })
+            ->select([
+                'qsr.resi_id',
+                'qsr.status',
+                'qsri.required_qty',
+                'qsri.scanned_qty',
+            ])
+            ->get();
+
+        $requiredQty = (int) $rows->sum('required_qty');
+        $scannedQty = (int) $rows->sum('scanned_qty');
+        $resiCount = (int) $rows->pluck('resi_id')->unique()->count();
+        $completedResiCount = (int) $rows->where('status', 'completed')->pluck('resi_id')->unique()->count();
+        $inProgressResiCount = max(0, $resiCount - $completedResiCount);
+        $progress = $requiredQty > 0 ? (int) floor(min(100, ($scannedQty / $requiredQty) * 100)) : 0;
+
+        return [
+            'required_qty' => $requiredQty,
+            'scanned_qty' => $scannedQty,
+            'resi_count' => $resiCount,
+            'completed_resi_count' => $completedResiCount,
+            'in_progress_resi_count' => $inProgressResiCount,
+            'progress' => $progress,
+        ];
     }
 
     private function applyPackerDateFilter($query, Request $request): void
@@ -443,14 +537,24 @@ class PickerTransitController extends Controller
         }
     }
 
-    private function applyPickerStatusFilter($query, Request $request): void
+    private function applyPickerStatusFilter($query, Request|string $request): mixed
     {
-        $status = (string) $request->input('status', '');
+        $status = $request instanceof Request ? (string) $request->input('status', '') : $request;
         if ($status === 'ongoing') {
-            $query->where('remaining_qty', '>', 0);
+            $query->whereNotExists(function ($sub) {
+                $sub->select(DB::raw(1))
+                    ->from('packer_scan_outs as pso')
+                    ->whereColumn('pso.resi_id', 'qc_scan_resis.resi_id');
+            });
         } elseif ($status === 'done') {
-            $query->where('remaining_qty', '<=', 0);
+            $query->whereExists(function ($sub) {
+                $sub->select(DB::raw(1))
+                    ->from('packer_scan_outs as pso')
+                    ->whereColumn('pso.resi_id', 'qc_scan_resis.resi_id');
+            });
         }
+
+        return $query;
     }
 
     private function applyPackerStatusFilter($query, Request $request): void

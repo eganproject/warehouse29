@@ -16,10 +16,13 @@
             <div class="col-md-6">
                 <div class="card card-flush h-100">
                     <div class="card-body">
-                        <div class="d-flex align-items-start justify-content-between gap-2">
-                            <div>
-                                <div class="text-muted">QC Transit - Belum Scan Out</div>
-                                <div class="fs-2 fw-bold" id="picker_summary_ongoing">0</div>
+                        <div class="d-flex align-items-center justify-content-between gap-2">
+                            <div class="d-flex align-items-center gap-3">
+                                <i class="bi bi-hourglass-split fs-2 text-warning me-3"></i>
+                                <div>
+                                    <div class="text-muted">QC Transit - Belum Scan Out</div>
+                                    <div class="fs-2 fw-bold" id="picker_summary_ongoing">0</div>
+                                </div>
                             </div>
                             <button type="button" class="btn btn-sm btn-light btn-picker-status" data-status="ongoing" data-title="QC Transit - Belum Scan Out">
                                 Detail
@@ -32,10 +35,13 @@
             <div class="col-md-6">
                 <div class="card card-flush h-100">
                     <div class="card-body">
-                        <div class="d-flex align-items-start justify-content-between gap-2">
-                            <div>
-                                <div class="text-muted">QC Transit - Selesai</div>
-                                <div class="fs-2 fw-bold" id="picker_summary_done">0</div>
+                        <div class="d-flex align-items-center justify-content-between gap-2">
+                            <div class="d-flex align-items-center gap-3">
+                                <i class="bi bi-check-circle-fill fs-2 text-success me-3"></i>
+                                <div>
+                                    <div class="text-muted">QC Transit - Selesai</div>
+                                    <div class="fs-2 fw-bold" id="picker_summary_done">0</div>
+                                </div>
                             </div>
                             <button type="button" class="btn btn-sm btn-light btn-picker-status" data-status="done" data-title="QC Transit - Selesai">
                                 Detail
@@ -54,7 +60,7 @@
                         <path d="M11 19C6.55556 19 3 15.4444 3 11C3 6.55556 6.55556 3 11 3C15.4444 3 19 6.55556 19 11C19 15.4444 15.4444 19 11 19ZM11 5C7.53333 5 5 7.53333 5 11C5 14.4667 7.53333 17 11 17C14.4667 17 17 14.4667 17 11C17 7.53333 14.4667 5 11 5Z" fill="black" />
                     </svg>
                 </span>
-                <input type="text" class="form-control form-control-solid w-250px ps-14" id="picker_filter_search" placeholder="Search SKU / Nama" />
+                <input type="text" class="form-control form-control-solid w-250px ps-14" id="picker_filter_search" placeholder="Search Resi / Pesanan / SKU" />
             </div>
 
             <input type="text" class="form-control form-control-solid w-150px" id="picker_filter_date" placeholder="Tanggal" value="{{ $today ?? '' }}" />
@@ -80,11 +86,13 @@
                     <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
                         <th>No</th>
                         <th>Tanggal</th>
-                        <th>SKU</th>
-                        <th>Nama</th>
-                        <th class="text-end">Qty Transit</th>
-                        <th class="text-end">Sisa Qty</th>
-                        <th>Last QC</th>
+                        <th>ID Pesanan</th>
+                        <th>No Resi</th>
+                        <th>SKU Dalam Resi</th>
+                        <th>Progres QC Resi</th>
+                        <th class="text-end">Scan / Wajib</th>
+                        <th>Scan Out</th>
+                        <th>Petugas QC</th>
                         <th>Detail</th>
                     </tr>
                 </thead>
@@ -112,7 +120,7 @@
             </div>
             <div class="modal-body">
                 <div class="d-flex flex-wrap align-items-center gap-2 mb-4">
-                    <input type="text" class="form-control form-control-solid w-250px" id="picker_status_search" placeholder="Search SKU" />
+                    <input type="text" class="form-control form-control-solid w-250px" id="picker_status_search" placeholder="Search Resi / Pesanan / SKU" />
                     <button type="button" class="btn btn-light-primary" id="picker_status_export">Export Excel</button>
                 </div>
                 <div class="table-responsive">
@@ -121,10 +129,12 @@
                             <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
                                 <th>No</th>
                                 <th>Tanggal</th>
+                                <th>ID Pesanan</th>
+                                <th>No Resi</th>
                                 <th>SKU</th>
-                                <th class="text-end">Qty Transit</th>
-                                <th class="text-end">Sisa Qty</th>
-                                <th>Last QC</th>
+                                <th>Progres QC</th>
+                                <th class="text-end">Scan / Wajib</th>
+                                <th>Scan Out</th>
                             </tr>
                         </thead>
                         <tbody></tbody>
@@ -146,23 +156,53 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <div class="d-flex flex-wrap align-items-center gap-2 mb-4">
-                    <div class="badge badge-light-primary">Total Resi: <span id="picker_transit_detail_total_resi">0</span></div>
-                    <div class="badge badge-light-success">Total Qty SKU: <span id="picker_transit_detail_total_qty">0</span></div>
+                <div class="d-flex flex-wrap align-items-center gap-3 mb-5">
+                    <div class="d-flex align-items-center gap-1 px-3 py-2 rounded bg-light-primary">
+                        <i class="bi bi-receipt text-primary fs-5"></i>
+                        <span class="text-muted fs-7 me-1">Total SKU</span>
+                        <span class="fw-bold text-primary fs-6" id="picker_transit_detail_total_resi">0</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-1 px-3 py-2 rounded bg-light-success">
+                        <i class="bi bi-check-circle text-success fs-5"></i>
+                        <span class="text-muted fs-7 me-1">SKU Selesai</span>
+                        <span class="fw-bold text-success fs-6" id="picker_transit_detail_qc_scanned">0</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-1 px-3 py-2 rounded bg-light-warning">
+                        <i class="bi bi-hourglass-split text-warning fs-5"></i>
+                        <span class="text-muted fs-7 me-1">Belum Selesai</span>
+                        <span class="fw-bold text-warning fs-6" id="picker_transit_detail_qc_pending">0</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-1 px-3 py-2 rounded bg-light-info">
+                        <i class="bi bi-box text-info fs-5"></i>
+                        <span class="text-muted fs-7 me-1">Scan / Wajib</span>
+                        <span class="fw-bold text-info fs-6" id="picker_transit_detail_total_qty">0</span>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center position-relative mb-4">
+                    <span class="svg-icon svg-icon-1 position-absolute ms-6">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                            <rect opacity="0.5" x="17.0365" y="15.1223" width="8.15546" height="2" rx="1" transform="rotate(45 17.0365 15.1223)" fill="black" />
+                            <path d="M11 19C6.55556 19 3 15.4444 3 11C3 6.55556 6.55556 3 11 3C15.4444 3 19 6.55556 19 11C19 15.4444 15.4444 19 11 19ZM11 5C7.53333 5 5 7.53333 5 11C5 14.4667 7.53333 17 11 17C14.4667 17 17 14.4667 17 11C17 7.53333 14.4667 5 11 5Z" fill="black" />
+                        </svg>
+                    </span>
+                    <input type="text" class="form-control form-control-solid w-300px ps-14" id="picker_transit_detail_search" placeholder="Search SKU / Nama" />
                 </div>
                 <div class="table-responsive">
-                    <table class="table table-row-dashed align-middle">
+                    <table class="table table-row-dashed align-middle fs-7">
                         <thead>
                             <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
-                                <th width="10%">No</th>
-                                <th width="45%">ID Pesanan</th>
-                                <th width="30%">No Resi</th>
-                                <th width="15%" class="text-end">Qty</th>
+                                <th width="5%">No</th>
+                                <th width="20%">SKU</th>
+                                <th>Nama Item</th>
+                                <th class="text-end">Scan / Wajib</th>
+                                <th class="text-center">Progress</th>
+                                <th>Petugas</th>
+                                <th>Status QC</th>
                             </tr>
                         </thead>
                         <tbody id="picker_transit_detail_body">
                             <tr>
-                                <td colspan="4" class="text-center text-muted py-6">Belum ada data.</td>
+                                <td colspan="7" class="text-center text-muted py-6">Belum ada data.</td>
                             </tr>
                         </tbody>
                     </table>
@@ -241,7 +281,10 @@
         const pickerTransitDetailSubtitleEl = document.getElementById('picker_transit_detail_subtitle');
         const pickerTransitDetailTotalResiEl = document.getElementById('picker_transit_detail_total_resi');
         const pickerTransitDetailTotalQtyEl = document.getElementById('picker_transit_detail_total_qty');
+        const pickerTransitDetailQcScannedEl = document.getElementById('picker_transit_detail_qc_scanned');
+        const pickerTransitDetailQcPendingEl = document.getElementById('picker_transit_detail_qc_pending');
         const pickerTransitDetailBodyEl = document.getElementById('picker_transit_detail_body');
+        const pickerTransitDetailSearchEl = document.getElementById('picker_transit_detail_search');
 
         const pickerTransitAuditModalEl = document.getElementById('modal_picker_transit_audit');
         const pickerTransitAuditModal = pickerTransitAuditModalEl ? new bootstrap.Modal(pickerTransitAuditModalEl) : null;
@@ -252,6 +295,7 @@
         let dtMain = null;
         let dtStatus = null;
         let statusFilter = '';
+        let activeDetailQcResiId = '';
 
         if (!tableEl.length || !$.fn.DataTable) {
             console.error('DataTables unavailable');
@@ -288,32 +332,53 @@
             columns: [
                 { data: null, orderable: false, searchable: false, render: (data, type, row, meta) => meta.row + meta.settings._iDisplayStart + 1 },
                 { data: 'date' },
-                { data: 'sku' },
-                { data: 'name' },
-                { data: 'qty', className: 'text-end' },
-                { data: 'remaining_qty', className: 'text-end', render: (data) => {
-                    const value = Number(data) || 0;
-                    const badgeClass = value > 0 ? 'badge-light-warning' : 'badge-light-success';
-                    return `<span class="badge ${badgeClass}">${value}</span>`;
+                { data: 'id_pesanan', render: (data) => `<span class="fw-semibold text-gray-700">${data || '-'}</span>` },
+                { data: 'no_resi', render: (data) => `<span class="fw-bold font-monospace text-primary">${data || '-'}</span>` },
+                { data: 'sku_summary', orderable: false, render: (data, type, row) => {
+                    return `<div class="fw-semibold">${Number(row.sku_count || 0)} SKU</div><div class="text-muted fs-9 text-truncate" style="max-width:260px">${data || '-'}</div>`;
                 }},
-                { data: 'picked_at' },
+                { data: 'qc_progress', orderable: false, render: (data, type, row) => {
+                    const pct = Number(data || 0);
+                    const barClass = pct >= 100 ? 'bg-success' : (pct > 0 ? 'bg-warning' : 'bg-secondary');
+                    return `<div class="d-flex align-items-center gap-2" style="min-width:165px">
+                                <div class="progress flex-grow-1 h-6px bg-light">
+                                    <div class="progress-bar ${barClass}" style="width:${pct}%"></div>
+                                </div>
+                                <span class="fw-semibold fs-8">${pct}%</span>
+                            </div>
+                            <div class="text-muted fs-9">${row.qc_status === 'completed' ? 'QC selesai' : 'Belum selesai QC'}</div>`;
+                }},
+                { data: 'qc_scanned_qty', className: 'text-end', orderable: false, render: (data, type, row) => {
+                    const scanned = Number(data || 0).toLocaleString('id-ID');
+                    const required = Number(row.qc_required_qty || 0).toLocaleString('id-ID');
+                    return `<span class="fw-semibold">${scanned}</span><span class="text-muted fs-8"> / ${required}</span>`;
+                }},
+                { data: 'scan_out_status', render: (data, type, row) => {
+                    if (data === 'done') {
+                        return `<span class="badge badge-light-success">Selesai</span><div class="text-muted fs-9">${row.scan_out_at || '-'}</div>`;
+                    }
+                    return '<span class="badge badge-light-warning">Belum Scan Out</span>';
+                }},
+                { data: 'scanner_name', render: (data, type, row) => `<div class="fw-semibold">${data || '-'}</div><div class="text-muted fs-9">${row.session_code || '-'}</div>` },
                 { data: null, orderable: false, searchable: false, render: (data, type, row) => {
-                    const date = row?.date || '';
-                    const sku = row?.sku || '';
-                    const disabled = !date || !sku ? 'disabled' : '';
-                    return `
-                        <button type="button" class="btn btn-sm btn-light-primary btn-picker-transit-detail" data-date="${date}" data-sku="${sku}" ${disabled}>
-                            Detail
-                        </button>
-                    `;
+                    const id = row?.id || '';
+                    const disabled = !id ? 'disabled' : '';
+                    return `<button type="button" class="btn btn-sm btn-light-primary btn-picker-transit-detail" data-id="${id}" data-label="${row?.no_resi || row?.id_pesanan || '-'}" ${disabled}><i class="bi bi-list-ul me-1"></i>SKU</button>`;
                 }},
-            ]
+            ],
+            createdRow: (row, data) => {
+                if (data.scan_out_status === 'done') {
+                    $(row).addClass('bg-light-success');
+                }
+            }
         });
 
         const reloadMain = () => dtMain?.ajax?.reload();
 
-        searchInput?.addEventListener('keyup', (e) => {
-            if (e.key === 'Enter') reloadMain();
+        let mainSearchTimer = null;
+        searchInput?.addEventListener('keyup', () => {
+            clearTimeout(mainSearchTimer);
+            mainSearchTimer = setTimeout(reloadMain, 300);
         });
         applyBtn?.addEventListener('click', reloadMain);
         resetBtn?.addEventListener('click', () => {
@@ -349,10 +414,12 @@
                 columns: [
                     { data: null, orderable: false, searchable: false, render: (data, type, row, meta) => meta.row + meta.settings._iDisplayStart + 1 },
                     { data: 'date' },
-                    { data: 'sku' },
-                    { data: 'qty', className: 'text-end' },
-                    { data: 'remaining_qty', className: 'text-end' },
-                    { data: 'picked_at' },
+                    { data: 'id_pesanan' },
+                    { data: 'no_resi' },
+                    { data: 'sku_summary', orderable: false },
+                    { data: 'qc_progress', orderable: false, render: (data, type, row) => `${Number(data || 0)}% (${row.qc_status === 'completed' ? 'QC selesai' : 'Belum selesai QC'})` },
+                    { data: 'qc_scanned_qty', className: 'text-end', orderable: false, render: (data, type, row) => `${Number(data || 0)} / ${Number(row.qc_required_qty || 0)}` },
+                    { data: 'scan_out_status', render: (data) => data === 'done' ? 'Selesai' : 'Belum Scan Out' },
                 ]
             });
         };
@@ -491,14 +558,17 @@
         });
 
         // Detail resi handler
-        const setPickerTransitDetailLoading = (date, sku) => {
-            if (pickerTransitDetailSubtitleEl) pickerTransitDetailSubtitleEl.textContent = `${sku || '-'} | Tanggal ${date || '-'}`;
+        const setPickerTransitDetailLoading = (label) => {
+            if (pickerTransitDetailSubtitleEl) pickerTransitDetailSubtitleEl.textContent = label || '-';
             if (pickerTransitDetailTotalResiEl) pickerTransitDetailTotalResiEl.textContent = '0';
             if (pickerTransitDetailTotalQtyEl) pickerTransitDetailTotalQtyEl.textContent = '0';
+            if (pickerTransitDetailQcScannedEl) pickerTransitDetailQcScannedEl.textContent = '0';
+            if (pickerTransitDetailQcPendingEl) pickerTransitDetailQcPendingEl.textContent = '0';
+            if (pickerTransitDetailSearchEl) pickerTransitDetailSearchEl.value = '';
             if (pickerTransitDetailBodyEl) {
                 pickerTransitDetailBodyEl.innerHTML = `
                     <tr>
-                        <td colspan="4" class="text-center text-muted py-6">Memuat data...</td>
+                        <td colspan="7" class="text-center text-muted py-6">Memuat data...</td>
                     </tr>
                 `;
             }
@@ -509,53 +579,98 @@
             if (!Array.isArray(rows) || rows.length === 0) {
                 pickerTransitDetailBodyEl.innerHTML = `
                     <tr>
-                        <td colspan="4" class="text-center text-muted py-6">Tidak ada resi untuk SKU ini.</td>
+                        <td colspan="7" class="text-center text-muted py-6">Tidak ada SKU yang cocok.</td>
                     </tr>
                 `;
                 return;
             }
-            pickerTransitDetailBodyEl.innerHTML = rows.map((r, idx) => `
-                <tr>
-                    <td>${idx + 1}</td>
-                    <td>${r.id_pesanan || '-'}</td>
-                    <td>${r.no_resi || '-'}</td>
-                    <td class="text-end">${Number(r.qty || 0)}</td>
-                </tr>
-            `).join('');
+            pickerTransitDetailBodyEl.innerHTML = rows.map((r, idx) => {
+                const qcBadge = qcStatusBadge(r.qc_status);
+                const pct = Number(r.progress || 0);
+                const barClass = r.qc_status === 'completed' ? 'bg-success' : (pct > 0 ? 'bg-warning' : 'bg-secondary');
+                return `
+                <tr class="${r.qc_status === 'not_started' ? 'opacity-75' : ''}">
+                    <td class="text-muted">${idx + 1}</td>
+                    <td><span class="font-monospace fw-bold text-primary fs-7">${r.sku || '-'}</span></td>
+                    <td><span class="fw-semibold text-gray-800">${r.name || '-'}</span></td>
+                    <td class="text-end fw-semibold">${Number(r.scanned_qty || 0).toLocaleString('id-ID')} / ${Number(r.required_qty || 0).toLocaleString('id-ID')}</td>
+                    <td class="text-center">
+                        <div class="d-inline-flex align-items-center gap-2">
+                            <div class="progress w-75px h-6px bg-light">
+                                <div class="progress-bar ${barClass}" style="width:${pct}%"></div>
+                            </div>
+                            <span class="fs-9 fw-semibold">${pct}%</span>
+                        </div>
+                    </td>
+                    <td>
+                        <div class="fw-semibold">${r.scanner_name || '-'}</div>
+                        <div class="text-muted fs-9">${r.session_code || '-'}</div>
+                    </td>
+                    <td>${qcBadge}<div class="text-muted fs-9 mt-1">${r.completed_at && r.completed_at !== '-' ? r.completed_at : r.scanned_at}</div></td>
+                </tr>`;
+            }).join('');
         };
 
-        tableEl.on('click', '.btn-picker-transit-detail', async function() {
-            const date = this.getAttribute('data-date') || '';
-            const sku = this.getAttribute('data-sku') || '';
-            if (!pickerTransitDetailModal || !date || !sku) return;
+        const qcStatusBadge = (status) => {
+            if (status === 'completed') {
+                return `<span class="badge badge-light-success"><i class="bi bi-check-circle-fill me-1"></i>Selesai</span>`;
+            }
+            if (status === 'in_progress') {
+                return `<span class="badge badge-light-warning"><i class="bi bi-hourglass-split me-1"></i>Proses QC</span>`;
+            }
+            return `<span class="badge badge-light"><i class="bi bi-dash-circle me-1"></i>Belum QC</span>`;
+        };
 
-            setPickerTransitDetailLoading(date, sku);
-            pickerTransitDetailModal.show();
+        const loadPickerTransitDetail = async () => {
+            if (!activeDetailQcResiId) return;
+            const q = (pickerTransitDetailSearchEl?.value || '').trim();
 
             try {
-                const params = new URLSearchParams({ date, sku });
+                const params = new URLSearchParams({ qc_resi_id: activeDetailQcResiId });
+                if (q) params.set('q', q);
                 const response = await fetch(`${pickerTransitDetailUrl}?${params.toString()}`);
                 const payload = await response.json();
                 if (!response.ok) {
-                    throw new Error(payload?.message || 'Gagal memuat detail resi.');
+                    throw new Error(payload?.message || 'Gagal memuat detail SKU.');
                 }
 
                 const meta = payload?.meta || {};
                 if (pickerTransitDetailSubtitleEl) {
-                    pickerTransitDetailSubtitleEl.textContent = `${meta.sku || sku} | Tanggal ${meta.date || date}`;
+                    pickerTransitDetailSubtitleEl.textContent = `${meta.no_resi || '-'} | ${meta.id_pesanan || '-'} | ${meta.date || '-'}`;
                 }
-                if (pickerTransitDetailTotalResiEl) pickerTransitDetailTotalResiEl.textContent = Number(meta.total_resi || 0).toLocaleString('id-ID');
-                if (pickerTransitDetailTotalQtyEl) pickerTransitDetailTotalQtyEl.textContent = Number(meta.total_qty || 0).toLocaleString('id-ID');
+                if (pickerTransitDetailTotalResiEl) pickerTransitDetailTotalResiEl.textContent = Number(meta.total_sku || 0).toLocaleString('id-ID');
+                if (pickerTransitDetailTotalQtyEl) {
+                    pickerTransitDetailTotalQtyEl.textContent = `${Number(meta.qc_scanned_qty || 0).toLocaleString('id-ID')} / ${Number(meta.qc_required_qty || 0).toLocaleString('id-ID')}`;
+                }
+                if (pickerTransitDetailQcScannedEl) pickerTransitDetailQcScannedEl.textContent = Number(meta.qc_scanned || 0).toLocaleString('id-ID');
+                if (pickerTransitDetailQcPendingEl) pickerTransitDetailQcPendingEl.textContent = Number(meta.qc_in_progress || 0).toLocaleString('id-ID');
                 renderPickerTransitDetailRows(payload?.data || []);
             } catch (e) {
                 if (pickerTransitDetailBodyEl) {
                     pickerTransitDetailBodyEl.innerHTML = `
                         <tr>
-                            <td colspan="4" class="text-center text-danger py-6">${e.message || 'Gagal memuat detail resi.'}</td>
+                            <td colspan="7" class="text-center text-danger py-6">${e.message || 'Gagal memuat detail SKU.'}</td>
                         </tr>
                     `;
                 }
             }
+        };
+
+        tableEl.on('click', '.btn-picker-transit-detail', async function() {
+            const id = this.getAttribute('data-id') || '';
+            const label = this.getAttribute('data-label') || '';
+            if (!pickerTransitDetailModal || !id) return;
+
+            activeDetailQcResiId = id;
+            setPickerTransitDetailLoading(label);
+            pickerTransitDetailModal.show();
+            await loadPickerTransitDetail();
+        });
+
+        let detailSearchTimer = null;
+        pickerTransitDetailSearchEl?.addEventListener('input', () => {
+            if (detailSearchTimer) clearTimeout(detailSearchTimer);
+            detailSearchTimer = setTimeout(loadPickerTransitDetail, 250);
         });
     });
 </script>

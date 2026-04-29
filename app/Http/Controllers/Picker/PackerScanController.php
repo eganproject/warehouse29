@@ -7,7 +7,7 @@ use App\Models\Item;
 use App\Models\PackerResiScan;
 use App\Models\PackerScanException;
 use App\Models\PackerTransitHistory;
-use App\Models\PickerTransitItem;
+use App\Models\QcTransitItem;
 use App\Models\Resi;
 use App\Models\ResiDetail;
 use Illuminate\Http\Request;
@@ -136,10 +136,10 @@ class PackerScanController extends Controller
                     continue;
                 }
 
-                $transitRow = PickerTransitItem::where('item_id', $item->id)
-                    ->where('picked_date', '<=', $scanDate)
+                $transitRow = QcTransitItem::where('item_id', $item->id)
+                    ->where('transit_date', '<=', $scanDate)
                     ->where('remaining_qty', '>', 0)
-                    ->orderByDesc('picked_date')
+                    ->orderByDesc('transit_date')
                     ->lockForUpdate()
                     ->first();
 

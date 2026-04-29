@@ -15,20 +15,18 @@ class QcScanInputController extends Controller
                 'pickerTransit' => route('admin.inventory.picker-transit.index'),
                 'pickingList' => route('admin.inventory.picking-list.index'),
 
-                // Reuse existing QC scan (mobile) endpoints to avoid duplicate business logic.
-                'qcCurrent' => route('picker.current'),
-                'qcStart' => route('picker.start'),
-                'qcScanItem' => route('picker.scan-item'),
-                'qcItemsStore' => route('picker.items.store'),
-                'qcItemsUpdate' => route('picker.items.update', ':id'),
-                'qcItemsDestroy' => route('picker.items.destroy', ':id'),
-                'qcSubmit' => route('picker.submit'),
-                'qcSearchItems' => route('picker.items.search'),
+                'qcCurrent' => route('qc.current'),
+                'qcStart' => route('qc.start'),
+                'qcScanItem' => route('qc.scan-item'),
+                'qcSearchItems' => route('qc.items.search'),
 
                 // Picking list reference (mobile JSON endpoint)
                 'pickingListData' => route('picker.picking-list.data'),
+
+                // Resi lookup & record for QC scan flow
+                'qcResiLookup'  => route('qc.resi-lookup'),
+                'qcResiRecord'  => route('qc.resi-record'),
             ],
         ]);
     }
 }
-

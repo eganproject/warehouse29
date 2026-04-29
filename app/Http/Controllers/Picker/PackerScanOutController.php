@@ -9,7 +9,8 @@ use App\Models\PackerResiScan;
 use App\Models\PackerScanException;
 use App\Models\PackerScanOut;
 use App\Models\PackerTransitHistory;
-use App\Models\PickerTransitItem;
+use App\Models\QcScanResi;
+use App\Models\QcTransitItem;
 use App\Models\Resi;
 use App\Models\ResiDetail;
 use Illuminate\Http\Request;
@@ -237,6 +238,19 @@ class PackerScanOutController extends Controller
                 ]);
             }
 
+            $qcResi = QcScanResi::where('resi_id', $resi->id)
+                ->where('status', 'completed')
+                ->latest('completed_at')
+                ->lockForUpdate()
+                ->first();
+
+            if (!$qcResi) {
+                DB::rollBack();
+                return response()->json([
+                    'message' => 'Resi belum selesai QC scan resi.',
+                ], 422);
+            }
+
             $items = collect();
             if (!empty($skuTotals)) {
                 $items = Item::whereIn('sku', array_keys($skuTotals))
@@ -258,10 +272,10 @@ class PackerScanOutController extends Controller
                     continue;
                 }
 
-                $transitRows = PickerTransitItem::where('item_id', $item->id)
-                    ->where('picked_date', '<=', $scanDate)
+                $transitRows = QcTransitItem::where('item_id', $item->id)
+                    ->where('transit_date', '<=', $scanDate)
                     ->where('remaining_qty', '>', 0)
-                    ->orderBy('picked_date')
+                    ->orderBy('transit_date')
                     ->orderBy('id')
                     ->lockForUpdate()
                     ->get();

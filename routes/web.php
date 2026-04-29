@@ -34,6 +34,7 @@ use App\Http\Controllers\Picker\PickerDashboardController;
 use App\Http\Controllers\Picker\PackerScanOutController;
 use App\Http\Controllers\Picker\PickingListMobileController;
 use App\Http\Controllers\Picker\PickerSessionController;
+use App\Http\Controllers\Qc\QcScanController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -73,6 +74,15 @@ Route::middleware('auth')->prefix('picker')->as('picker.')->group(function () {
     Route::delete('/items/{id}', [PickerSessionController::class, 'destroyItem'])->name('items.destroy');
     Route::post('/scan-item', [PickerSessionController::class, 'scanItem'])->name('scan-item');
     Route::post('/submit', [PickerSessionController::class, 'submit'])->name('submit');
+});
+
+Route::middleware('auth')->prefix('qc')->as('qc.')->group(function () {
+    Route::get('/current', [QcScanController::class, 'current'])->name('current');
+    Route::post('/start', [QcScanController::class, 'start'])->name('start');
+    Route::get('/items/search', [QcScanController::class, 'searchItems'])->name('items.search');
+    Route::post('/scan-item', [QcScanController::class, 'scanItem'])->name('scan-item');
+    Route::get('/resi-lookup', [QcScanController::class, 'lookupResi'])->name('resi-lookup');
+    Route::post('/resi-record', [QcScanController::class, 'recordResi'])->name('resi-record');
 });
 
 Route::middleware('auth')->prefix('opname')->as('opname.')->group(function () {
@@ -268,7 +278,6 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
 
         Route::get('/picker-sessions', [PickerHistoryController::class, 'index'])->name('picker-sessions.index');
         Route::get('/picker-sessions/data', [PickerHistoryController::class, 'data'])->name('picker-sessions.data');
-        Route::post('/picker-sessions/{id}/submit', [PickerHistoryController::class, 'submit'])->name('picker-sessions.submit');
         Route::delete('/picker-sessions/{id}', [PickerHistoryController::class, 'destroy'])->name('picker-sessions.destroy');
 
         Route::get('/qc-scan', [QcScanInputController::class, 'index'])->name('qc-scan.index');

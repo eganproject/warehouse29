@@ -7,6 +7,7 @@ use App\Models\DamagedGood;
 use App\Models\InboundTransaction;
 use App\Models\OutboundTransaction;
 use App\Models\PickerSession;
+use App\Models\QcScanResi;
 use App\Models\StockMutation;
 use App\Models\StockOpname;
 use Illuminate\Http\Request;
@@ -243,6 +244,25 @@ class StockMutationController extends Controller
                             'label' => trim(($row->item?->sku ?? '').' - '.($row->item?->name ?? '')),
                             'qty' => (int) $row->qty,
                             'note' => $row->note ?? '-',
+                        ];
+                    })->values()->all();
+                }
+                break;
+            case 'qc_resi':
+                $qcResi = QcScanResi::with(['session.user', 'resi', 'items.item'])->find($mutation->source_id);
+                if ($qcResi) {
+                    $sourceSummary = [
+                        'label' => 'QC Scan Resi',
+                        'code' => $qcResi->session?->code ?? '-',
+                        'ref' => $qcResi->resi?->no_resi ?? $qcResi->resi?->id_pesanan ?? '-',
+                        'date' => ($qcResi->completed_at ?? $qcResi->scanned_at)?->format('Y-m-d H:i'),
+                        'note' => $qcResi->session?->user?->name ?? '-',
+                    ];
+                    $sourceItems = $qcResi->items->map(function ($row) {
+                        return [
+                            'label' => trim(($row->sku ?? '').' - '.($row->item?->name ?? '')),
+                            'qty' => (int) $row->scanned_qty,
+                            'note' => ((int) $row->scanned_qty).'/'.((int) $row->required_qty),
                         ];
                     })->values()->all();
                 }

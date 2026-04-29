@@ -5,80 +5,52 @@
 
 @section('content')
 <div class="card">
-    <div class="card-header border-0 pt-6">
-        <div class="card-title">
+    <div class="card-header border-0 pt-6 pb-4 flex-wrap gap-3">
+        <div class="card-title flex-wrap gap-2">
+            {{-- Search --}}
             <div class="d-flex align-items-center position-relative my-1">
-                <span class="svg-icon svg-icon-1 position-absolute ms-6">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
-                        <rect opacity="0.5" x="17.0365" y="15.1223" width="8.15546" height="2" rx="1" transform="rotate(45 17.0365 15.1223)" fill="black" />
-                        <path d="M11 19C6.55556 19 3 15.4444 3 11C3 6.55556 6.55556 3 11 3C15.4444 3 19 6.55556 19 11C19 15.4444 15.4444 19 11 19ZM11 5C7.53333 5 5 7.53333 5 11C5 14.4667 7.53333 17 11 17C14.4667 17 17 14.4667 17 11C17 7.53333 14.4667 5 11 5Z" fill="black" />
-                    </svg>
-                </span>
-                <input type="text" class="form-control form-control-solid w-250px ps-14" placeholder="Cari kode / SKU / petugas QC" data-kt-filter="search" />
+                <i class="bi bi-search position-absolute ms-3 text-gray-500 fs-5"></i>
+                <input type="text" class="form-control form-control-solid w-200px ps-10" placeholder="Cari kode / SKU / petugas" id="qc_search" />
             </div>
-        </div>
-        <div class="card-toolbar">
-            <div class="d-flex align-items-center gap-2 me-4">
-                <input type="text" class="form-control form-control-solid w-150px" id="filter_date_from" placeholder="Dari" value="{{ $today ?? '' }}" />
-                <input type="text" class="form-control form-control-solid w-150px" id="filter_date_to" placeholder="Sampai" value="{{ $today ?? '' }}" />
-                <button type="button" class="btn btn-light" id="filter_date_apply">Filter</button>
-                <button type="button" class="btn btn-light" id="filter_date_reset">Reset</button>
-            </div>
-            <div class="d-flex justify-content-end" data-kt-user-table-toolbar="base">
-                <button type="button" class="btn btn-light-primary me-3" data-kt-menu-trigger="click" data-kt-menu-placement="bottom-end">
-                    <span class="svg-icon svg-icon-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
-                            <path d="M19.0759 3H4.72777C3.95892 3 3.47768 3.83148 3.86067 4.49814L8.56967 12.6949C9.17923 13.7559 9.5 14.9582 9.5 16.1819V19.5072C9.5 20.2189 10.2223 20.7028 10.8805 20.432L13.8805 19.1977C14.2553 19.0435 14.5 18.6783 14.5 18.273V13.8372C14.5 12.8089 14.8171 11.8056 15.408 10.964L19.8943 4.57465C20.3596 3.912 19.8856 3 19.0759 3Z" fill="black" />
-                        </svg>
-                    </span>
-                    Filter
-                </button>
-                <div class="menu menu-sub menu-sub-dropdown w-300px w-md-325px" data-kt-menu="true">
-                    <div class="px-7 py-5">
-                        <div class="fs-5 text-dark fw-bolder">Filter QC Scan</div>
-                    </div>
-                    <div class="separator border-gray-200"></div>
-                    <div class="px-7 py-5">
-                        <div class="mb-10">
-                            <label class="form-label fs-6 fw-bold">Petugas QC:</label>
-                            <select id="filter_picker_user" class="form-select form-select-solid fw-bolder" data-control="select2" data-placeholder="Select option" data-allow-clear="true">
-                                <option value="">Semua</option>
-                                @foreach($users as $u)
-                                    <option value="{{ $u->id }}">{{ $u->name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="mb-10">
-                            <label class="form-label fs-6 fw-bold">Status Sesi:</label>
-                            <select id="filter_picker_status" class="form-select form-select-solid fw-bolder" data-control="select2" data-placeholder="Select option" data-allow-clear="true">
-                                <option value="">Semua</option>
-                                <option value="draft">Draft</option>
-                                <option value="submitted">Submitted</option>
-                            </select>
-                        </div>
-                        <div class="d-flex justify-content-end">
-                            <button type="button" class="btn btn-light btn-active-light-primary me-2" id="filter_picker_reset">Reset</button>
-                            <button type="button" class="btn btn-primary" id="filter_picker_apply">Terapkan</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            {{-- Date From --}}
+            <input type="text" class="form-control form-control-solid w-135px" id="filter_date_from" placeholder="Dari" value="{{ $today ?? '' }}" />
+            {{-- Date To --}}
+            <input type="text" class="form-control form-control-solid w-135px" id="filter_date_to" placeholder="Sampai" value="{{ $today ?? '' }}" />
+            {{-- User --}}
+            <select id="filter_picker_user" class="form-select form-select-solid w-175px">
+                <option value="">Semua Petugas</option>
+                @foreach($users as $u)
+                    <option value="{{ $u->id }}">{{ $u->name }}</option>
+                @endforeach
+            </select>
+            {{-- Status --}}
+            <select id="filter_picker_status" class="form-select form-select-solid w-150px">
+                <option value="">Semua Status</option>
+                <option value="active">Aktif</option>
+                <option value="closed">Closed</option>
+            </select>
+            {{-- Apply / Reset --}}
+            <button type="button" class="btn btn-primary px-4" id="filter_apply">
+                <i class="bi bi-funnel me-1"></i>Terapkan
+            </button>
+            <button type="button" class="btn btn-light px-4" id="filter_reset">
+                <i class="bi bi-arrow-counterclockwise me-1"></i>Reset
+            </button>
         </div>
     </div>
+
     <div class="card-body py-6">
         <div class="table-responsive">
-            <table class="table align-middle table-row-dashed fs-6 gy-5" id="picker_sessions_table">
+            <table class="table align-middle table-row-dashed fs-6 gy-4" id="picker_sessions_table">
                 <thead>
                     <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
-                        <th>ID</th>
-                        <th>Kode</th>
-                        <th>QC</th>
+                        <th>Kode Sesi</th>
+                        <th>Petugas QC</th>
                         <th>Status</th>
-                        <th>Mulai</th>
-                        <th>Selesai</th>
-                        <th>Item</th>
-                        <th>Qty</th>
-                        <th>Catatan</th>
+                        <th>Tanggal</th>
+                        <th>Progres Resi</th>
+                        <th>Progres Qty QC</th>
+                        <th class="text-end">Qty Transit</th>
                         <th class="text-end">Aksi</th>
                     </tr>
                 </thead>
@@ -87,45 +59,128 @@
         </div>
     </div>
 </div>
+
+{{-- Detail Modal --}}
+<div class="modal fade" id="modal_qc_session_detail" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title fw-bold mb-1" id="qc_detail_title">Detail Sesi QC</h5>
+                    <div class="text-muted fs-7" id="qc_detail_subtitle">-</div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                {{-- Info pills --}}
+                <div class="d-flex flex-wrap gap-2 mb-5" id="qc_detail_pills"></div>
+
+                {{-- Resi table --}}
+                <h6 class="fw-bold text-gray-700 mb-3">
+                    <i class="bi bi-upc-scan me-1 text-primary"></i>Progres Resi QC
+                </h6>
+                <div class="table-responsive mb-6">
+                    <table class="table table-row-dashed align-middle fs-7">
+                        <thead>
+                            <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
+                                <th width="5%">No</th>
+                                <th>No Resi</th>
+                                <th>ID Pesanan</th>
+                                <th class="text-end">Qty QC</th>
+                                <th class="text-center">Progress</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="qc_detail_resi_body">
+                            <tr><td colspan="4" class="text-center text-muted py-4">Belum ada data.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                {{-- Items table --}}
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                    <h6 class="fw-bold text-gray-700 mb-0">
+                        <i class="bi bi-box-seam me-1 text-primary"></i>Detail Resi dan SKU
+                    </h6>
+                    <div class="d-flex align-items-center position-relative">
+                        <i class="bi bi-search position-absolute ms-3 text-gray-500 fs-5"></i>
+                        <input type="text" class="form-control form-control-solid w-250px ps-10" id="qc_detail_items_search" placeholder="Cari resi / SKU / nama" />
+                    </div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-row-dashed align-middle fs-7">
+                        <thead>
+                            <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
+                                <th width="5%">No</th>
+                                <th>Resi</th>
+                                <th>SKU</th>
+                                <th>Nama Item</th>
+                                <th class="text-end">Scan / Wajib</th>
+                                <th>Status QC</th>
+                            </tr>
+                        </thead>
+                        <tbody id="qc_detail_items_body">
+                            <tr><td colspan="6" class="text-center text-muted py-4">Belum ada data.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 @endsection
 
 @push('scripts')
 <script>
-    const dataUrl = '{{ $dataUrl }}';
-    const submitUrlTpl = '{{ route('admin.outbound.picker-sessions.submit', ':id') }}';
+    const dataUrl      = '{{ $dataUrl }}';
     const deleteUrlTpl = '{{ route('admin.outbound.picker-sessions.destroy', ':id') }}';
-    const csrfToken = '{{ csrf_token() }}';
-    const todayStr = '{{ $today ?? '' }}';
+    const csrfToken    = '{{ csrf_token() }}';
+    const todayStr     = '{{ $today ?? '' }}';
 
     document.addEventListener('DOMContentLoaded', () => {
-        const tableEl = $('#picker_sessions_table');
-        const searchInput = document.querySelector('[data-kt-filter="search"]');
-        const applyBtn = document.getElementById('filter_picker_apply');
-        const resetBtn = document.getElementById('filter_picker_reset');
-        const userSelect = document.getElementById('filter_picker_user');
-        const statusSelect = document.getElementById('filter_picker_status');
-        const dateFromEl = document.getElementById('filter_date_from');
-        const dateToEl = document.getElementById('filter_date_to');
-        const dateApplyBtn = document.getElementById('filter_date_apply');
-        const dateResetBtn = document.getElementById('filter_date_reset');
-        let fpFrom = null;
-        let fpTo = null;
+        /* ── DOM refs ─────────────────────────────────────────── */
+        const tableEl       = $('#picker_sessions_table');
+        const searchInput   = document.getElementById('qc_search');
+        const userSelect    = document.getElementById('filter_picker_user');
+        const statusSelect  = document.getElementById('filter_picker_status');
+        const dateFromEl    = document.getElementById('filter_date_from');
+        const dateToEl      = document.getElementById('filter_date_to');
+        const applyBtn      = document.getElementById('filter_apply');
+        const resetBtn      = document.getElementById('filter_reset');
 
+        const detailModalEl = document.getElementById('modal_qc_session_detail');
+        const detailModal   = detailModalEl ? new bootstrap.Modal(detailModalEl) : null;
+        const detailTitleEl     = document.getElementById('qc_detail_title');
+        const detailSubtitleEl  = document.getElementById('qc_detail_subtitle');
+        const detailPillsEl     = document.getElementById('qc_detail_pills');
+        const detailResiBodyEl  = document.getElementById('qc_detail_resi_body');
+        const detailItemsBodyEl = document.getElementById('qc_detail_items_body');
+        const detailItemsSearchEl = document.getElementById('qc_detail_items_search');
+
+        /* ── Row data store ───────────────────────────────────── */
+        const rowDataStore = {};
+        let activeDetailRow = null;
+
+        /* ── HTML escape helper ───────────────────────────────── */
+        const esc = v => String(v ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+
+        /* ── Select2 init ─────────────────────────────────────── */
         const select2Safe = (el, placeholder) => {
             if (el && typeof $ !== 'undefined' && $.fn.select2) {
                 $(el).select2({ placeholder, allowClear: true, width: '100%' })
-                    .on('select2:opening select2:closing select2:close', function(e){ e.stopPropagation(); });
+                    .on('select2:opening select2:closing select2:close', e => e.stopPropagation());
             }
         };
-
-        select2Safe(userSelect, 'Semua');
-        select2Safe(statusSelect, 'Semua');
+        select2Safe(userSelect, 'Semua Petugas');
+        select2Safe(statusSelect, 'Semua Status');
 
         if (!tableEl.length || !$.fn.DataTable) {
             console.error('DataTables unavailable');
             return;
         }
 
+        /* ── Flatpickr ────────────────────────────────────────── */
+        let fpFrom = null, fpTo = null;
         if (typeof flatpickr !== 'undefined') {
             if (dateFromEl) {
                 fpFrom = flatpickr(dateFromEl, { dateFormat: 'Y-m-d', allowInput: true });
@@ -137,230 +192,372 @@
             }
         }
 
+        /* ── DataTable ────────────────────────────────────────── */
         const dt = tableEl.DataTable({
             processing: true,
             serverSide: true,
             dom: 'rtip',
-            order: [[0, 'desc']],
+            order: [[3, 'desc']],
             ajax: {
                 url: dataUrl,
                 dataSrc: 'data',
-                data: function(params) {
-                    params.q = searchInput?.value || '';
-                    params.user_id = userSelect?.value || '';
-                    params.status = statusSelect?.value || '';
+                data(params) {
+                    params.q          = searchInput?.value || '';
+                    params.user_id    = userSelect?.value  || '';
+                    params.status     = statusSelect?.value || '';
                     if (dateFromEl?.value) params.date_from = dateFromEl.value;
-                    if (dateToEl?.value) params.date_to = dateToEl.value;
+                    if (dateToEl?.value)   params.date_to   = dateToEl.value;
                 }
             },
             columns: [
-                { data: 'id' },
-                { data: 'code' },
-                { data: 'picker' },
-                { data: 'status', render: (data) => {
-                    if (data === 'submitted') {
-                        return '<span class="badge badge-light-success">Submitted</span>';
+                /* 0 – Kode Sesi */
+                {
+                    data: 'code',
+                    render(data, type, row) {
+                        return `<span class="fw-bold font-monospace fs-7">${esc(data) || '-'}</span>
+                                <div class="text-muted fs-8">#${esc(String(row.id))}</div>`;
                     }
-                    return '<span class="badge badge-light-warning">Draft</span>';
-                }},
-                { data: 'started_at' },
-                { data: 'submitted_at' },
-                { data: 'item' },
-                { data: 'qty' },
-                { data: 'note' },
-                { data: 'id', orderable:false, searchable:false, className:'text-end', render: (data, type, row) => {
-                    if (row?.status !== 'draft') {
-                        return '-';
+                },
+                /* 1 – Petugas QC */
+                { data: 'picker', render: data => esc(data) || '-' },
+                /* 2 – Status */
+                {
+                    data: 'status',
+                    render(data) {
+                        if (data === 'closed') {
+                            return '<span class="badge badge-light-success"><i class="bi bi-check-circle me-1"></i>Closed</span>';
+                        }
+                        return '<span class="badge badge-light-primary"><i class="bi bi-play-circle me-1"></i>Aktif</span>';
                     }
-                    const actions = [];
-                    actions.push(`<a href="#" class="btn btn-sm btn-light btn-active-light-primary btn-submit" data-id="${data}">Submit</a>`);
-                    if (Number(row?.qty || 0) === 0) {
-                        actions.push(`<a href="#" class="btn btn-sm btn-light-danger btn-delete" data-id="${data}">Hapus</a>`);
+                },
+                /* 3 – Tanggal */
+                {
+                    data: 'started_at',
+                    render(data, type, row) {
+                        const started   = esc(data) || '-';
+                        const lastScan = row.last_scan_at ? `<div class="text-muted fs-8"><i class="bi bi-upc-scan me-1"></i>${esc(row.last_scan_at)}</div>` : '';
+                        return `<span class="fs-7">${started}</span>${lastScan}`;
                     }
-                    return `<div class="text-end d-flex justify-content-end gap-2">${actions.join('')}</div>`;
-                }},
+                },
+                /* 4 – Progres Resi */
+                {
+                    data: 'resis',
+                    orderable: false,
+                    searchable: false,
+                    render(data, type, row) {
+                        /* Store row for the detail modal */
+                        rowDataStore[String(row.id)] = row;
+
+                        const count = Array.isArray(data) ? data.length : 0;
+                        const completed = Number(row.resi_completed_count || 0);
+                        const inProgress = Number(row.resi_in_progress_count || 0);
+                        const badgeClass = inProgress > 0 ? 'btn-light-warning' : (count > 0 ? 'btn-light-success' : 'btn-light');
+                        return `<button class="btn btn-sm ${badgeClass} btn-detail-session px-3" data-id="${esc(String(row.id))}">
+                                    <i class="bi bi-upc-scan me-1"></i>${completed}/${count} Resi selesai
+                                </button>
+                                <div class="text-muted fs-9 mt-1">${inProgress} belum lengkap</div>`;
+                    }
+                },
+                /* 5 – Progres Qty QC */
+                {
+                    data: 'qc_progress',
+                    orderable: false,
+                    render(data, type, row) {
+                        const pct = Number(data || 0);
+                        const scanned = Number(row.scanned_qty || 0).toLocaleString('id-ID');
+                        const required = Number(row.required_qty || 0).toLocaleString('id-ID');
+                        const barClass = pct >= 100 ? 'bg-success' : 'bg-warning';
+                        return `<div class="d-flex align-items-center gap-2" style="min-width:180px">
+                                    <div class="progress flex-grow-1 h-6px bg-light">
+                                        <div class="progress-bar ${barClass}" style="width:${pct}%"></div>
+                                    </div>
+                                    <span class="fw-semibold fs-8">${pct}%</span>
+                                </div>
+                                <div class="text-muted fs-9">${scanned}/${required} qty</div>`;
+                    }
+                },
+                /* 6 – Qty Transit */
+                {
+                    data: 'qty',
+                    className: 'text-end',
+                    render: data => `<span class="fw-bold">${Number(data || 0).toLocaleString('id-ID')}</span>`
+                },
+                /* 7 – Aksi */
+                {
+                    data: 'id',
+                    orderable: false,
+                    searchable: false,
+                    className: 'text-end',
+                    render(data, type, row) {
+                        if (row?.status !== 'active') return '-';
+                        const actions = [];
+                        if (Number(row?.qty || 0) === 0) {
+                            actions.push(`<button class="btn btn-sm btn-light-danger btn-delete" data-id="${esc(String(data))}"><i class="bi bi-trash me-1"></i>Hapus</button>`);
+                        }
+                        return actions.length ? `<div class="d-flex justify-content-end gap-2">${actions.join('')}</div>` : '-';
+                    }
+                },
             ]
         });
 
-        const reloadTable = () => dt.ajax.reload();
-        searchInput?.addEventListener('keyup', reloadTable);
-        applyBtn?.addEventListener('click', reloadTable);
-        resetBtn?.addEventListener('click', () => {
-            if (userSelect) userSelect.value = '';
-            if (statusSelect) statusSelect.value = '';
-            if (typeof $ !== 'undefined' && $(userSelect).data('select2')) {
-                $(userSelect).val('').trigger('change.select2');
-            }
-            if (typeof $ !== 'undefined' && $(statusSelect).data('select2')) {
-                $(statusSelect).val('').trigger('change.select2');
-            }
-            reloadTable();
+        const reloadTable = () => dt.ajax.reload(null, false);
+
+        /* ── Search debounce ──────────────────────────────────── */
+        let searchTimer = null;
+        searchInput?.addEventListener('input', () => {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(reloadTable, 400);
         });
-        dateApplyBtn?.addEventListener('click', reloadTable);
-        dateResetBtn?.addEventListener('click', () => {
-            if (fpFrom && todayStr) {
-                fpFrom.setDate(todayStr, true);
-            } else if (dateFromEl) {
-                dateFromEl.value = todayStr || '';
+
+        /* ── Filter buttons ───────────────────────────────────── */
+        applyBtn?.addEventListener('click', reloadTable);
+
+        resetBtn?.addEventListener('click', () => {
+            if (searchInput) searchInput.value = '';
+            if (userSelect) {
+                if (typeof $ !== 'undefined' && $(userSelect).data('select2')) {
+                    $(userSelect).val('').trigger('change.select2');
+                } else {
+                    userSelect.value = '';
+                }
             }
-            if (fpTo && todayStr) {
-                fpTo.setDate(todayStr, true);
-            } else if (dateToEl) {
-                dateToEl.value = todayStr || '';
+            if (statusSelect) {
+                if (typeof $ !== 'undefined' && $(statusSelect).data('select2')) {
+                    $(statusSelect).val('').trigger('change.select2');
+                } else {
+                    statusSelect.value = '';
+                }
             }
+            if (fpFrom && todayStr) fpFrom.setDate(todayStr, true);
+            else if (dateFromEl) dateFromEl.value = todayStr || '';
+            if (fpTo && todayStr)   fpTo.setDate(todayStr, true);
+            else if (dateToEl)   dateToEl.value = todayStr || '';
             reloadTable();
         });
 
+        /* ── Detail modal ─────────────────────────────────────── */
+        const pendingResis = row => (Array.isArray(row?.resis) ? row.resis : [])
+            .filter(r => (r.status || 'in_progress') !== 'completed');
+
+        const renderDetail = row => {
+            if (!row) return;
+            /* Title / subtitle */
+            if (detailTitleEl)    detailTitleEl.textContent    = row.code || '-';
+            if (detailSubtitleEl) detailSubtitleEl.textContent = `${row.picker || '-'} • ${row.started_at || '-'}`;
+
+            /* Info pills */
+            if (detailPillsEl) {
+                const statusBadge = row.status === 'closed'
+                    ? `<span class="badge badge-light-success"><i class="bi bi-check-circle me-1"></i>Closed</span>`
+                    : `<span class="badge badge-light-primary"><i class="bi bi-play-circle me-1"></i>Aktif</span>`;
+                const lastScanPill = row.last_scan_at
+                    ? pill('bi-upc-scan', 'text-success', 'Last Scan', esc(row.last_scan_at))
+                    : '';
+                detailPillsEl.innerHTML = [
+                    statusBadge,
+                    pill('bi-tag',          'text-primary',  'Kode',     esc(row.code)),
+                    pill('bi-person',        'text-info',     'Petugas',  esc(row.picker)),
+                    pill('bi-calendar',      'text-gray-600', 'Mulai',    esc(row.started_at)),
+                    lastScanPill,
+                    pill('bi-upc-scan',      'text-primary',  'Resi Selesai', `${row.resi_completed_count ?? 0}/${row.resi_count ?? 0}`),
+                    pill('bi-box-seam',      'text-warning',  'Qty QC', `${row.scanned_qty ?? 0}/${row.required_qty ?? 0}`),
+                    pill('bi-graph-up',      'text-success',  'Progress', `${row.qc_progress ?? 0}%`),
+                ].filter(Boolean).join('');
+            }
+
+            /* Resi rows */
+            if (detailResiBodyEl) {
+                const resis = pendingResis(row);
+                if (resis.length === 0) {
+                    detailResiBodyEl.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">Tidak ada resi yang masih belum selesai QC.</td></tr>`;
+                } else {
+                    detailResiBodyEl.innerHTML = resis.map((r, i) => `
+                        <tr>
+                            <td class="text-muted">${i + 1}</td>
+                            <td><span class="fw-bold font-monospace text-primary fs-7">${esc(r.no_resi)}</span></td>
+                            <td>${esc(r.id_pesanan)}</td>
+                            <td class="text-end fw-semibold">${Number(r.scanned_qty || 0).toLocaleString('id-ID')} / ${Number(r.required_qty || 0).toLocaleString('id-ID')}</td>
+                            <td class="text-center">
+                                <div class="d-inline-flex align-items-center gap-2">
+                                    <div class="progress w-75px h-6px bg-light">
+                                        <div class="progress-bar ${r.status === 'completed' ? 'bg-success' : 'bg-warning'}" style="width:${Number(r.progress || 0)}%"></div>
+                                    </div>
+                                    <span class="fs-9 fw-semibold">${Number(r.progress || 0)}%</span>
+                                </div>
+                            </td>
+                            <td>${qcStatusBadge(r.status)}</td>
+                        </tr>`).join('');
+                }
+            }
+
+            /* Items rows */
+            renderDetailItems(row);
+        };
+
+        const renderDetailItems = row => {
+            if (!detailItemsBodyEl) return;
+            const keyword = (detailItemsSearchEl?.value || '').trim().toLowerCase();
+            const resis = Array.isArray(row?.resis) ? row.resis : [];
+            const groups = resis.map(r => {
+                const items = Array.isArray(r.items) ? r.items : [];
+                const resiMatch = String(r.no_resi || '').toLowerCase().includes(keyword)
+                    || String(r.id_pesanan || '').toLowerCase().includes(keyword)
+                    || String(r.status || '').toLowerCase().includes(keyword);
+                const filteredItems = keyword === ''
+                    ? items
+                    : (resiMatch ? items : items.filter(it => {
+                        return String(it.sku || '').toLowerCase().includes(keyword)
+                            || String(it.name || '').toLowerCase().includes(keyword)
+                            || String(it.status || '').toLowerCase().includes(keyword);
+                    }));
+                return { ...r, items: filteredItems };
+            }).filter(r => (Array.isArray(r.items) && r.items.length > 0));
+
+            if (groups.length === 0) {
+                detailItemsBodyEl.innerHTML = `<tr><td colspan="6" class="text-center text-muted py-4">Tidak ada detail resi/SKU yang cocok.</td></tr>`;
+            } else {
+                let no = 1;
+                detailItemsBodyEl.innerHTML = groups.map(r => {
+                    const header = `
+                        <tr class="bg-light">
+                            <td class="text-muted">${no++}</td>
+                            <td colspan="3">
+                                <div class="fw-bold font-monospace text-primary">${esc(r.no_resi || '-')}</div>
+                                <div class="text-muted fs-9">${esc(r.id_pesanan || '-')} · ${Number(r.scanned_qty || 0).toLocaleString('id-ID')} / ${Number(r.required_qty || 0).toLocaleString('id-ID')} qty · ${Number(r.progress || 0)}%</div>
+                            </td>
+                            <td class="text-end fw-semibold">${Number(r.scanned_qty || 0).toLocaleString('id-ID')} / ${Number(r.required_qty || 0).toLocaleString('id-ID')}</td>
+                            <td>${qcStatusBadge(r.status)}</td>
+                        </tr>`;
+                    const itemRows = r.items.map(it => `
+                        <tr>
+                            <td></td>
+                            <td class="text-muted fs-9">${esc(r.no_resi || '-')}</td>
+                            <td><span class="fw-bold font-monospace">${esc(it.sku)}</span></td>
+                            <td>${esc(it.name)}</td>
+                            <td class="text-end fw-semibold">${Number(it.scanned_qty || 0).toLocaleString('id-ID')} / ${Number(it.required_qty || 0).toLocaleString('id-ID')}</td>
+                            <td>${qcStatusBadge(it.status)}</td>
+                        </tr>`).join('');
+                    return header + itemRows;
+                }).join('');
+            }
+        };
+
+        tableEl.on('click', '.btn-detail-session', function() {
+            const id  = this.getAttribute('data-id');
+            const row = rowDataStore[id];
+            if (!row || !detailModal) return;
+
+            activeDetailRow = row;
+            if (detailItemsSearchEl) detailItemsSearchEl.value = '';
+            renderDetail(row);
+
+            detailModal.show();
+        });
+
+        let detailSearchTimer = null;
+        detailItemsSearchEl?.addEventListener('input', () => {
+            clearTimeout(detailSearchTimer);
+            detailSearchTimer = setTimeout(() => renderDetailItems(activeDetailRow), 200);
+        });
+
+        /* pill helper */
+        function pill(icon, colorClass, label, value) {
+            return `<span class="d-inline-flex align-items-center gap-1 px-3 py-1 rounded bg-light">
+                        <i class="bi ${esc(icon)} ${esc(colorClass)} fs-7"></i>
+                        <span class="text-muted fs-8">${esc(label)}:</span>
+                        <span class="fw-semibold fs-7">${value}</span>
+                    </span>`;
+        }
+
+        function qcStatusBadge(status) {
+            if (status === 'completed') {
+                return '<span class="badge badge-light-success"><i class="bi bi-check-circle me-1"></i>Selesai</span>';
+            }
+            return '<span class="badge badge-light-warning"><i class="bi bi-hourglass-split me-1"></i>Belum Lengkap</span>';
+        }
+
+        /* ── Shared API action helper ─────────────────────────── */
+        const apiAction = async ({ url, method = 'POST', body = null }) => {
+            const opts = {
+                method,
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json',
+                },
+            };
+            if (body) {
+                opts.headers['Content-Type'] = 'application/x-www-form-urlencoded';
+                opts.body = body;
+            }
+            const res  = await fetch(url, opts);
+            const text = await res.text();
+            let json = null;
+            try { json = JSON.parse(text); } catch { /* ignore */ }
+            return { ok: res.ok, status: res.status, json };
+        };
+
+        const swalConfirm = async (title, text, confirmText, confirmClass = 'btn btn-primary') => {
+            if (typeof Swal === 'undefined') return window.confirm(`${title}\n${text}`);
+            const res = await Swal.fire({
+                title, text, icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: confirmText,
+                cancelButtonText: 'Batal',
+                buttonsStyling: false,
+                customClass: { confirmButton: confirmClass, cancelButton: 'btn btn-light' },
+            });
+            return res.isConfirmed;
+        };
+
+        const swalResult = (ok, msg) => {
+            if (typeof Swal !== 'undefined') {
+                Swal.fire(ok ? 'Berhasil' : 'Error', msg, ok ? 'success' : 'error');
+            } else {
+                alert(msg);
+            }
+        };
+
         const showInsufficientStock = (details) => {
-            if (!Array.isArray(details) || !details.length) return;
-            if (typeof Swal === 'undefined') return;
-            const list = details.map((row) => {
+            if (!Array.isArray(details) || !details.length || typeof Swal === 'undefined') return;
+            const list = details.map(row => {
                 const sku = row.sku || '-';
                 const name = row.name ? ` • ${row.name}` : '';
-                const available = typeof row.available !== 'undefined' ? row.available : '-';
-                const required = typeof row.required !== 'undefined' ? row.required : '-';
-                return `<li style="margin-bottom:6px;"><strong>${sku}</strong>${name}<br><span style="color:#64748b;">Tersedia ${available}, butuh ${required}</span></li>`;
+                const available = row.available ?? '-';
+                const required  = row.required  ?? '-';
+                return `<li style="margin-bottom:6px"><strong>${sku}</strong>${name}<br><span style="color:#64748b">Tersedia ${available}, butuh ${required}</span></li>`;
             }).join('');
             Swal.fire({
                 icon: 'error',
                 title: 'Stok tidak mencukupi',
-                html: `<div style="text-align:left; font-size:14px;">Item berikut stoknya kurang:</div><ul style="text-align:left; padding-left:18px; margin-top:8px;">${list}</ul>`,
+                html: `<div style="text-align:left;font-size:14px">Item berikut stoknya kurang:</div><ul style="text-align:left;padding-left:18px;margin-top:8px">${list}</ul>`,
             });
         };
 
-        tableEl.on('click', '.btn-submit', async function(e) {
-            e.preventDefault();
-            const id = this.getAttribute('data-id');
-            if (!id) return;
-            let confirmed = true;
-            if (typeof AppSwal !== 'undefined' && AppSwal.confirm) {
-                confirmed = await AppSwal.confirm('Submit batch QC scan ini?', {
-                    confirmButtonText: 'Submit',
-                });
-            } else if (typeof Swal !== 'undefined') {
-                const res = await Swal.fire({
-                    title: 'Submit batch?',
-                    text: 'Batch akan dikunci dan stok akan berkurang.',
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonText: 'Submit',
-                    cancelButtonText: 'Batal',
-                    buttonsStyling: false,
-                    customClass: {
-                        confirmButton: 'btn btn-primary',
-                        cancelButton: 'btn btn-light'
-                    }
-                });
-                confirmed = res.isConfirmed;
-            } else {
-                confirmed = window.confirm('Submit batch QC scan ini?');
-            }
-            if (!confirmed) return;
-            try {
-                const res = await fetch(submitUrlTpl.replace(':id', id), {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': csrfToken,
-                        'Accept': 'application/json',
-                    },
-                });
-                const text = await res.text();
-                let json = null;
-                try { json = JSON.parse(text); } catch (err) { json = null; }
-                if (!res.ok) {
-                    if (json?.insufficient) {
-                        showInsufficientStock(json.insufficient);
-                        return;
-                    }
-                    const msg = json?.message || 'Gagal submit sesi';
-                    if (typeof AppSwal !== 'undefined' && AppSwal.error) {
-                        AppSwal.error(msg);
-                    } else if (typeof Swal !== 'undefined') {
-                        Swal.fire('Error', msg, 'error');
-                    } else {
-                        alert(msg);
-                    }
-                    return;
-                }
-                if (typeof AppSwal !== 'undefined' && AppSwal.success) {
-                    AppSwal.success(json?.message || 'Sesi berhasil disubmit');
-                } else if (typeof Swal !== 'undefined') {
-                    Swal.fire('Berhasil', json?.message || 'Sesi berhasil disubmit', 'success');
-                }
-                dt.ajax.reload(null, false);
-            } catch (err) {
-                if (typeof AppSwal !== 'undefined' && AppSwal.error) {
-                    AppSwal.error('Gagal submit sesi');
-                } else if (typeof Swal !== 'undefined') {
-                    Swal.fire('Error', 'Gagal submit sesi', 'error');
-                }
-            }
-        });
-
+        /* ── Delete handler ───────────────────────────────────── */
         tableEl.on('click', '.btn-delete', async function(e) {
             e.preventDefault();
             const id = this.getAttribute('data-id');
             if (!id) return;
-            let confirmed = true;
-            if (typeof AppSwal !== 'undefined' && AppSwal.confirm) {
-                confirmed = await AppSwal.confirm('Hapus batch kosong ini?', {
-                    confirmButtonText: 'Hapus',
-                });
-            } else if (typeof Swal !== 'undefined') {
-                const res = await Swal.fire({
-                    title: 'Hapus batch?',
-                    text: 'Batch kosong akan dihapus.',
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonText: 'Hapus',
-                    cancelButtonText: 'Batal',
-                    buttonsStyling: false,
-                    customClass: {
-                        confirmButton: 'btn btn-danger',
-                        cancelButton: 'btn btn-light'
-                    }
-                });
-                confirmed = res.isConfirmed;
-            } else {
-                confirmed = window.confirm('Hapus batch kosong ini?');
-            }
+            const confirmed = await swalConfirm(
+                'Hapus batch?',
+                'Batch kosong akan dihapus.',
+                'Hapus',
+                'btn btn-danger'
+            );
             if (!confirmed) return;
             try {
-                const res = await fetch(deleteUrlTpl.replace(':id', id), {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': csrfToken,
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
+                const { ok, json } = await apiAction({
+                    url: deleteUrlTpl.replace(':id', id),
                     body: new URLSearchParams({ _method: 'DELETE' }),
                 });
-                const text = await res.text();
-                let json = null;
-                try { json = JSON.parse(text); } catch (err) { json = null; }
-                if (!res.ok) {
-                    const msg = json?.message || 'Gagal menghapus sesi';
-                    if (typeof AppSwal !== 'undefined' && AppSwal.error) {
-                        AppSwal.error(msg);
-                    } else if (typeof Swal !== 'undefined') {
-                        Swal.fire('Error', msg, 'error');
-                    } else {
-                        alert(msg);
-                    }
+                if (!ok) {
+                    swalResult(false, json?.message || 'Gagal menghapus sesi');
                     return;
                 }
-                if (typeof AppSwal !== 'undefined' && AppSwal.success) {
-                    AppSwal.success(json?.message || 'Sesi berhasil dihapus');
-                } else if (typeof Swal !== 'undefined') {
-                    Swal.fire('Berhasil', json?.message || 'Sesi berhasil dihapus', 'success');
-                }
-                dt.ajax.reload(null, false);
-            } catch (err) {
-                if (typeof AppSwal !== 'undefined' && AppSwal.error) {
-                    AppSwal.error('Gagal menghapus sesi');
-                } else if (typeof Swal !== 'undefined') {
-                    Swal.fire('Error', 'Gagal menghapus sesi', 'error');
-                }
+                swalResult(true, json?.message || 'Sesi berhasil dihapus');
+                reloadTable();
+            } catch {
+                swalResult(false, 'Gagal menghapus sesi');
             }
         });
     });

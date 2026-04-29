@@ -10,7 +10,8 @@ use App\Models\PackerResiScan;
 use App\Models\PackerScanOut;
 use App\Models\PickingList;
 use App\Models\PickingListException;
-use App\Models\PickerTransitItem;
+use App\Models\QcTransitItem;
+use App\Models\QcScanResi;
 use App\Models\Resi;
 use App\Models\ResiDetail;
 use Illuminate\Http\Request;
@@ -278,6 +279,7 @@ class ResiImportController extends Controller
 
         $hasPackerScan = PackerResiScan::where('resi_id', $resi->id)->exists();
         $hasScanOut = PackerScanOut::where('resi_id', $resi->id)->exists();
+        $hasQcScan = QcScanResi::where('resi_id', $resi->id)->exists();
         if ($hasScanOut) {
             return response()->json([
                 'message' => 'Resi sudah scan out, tidak bisa dibatalkan.',
@@ -286,6 +288,11 @@ class ResiImportController extends Controller
         if ($hasPackerScan) {
             return response()->json([
                 'message' => 'Resi sudah diproses, tidak bisa dibatalkan.',
+            ], 422);
+        }
+        if ($hasQcScan) {
+            return response()->json([
+                'message' => 'Resi sudah masuk proses QC, tidak bisa dibatalkan.',
             ], 422);
         }
 
@@ -337,7 +344,8 @@ class ResiImportController extends Controller
 
         $hasPackerScan = PackerResiScan::where('resi_id', $resi->id)->exists();
         $hasScanOut = PackerScanOut::where('resi_id', $resi->id)->exists();
-        if ($hasScanOut || $hasPackerScan) {
+        $hasQcScan = QcScanResi::where('resi_id', $resi->id)->exists();
+        if ($hasScanOut || $hasPackerScan || $hasQcScan) {
             return response()->json([
                 'message' => 'Resi sudah memiliki proses lanjutan, batal cancel tidak diizinkan.',
             ], 422);
@@ -470,8 +478,8 @@ class ResiImportController extends Controller
             return 0;
         }
 
-        return (int) PickerTransitItem::where('item_id', $itemId)
-            ->where('picked_date', $date)
+        return (int) QcTransitItem::where('item_id', $itemId)
+            ->where('transit_date', $date)
             ->value('qty');
     }
 

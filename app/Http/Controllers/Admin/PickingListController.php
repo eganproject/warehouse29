@@ -8,7 +8,7 @@ use App\Models\Item;
 use App\Models\PickingList;
 use App\Models\PickingListException;
 use App\Models\PackerScanException;
-use App\Models\PickerTransitItem;
+use App\Models\QcTransitItem;
 use App\Support\StockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -173,8 +173,8 @@ class PickingListController extends Controller
                 ]);
             }
 
-            $transit = PickerTransitItem::where('item_id', $item->id)
-                ->where('picked_date', $listDate)
+            $transit = QcTransitItem::where('item_id', $item->id)
+                ->where('transit_date', $listDate)
                 ->lockForUpdate()
                 ->first();
 
@@ -269,9 +269,9 @@ class PickingListController extends Controller
                 $required[$sku] = $qty;
             }
 
-            $pickedRows = DB::table('picker_transit_items as pt')
+            $pickedRows = DB::table('qc_transit_items as pt')
                 ->join('items as i', 'i.id', '=', 'pt.item_id')
-                ->whereDate('pt.picked_date', $listDate)
+                ->whereDate('pt.transit_date', $listDate)
                 ->select('i.sku', DB::raw('SUM(pt.qty) as qty'))
                 ->groupBy('i.sku')
                 ->get();
@@ -501,8 +501,8 @@ class PickingListController extends Controller
             return 0;
         }
 
-        return (int) PickerTransitItem::where('item_id', $itemId)
-            ->where('picked_date', $date)
+        return (int) QcTransitItem::where('item_id', $itemId)
+            ->where('transit_date', $date)
             ->value('qty');
     }
 
