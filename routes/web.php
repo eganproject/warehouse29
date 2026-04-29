@@ -235,15 +235,6 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         Route::get('/returns/{id}/detail', [InboundController::class, 'returnsDetail'])->name('returns.detail');
         Route::post('/returns/{id}/approve', [InboundController::class, 'returnsApprove'])->name('returns.approve');
 
-        Route::get('/manuals', [InboundController::class, 'manuals'])->name('manuals.index');
-        Route::get('/manuals/data', [InboundController::class, 'manualsData'])->name('manuals.data');
-        Route::post('/manuals', [InboundController::class, 'manualsStore'])->name('manuals.store');
-        Route::post('/manuals/import', [InboundController::class, 'manualsImport'])->name('manuals.import');
-        Route::get('/manuals/{id}', [InboundController::class, 'manualsShow'])->name('manuals.show');
-        Route::put('/manuals/{id}', [InboundController::class, 'manualsUpdate'])->name('manuals.update');
-        Route::delete('/manuals/{id}', [InboundController::class, 'manualsDestroy'])->name('manuals.destroy');
-        Route::get('/manuals/{id}/detail', [InboundController::class, 'manualsDetail'])->name('manuals.detail');
-        Route::post('/manuals/{id}/approve', [InboundController::class, 'manualsApprove'])->name('manuals.approve');
     });
 
     Route::prefix('outbound')->as('outbound.')->group(function () {

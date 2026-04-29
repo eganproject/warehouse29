@@ -29,11 +29,6 @@ class InboundController extends Controller
         return $this->index('return', 'Inbound - Retur', 'returns');
     }
 
-    public function manuals()
-    {
-        return $this->index('manual', 'Inbound - Manual', 'manuals');
-    }
-
     public function receiptsData(Request $request)
     {
         return $this->data($request, 'receipt');
@@ -42,11 +37,6 @@ class InboundController extends Controller
     public function returnsData(Request $request)
     {
         return $this->data($request, 'return');
-    }
-
-    public function manualsData(Request $request)
-    {
-        return $this->data($request, 'manual');
     }
 
     public function receiptsStore(Request $request)
@@ -59,11 +49,6 @@ class InboundController extends Controller
         return $this->store($request, 'return');
     }
 
-    public function manualsStore(Request $request)
-    {
-        return $this->store($request, 'manual');
-    }
-
     public function receiptsShow(int $id)
     {
         return $this->show('receipt', $id);
@@ -72,11 +57,6 @@ class InboundController extends Controller
     public function returnsShow(int $id)
     {
         return $this->show('return', $id);
-    }
-
-    public function manualsShow(int $id)
-    {
-        return $this->show('manual', $id);
     }
 
     public function receiptsDetail(int $id)
@@ -89,11 +69,6 @@ class InboundController extends Controller
         return $this->detail('return', 'Inbound - Retur', 'returns', $id);
     }
 
-    public function manualsDetail(int $id)
-    {
-        return $this->detail('manual', 'Inbound - Manual', 'manuals', $id);
-    }
-
     public function receiptsUpdate(Request $request, int $id)
     {
         return $this->update($request, 'receipt', $id);
@@ -102,11 +77,6 @@ class InboundController extends Controller
     public function returnsUpdate(Request $request, int $id)
     {
         return $this->update($request, 'return', $id);
-    }
-
-    public function manualsUpdate(Request $request, int $id)
-    {
-        return $this->update($request, 'manual', $id);
     }
 
     public function receiptsDestroy(int $id)
@@ -119,11 +89,6 @@ class InboundController extends Controller
         return $this->destroy('return', $id);
     }
 
-    public function manualsDestroy(int $id)
-    {
-        return $this->destroy('manual', $id);
-    }
-
     public function receiptsApprove(int $id)
     {
         return $this->approve('receipt', $id);
@@ -132,96 +97,6 @@ class InboundController extends Controller
     public function returnsApprove(int $id)
     {
         return $this->approve('return', $id);
-    }
-
-    public function manualsApprove(int $id)
-    {
-        return $this->approve('manual', $id);
-    }
-
-    public function manualsImport(Request $request)
-    {
-        $request->validate([
-            'file' => ['required', 'file', 'mimes:xlsx,xls', 'max:5120'],
-        ]);
-
-        $import = new InboundReceiptsImport();
-        DB::beginTransaction();
-        try {
-            Excel::import($import, $request->file('file'));
-            $groups = $import->groups ?? [];
-            if (empty($groups)) {
-                throw ValidationException::withMessages([
-                    'file' => 'Tidak ada data valid untuk diimport',
-                ]);
-            }
-
-            $createdTx = 0;
-            $createdItems = 0;
-            foreach ($groups as $group) {
-                $transactedAt = now();
-                if (!empty($group['transacted_at'])) {
-                    try {
-                        $transactedAt = Carbon::parse($group['transacted_at']);
-                    } catch (\Throwable $e) {
-                        throw ValidationException::withMessages([
-                            'file' => 'Format transacted_at tidak valid: '.$group['transacted_at'],
-                        ]);
-                    }
-                }
-
-                $tx = InboundTransaction::create([
-                    'code' => $this->generateCode('INB-MNL'),
-                    'type' => 'manual',
-                    'ref_no' => $group['ref_no'] ?? null,
-                    'note' => $group['note'] ?? null,
-                    'transacted_at' => $transactedAt,
-                    'created_by' => auth()->id(),
-                    'status' => 'pending',
-                ]);
-                $createdTx++;
-
-                foreach ($group['items'] as $row) {
-                    InboundItem::create([
-                        'inbound_transaction_id' => $tx->id,
-                        'item_id' => $row['item_id'],
-                        'qty' => $row['qty'],
-                        'note' => $row['note'] ?? null,
-                    ]);
-                    $createdItems++;
-
-                    StockService::mutate([
-                        'item_id' => $row['item_id'],
-                        'direction' => 'in',
-                        'qty' => $row['qty'],
-                        'source_type' => 'inbound',
-                        'source_subtype' => 'manual',
-                        'source_id' => $tx->id,
-                        'source_code' => $tx->code,
-                        'note' => $row['note'] ?? null,
-                        'occurred_at' => $transactedAt,
-                        'created_by' => auth()->id(),
-                    ]);
-                }
-            }
-
-            DB::commit();
-
-            return response()->json([
-                'message' => 'Import inbound manual berhasil',
-                'transactions' => $createdTx,
-                'items' => $createdItems,
-            ]);
-        } catch (ValidationException $e) {
-            DB::rollBack();
-            throw $e;
-        } catch (\Throwable $e) {
-            DB::rollBack();
-            return response()->json([
-                'message' => 'Gagal import inbound manual',
-                'error' => $e->getMessage(),
-            ], 500);
-        }
     }
 
     public function returnsImport(Request $request)
@@ -414,14 +289,6 @@ class InboundController extends Controller
                 'detail' => route('admin.inbound.returns.detail', ':id'),
                 'approve' => route('admin.inbound.returns.approve', ':id'),
             ],
-            'manual' => [
-                'store' => route('admin.inbound.manuals.store'),
-                'show' => route('admin.inbound.manuals.show', ':id'),
-                'update' => route('admin.inbound.manuals.update', ':id'),
-                'delete' => route('admin.inbound.manuals.destroy', ':id'),
-                'detail' => route('admin.inbound.manuals.detail', ':id'),
-                'approve' => route('admin.inbound.manuals.approve', ':id'),
-            ],
         ];
 
         return view('admin.stock-flow.index', [
@@ -439,13 +306,11 @@ class InboundController extends Controller
             'importUrl' => match ($type) {
                 'receipt' => route('admin.inbound.receipts.import'),
                 'return' => route('admin.inbound.returns.import'),
-                'manual' => route('admin.inbound.manuals.import'),
                 default => null,
             },
             'importTitle' => match ($type) {
                 'receipt' => 'Import Penerimaan Barang',
                 'return' => 'Import Retur Inbound',
-                'manual' => 'Import Manual Inbound',
                 default => null,
             },
         ]);
@@ -588,7 +453,7 @@ class InboundController extends Controller
         $prefix = match ($type) {
             'receipt' => 'INB-RCV',
             'return' => 'INB-RET',
-            default => 'INB-MNL',
+            default => 'INB-RCV',
         };
 
         $code = $this->generateCode($prefix);
@@ -814,7 +679,6 @@ class InboundController extends Controller
         return [
             'receipt' => 'Penerimaan Barang',
             'return' => 'Retur',
-            'manual' => 'Manual',
             'opening' => 'Saldo Awal',
         ];
     }

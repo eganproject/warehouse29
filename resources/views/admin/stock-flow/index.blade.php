@@ -18,11 +18,6 @@
                 'update' => Perm::can(auth()->user(), 'admin.inbound.returns.index', 'update'),
                 'delete' => Perm::can(auth()->user(), 'admin.inbound.returns.index', 'delete'),
             ],
-            'manual' => [
-                'create' => Perm::can(auth()->user(), 'admin.inbound.manuals.index', 'create'),
-                'update' => Perm::can(auth()->user(), 'admin.inbound.manuals.index', 'update'),
-                'delete' => Perm::can(auth()->user(), 'admin.inbound.manuals.index', 'delete'),
-            ],
         ];
     } elseif (isset($routeMap['picker'])) {
         $permMap = [
