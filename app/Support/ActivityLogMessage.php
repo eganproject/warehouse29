@@ -170,6 +170,7 @@ class ActivityLogMessage
             'admin.inventory.stock-adjustments' => ['label' => 'penyesuaian stok', 'table' => 'stock_adjustments', 'item_table' => 'stock_adjustment_items', 'item_fk' => 'stock_adjustment_id'],
             'admin.inventory.stock-opname' => ['label' => 'stock opname', 'table' => 'stock_opnames', 'item_table' => 'stock_opname_items', 'item_fk' => 'stock_opname_id', 'qty_column' => 'counted_qty'],
             'admin.inventory.damaged-goods' => ['label' => 'barang rusak', 'table' => 'damaged_goods', 'item_table' => 'damaged_good_items', 'item_fk' => 'damaged_good_id'],
+            'admin.inventory.damaged-allocations' => ['label' => 'alokasi barang rusak', 'table' => 'damaged_allocations', 'item_table' => 'damaged_allocation_items', 'item_fk' => 'damaged_allocation_id'],
             'admin.masterdata.users' => ['label' => 'user', 'table' => 'users'],
             'admin.masterdata.roles' => ['label' => 'role', 'table' => 'roles'],
             'admin.masterdata.divisi' => ['label' => 'divisi', 'table' => 'divisis'],

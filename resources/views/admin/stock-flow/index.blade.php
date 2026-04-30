@@ -167,7 +167,11 @@
                 <div class="modal-body scroll-y mx-5 mx-xl-15 my-7">
                     <div class="mb-6">
                         <div class="text-muted fs-7">
-                            Header minimal: <strong>sku</strong>, <strong>qty</strong>.<br>
+                            @if(($typeDefault ?? '') === 'return' && isset($routeMap['receipt']))
+                                Header minimal: <strong>sku</strong>, <strong>qty_diterima</strong>, <strong>qty_bagus</strong>, <strong>qty_rusak</strong>.<br>
+                            @else
+                                Header minimal: <strong>sku</strong>, <strong>qty</strong>.<br>
+                            @endif
                             Opsional: <strong>ref_no</strong>, <strong>note</strong>, <strong>item_note</strong>, <strong>transacted_at</strong>.
                         </div>
                     </div>
@@ -204,6 +208,7 @@
     const defaultTypeFilter = '{{ $typeDefault ?? '' }}';
     const permMap = @json($permMap ?? []);
     const canCreateDefault = {{ $canCreateDefault ? 'true' : 'false' }};
+    const isInboundReturnFlow = defaultTypeFilter === 'return' && !!routeMap?.receipt;
 
     document.addEventListener('DOMContentLoaded', () => {
         const tableEl = $('#stock_flow_table');
@@ -328,7 +333,38 @@
         const createItemRow = (data = {}) => {
             const row = document.createElement('div');
             row.className = 'row g-3 align-items-end mb-4 flow-item-row';
-            row.innerHTML = `
+            row.innerHTML = isInboundReturnFlow ? `
+                <div class="col-md-4">
+                    <label class="required fs-6 fw-bold form-label mb-2">Item</label>
+                    <select class="form-select form-select-solid flow-item-select" data-name="item_id" required>
+                        <option value=""></option>
+                        ${itemOptionsHtml}
+                    </select>
+                    <div class="invalid-feedback" data-error-for="item_id"></div>
+                </div>
+                <div class="col-md-2">
+                    <label class="required fs-6 fw-bold form-label mb-2">Qty Diterima</label>
+                    <input type="number" min="1" class="form-control form-control-solid" data-name="qty_received" required />
+                    <div class="invalid-feedback" data-error-for="qty_received"></div>
+                </div>
+                <div class="col-md-2">
+                    <label class="required fs-6 fw-bold form-label mb-2">Qty Bagus</label>
+                    <input type="number" min="0" class="form-control form-control-solid" data-name="qty_good" required />
+                    <div class="invalid-feedback" data-error-for="qty_good"></div>
+                </div>
+                <div class="col-md-2">
+                    <label class="required fs-6 fw-bold form-label mb-2">Qty Rusak</label>
+                    <input type="number" min="0" class="form-control form-control-solid" data-name="qty_damaged" required />
+                    <div class="invalid-feedback" data-error-for="qty_damaged"></div>
+                </div>
+                <div class="col-md-1">
+                    <label class="fs-6 fw-bold form-label mb-2">Catatan</label>
+                    <input type="text" class="form-control form-control-solid" data-name="note" />
+                </div>
+                <div class="col-md-1 text-end">
+                    <button type="button" class="btn btn-light btn-sm btn-remove-item">Hapus</button>
+                </div>
+            ` : `
                 <div class="col-md-6">
                     <label class="required fs-6 fw-bold form-label mb-2">Item</label>
                     <select class="form-select form-select-solid flow-item-select" data-name="item_id" required>
@@ -358,6 +394,12 @@
             }
             const qtyEl = row.querySelector('input[data-name="qty"]');
             if (qtyEl) qtyEl.value = data.qty ?? '';
+            const qtyReceivedEl = row.querySelector('input[data-name="qty_received"]');
+            if (qtyReceivedEl) qtyReceivedEl.value = data.qty_received ?? data.qty ?? '';
+            const qtyGoodEl = row.querySelector('input[data-name="qty_good"]');
+            if (qtyGoodEl) qtyGoodEl.value = data.qty_good ?? 0;
+            const qtyDamagedEl = row.querySelector('input[data-name="qty_damaged"]');
+            if (qtyDamagedEl) qtyDamagedEl.value = data.qty_damaged ?? data.qty ?? 0;
             const noteEl = row.querySelector('input[data-name="note"]');
             if (noteEl) noteEl.value = data.note ?? '';
 

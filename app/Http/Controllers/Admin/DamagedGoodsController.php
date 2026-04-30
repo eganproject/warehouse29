@@ -5,8 +5,10 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\DamagedGood;
 use App\Models\DamagedGoodItem;
+use App\Models\DamagedStockMutation;
 use App\Models\Item;
 use App\Models\StockMutation;
+use App\Support\DamagedStockService;
 use App\Support\StockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -177,6 +179,10 @@ class DamagedGoodsController extends Controller
             StockMutation::where('source_type', 'damaged')
                 ->where('source_id', $damage->id)
                 ->delete();
+            DamagedStockService::rollbackBySource('damaged', $damage->id);
+            DamagedStockMutation::where('source_type', 'damaged')
+                ->where('source_id', $damage->id)
+                ->delete();
             DamagedGoodItem::where('damaged_good_id', $damage->id)->delete();
 
             $damage->update([
@@ -224,6 +230,10 @@ class DamagedGoodsController extends Controller
             }
             StockService::rollbackBySource('damaged', $damage->id);
             StockMutation::where('source_type', 'damaged')
+                ->where('source_id', $damage->id)
+                ->delete();
+            DamagedStockService::rollbackBySource('damaged', $damage->id);
+            DamagedStockMutation::where('source_type', 'damaged')
                 ->where('source_id', $damage->id)
                 ->delete();
             DamagedGoodItem::where('damaged_good_id', $damage->id)->delete();
@@ -277,15 +287,27 @@ class DamagedGoodsController extends Controller
 
     private function postStockMovements(DamagedGood $damage): void
     {
-        if ($damage->source_type !== 'display') {
-            return;
-        }
-
         $damage->loadMissing('items');
         foreach ($damage->items as $row) {
-            StockService::mutate([
+            if ($damage->source_type === 'display') {
+                StockService::mutate([
+                    'item_id' => $row->item_id,
+                    'direction' => 'out',
+                    'qty' => $row->qty,
+                    'source_type' => 'damaged',
+                    'source_subtype' => $damage->source_type,
+                    'source_id' => $damage->id,
+                    'source_code' => $damage->code,
+                    'note' => $row->note ?? null,
+                    'occurred_at' => $damage->transacted_at ?? now(),
+                    'created_by' => auth()->id(),
+                    'idempotency_key' => StockService::idempotencyKey(['stock', 'damaged', $damage->source_type, $damage->id, $row->item_id]),
+                ]);
+            }
+
+            DamagedStockService::mutate([
                 'item_id' => $row->item_id,
-                'direction' => 'out',
+                'direction' => 'in',
                 'qty' => $row->qty,
                 'source_type' => 'damaged',
                 'source_subtype' => $damage->source_type,
@@ -294,7 +316,7 @@ class DamagedGoodsController extends Controller
                 'note' => $row->note ?? null,
                 'occurred_at' => $damage->transacted_at ?? now(),
                 'created_by' => auth()->id(),
-                'idempotency_key' => StockService::idempotencyKey(['stock', 'damaged', $damage->source_type, $damage->id, $row->item_id]),
+                'idempotency_key' => DamagedStockService::idempotencyKey(['damaged-stock', 'damaged', $damage->source_type, $damage->id, $row->item_id]),
             ]);
         }
     }

@@ -11,7 +11,7 @@ use Maatwebsite\Excel\Concerns\WithHeadingRow;
 
 class InboundReturnsImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
 {
-    /** @var array<string,array{ref_no:?string,note:?string,transacted_at:?string,items:array<int,array{item_id:int,qty:int,note:?string}>}> */
+    /** @var array<string,array{ref_no:?string,note:?string,transacted_at:?string,items:array<int,array{item_id:int,qty:int,qty_received:int,qty_good:int,qty_damaged:int,note:?string}>}> */
     public array $groups = [];
 
     public function collection(Collection $rows)
@@ -26,15 +26,17 @@ class InboundReturnsImport implements ToCollection, WithHeadingRow, SkipsEmptyRo
         $headers = array_keys($first?->toArray() ?? []);
         if (!in_array('sku', $headers, true)) {
             throw ValidationException::withMessages([
-                'file' => 'Header wajib: sku, qty (opsional: ref_no, note, item_note, transacted_at)',
+                'file' => 'Header wajib: sku, qty_diterima, qty_bagus, qty_rusak (opsional: ref_no, note, item_note, transacted_at)',
             ]);
         }
-        $qtyKey = $this->detectQtyKey($headers);
-        if ($qtyKey === null) {
+        $receivedKey = $this->detectFirstKey($headers, ['qty_diterima', 'qty_received', 'diterima', 'received', 'qty']);
+        if ($receivedKey === null) {
             throw ValidationException::withMessages([
-                'file' => 'Header qty wajib (gunakan: qty/quantity/jumlah/stok/stock)',
+                'file' => 'Header qty_diterima wajib (bisa gunakan: qty_diterima/qty_received/diterima/received/qty)',
             ]);
         }
+        $goodKey = $this->detectFirstKey($headers, ['qty_bagus', 'qty_good', 'bagus', 'good']);
+        $damagedKey = $this->detectFirstKey($headers, ['qty_rusak', 'qty_damaged', 'rusak', 'damaged']);
 
         $skus = $rows->map(fn ($row) => trim((string) ($row['sku'] ?? '')))
             ->filter()
@@ -57,9 +59,16 @@ class InboundReturnsImport implements ToCollection, WithHeadingRow, SkipsEmptyRo
                 $missing[$sku] = true;
                 continue;
             }
-            $qty = $this->parseQty($row, $qtyKey);
-            if ($qty <= 0) {
-                $errors[] = "Baris {$rowIndex}: qty tidak valid untuk SKU {$sku}";
+            $receivedQty = $this->parseQty($row, $receivedKey);
+            $goodQty = $goodKey ? $this->parseQty($row, $goodKey) : 0;
+            $damagedQty = $damagedKey ? $this->parseQty($row, $damagedKey) : max(0, $receivedQty - $goodQty);
+
+            if ($receivedQty <= 0) {
+                $errors[] = "Baris {$rowIndex}: qty diterima tidak valid untuk SKU {$sku}";
+                continue;
+            }
+            if ($goodQty + $damagedQty !== $receivedQty) {
+                $errors[] = "Baris {$rowIndex}: qty bagus + qty rusak harus sama dengan qty diterima untuk SKU {$sku}";
                 continue;
             }
 
@@ -89,11 +98,17 @@ class InboundReturnsImport implements ToCollection, WithHeadingRow, SkipsEmptyRo
             if (!isset($this->groups[$groupKey]['items'][$itemId])) {
                 $this->groups[$groupKey]['items'][$itemId] = [
                     'item_id' => $itemId,
-                    'qty' => $qty,
+                    'qty' => $receivedQty,
+                    'qty_received' => $receivedQty,
+                    'qty_good' => $goodQty,
+                    'qty_damaged' => $damagedQty,
                     'note' => $itemNote !== '' ? $itemNote : null,
                 ];
             } else {
-                $this->groups[$groupKey]['items'][$itemId]['qty'] += $qty;
+                $this->groups[$groupKey]['items'][$itemId]['qty'] += $receivedQty;
+                $this->groups[$groupKey]['items'][$itemId]['qty_received'] += $receivedQty;
+                $this->groups[$groupKey]['items'][$itemId]['qty_good'] += $goodQty;
+                $this->groups[$groupKey]['items'][$itemId]['qty_damaged'] += $damagedQty;
                 if ($itemNote !== '' && empty($this->groups[$groupKey]['items'][$itemId]['note'])) {
                     $this->groups[$groupKey]['items'][$itemId]['note'] = $itemNote;
                 }
@@ -129,9 +144,9 @@ class InboundReturnsImport implements ToCollection, WithHeadingRow, SkipsEmptyRo
         }
     }
 
-    private function detectQtyKey(array $headers): ?string
+    private function detectFirstKey(array $headers, array $candidates): ?string
     {
-        foreach (['qty', 'quantity', 'jumlah', 'stok', 'stock'] as $key) {
+        foreach ($candidates as $key) {
             if (in_array($key, $headers, true)) {
                 return $key;
             }

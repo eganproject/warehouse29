@@ -4,6 +4,7 @@
 @section('page_title', $pageTitle)
 
 @section('content')
+@php($isInboundReturn = ($transaction->type ?? '') === 'return' && str_contains($backUrl ?? '', '/inbound/'))
 <div class="card">
     <div class="card-header border-0 pt-6">
         <div class="card-title">
@@ -37,7 +38,13 @@
                 <thead>
                     <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
                         <th>Item</th>
-                        <th>Qty</th>
+                        @if($isInboundReturn)
+                            <th>Qty Diterima</th>
+                            <th>Qty Bagus</th>
+                            <th>Qty Rusak</th>
+                        @else
+                            <th>Qty</th>
+                        @endif
                         <th>Catatan</th>
                     </tr>
                 </thead>
@@ -45,7 +52,13 @@
                     @foreach($transaction->items as $row)
                         <tr>
                             <td>{{ $row->item?->sku }} - {{ $row->item?->name }}</td>
-                            <td>{{ $row->qty }}</td>
+                            @if($isInboundReturn)
+                                <td>{{ $row->qty_received ?: $row->qty }}</td>
+                                <td>{{ $row->qty_good ?? 0 }}</td>
+                                <td>{{ $row->qty_damaged ?? 0 }}</td>
+                            @else
+                                <td>{{ $row->qty }}</td>
+                            @endif
                             <td>{{ $row->note ?? '-' }}</td>
                         </tr>
                     @endforeach

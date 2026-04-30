@@ -75,8 +75,8 @@
                             <label class="required fs-6 fw-bold form-label mb-2">Sumber</label>
                             <select class="form-select form-select-solid" name="source_type" id="damage_source_type" required>
                                 <option value="">Pilih sumber</option>
-                                <option value="display">Display (Mengurangi stok)</option>
-                                <option value="inbound_return">Retur Inbound (Tidak mengurangi stok)</option>
+                                <option value="display">Display (Stok normal ke stok rusak)</option>
+                                <option value="inbound_return">Retur Inbound (Masuk stok rusak)</option>
                             </select>
                             <div class="invalid-feedback" id="error_source_type"></div>
                         </div>

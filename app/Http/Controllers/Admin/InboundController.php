@@ -6,9 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\InboundItem;
 use App\Models\InboundTransaction;
 use App\Models\Item;
+use App\Models\DamagedGood;
+use App\Models\DamagedGoodItem;
 use App\Models\StockMutation;
 use App\Imports\InboundReceiptsImport;
 use App\Imports\InboundReturnsImport;
+use App\Support\DamagedStockService;
 use App\Support\StockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -144,7 +147,10 @@ class InboundController extends Controller
                     InboundItem::create([
                         'inbound_transaction_id' => $tx->id,
                         'item_id' => $row['item_id'],
-                        'qty' => $row['qty'],
+                        'qty' => $row['qty_received'] ?? $row['qty'],
+                        'qty_received' => $row['qty_received'] ?? $row['qty'],
+                        'qty_good' => $row['qty_good'] ?? 0,
+                        'qty_damaged' => $row['qty_damaged'] ?? ($row['qty_received'] ?? $row['qty']),
                         'note' => $row['note'] ?? null,
                     ]);
                     $createdItems++;
@@ -217,6 +223,9 @@ class InboundController extends Controller
                         'inbound_transaction_id' => $tx->id,
                         'item_id' => $row['item_id'],
                         'qty' => $row['qty'],
+                        'qty_received' => $row['qty'],
+                        'qty_good' => $row['qty'],
+                        'qty_damaged' => 0,
                         'note' => $row['note'] ?? null,
                     ]);
                     $createdItems++;
@@ -352,16 +361,25 @@ class InboundController extends Controller
         $data = $query->get()->map(function ($row) {
             $ts = $row->transacted_at ? Carbon::parse($row->transacted_at)->format('Y-m-d H:i') : '';
             $items = $row->items ?? collect();
-            $labels = $items->map(function ($it) {
+            $labels = $items->map(function ($it) use ($row) {
                 $sku = trim($it->item?->sku ?? '');
                 if ($sku === '') {
                     return '';
                 }
-                $qty = (int) ($it->qty ?? 0);
-                return sprintf('%s (%d)', $sku, $qty);
+                if (($row->type ?? '') === 'return') {
+                    return sprintf(
+                        '%s (terima %d, bagus %d, rusak %d)',
+                        $sku,
+                        (int) ($it->qty_received ?? $it->qty ?? 0),
+                        (int) ($it->qty_good ?? 0),
+                        (int) ($it->qty_damaged ?? 0)
+                    );
+                }
+
+                return sprintf('%s (%d)', $sku, (int) ($it->qty ?? 0));
             })->filter()->values();
             $itemLabel = $labels->implode(', ');
-            $totalQty = (int) $items->sum('qty');
+            $totalQty = (int) $items->sum(fn ($it) => (int) ($it->qty_received ?? $it->qty ?? 0));
             return [
                 'id' => $row->id,
                 'code' => $row->code,
@@ -400,6 +418,9 @@ class InboundController extends Controller
                 return [
                     'item_id' => $item->item_id,
                     'qty' => $item->qty,
+                    'qty_received' => $item->qty_received ?: $item->qty,
+                    'qty_good' => $item->qty_good ?? 0,
+                    'qty_damaged' => $item->qty_damaged ?? 0,
                     'note' => $item->note ?? '',
                 ];
             })->values(),
@@ -412,7 +433,7 @@ class InboundController extends Controller
             ->where('type', $type)
             ->findOrFail($id);
 
-        $totalQty = $tx->items->sum('qty');
+        $totalQty = $tx->items->sum(fn ($item) => (int) ($item->qty_received ?? $item->qty ?? 0));
 
         return view('admin.stock-flow.detail', [
             'pageTitle' => $pageTitle,
@@ -424,7 +445,7 @@ class InboundController extends Controller
 
     private function store(Request $request, string $type)
     {
-        $validated = $this->validatePayload($request);
+        $validated = $this->validatePayload($request, $type);
 
         $prefix = match ($type) {
             'receipt' => 'INB-RCV',
@@ -452,6 +473,9 @@ class InboundController extends Controller
                     'inbound_transaction_id' => $tx->id,
                     'item_id' => $row['item_id'],
                     'qty' => $row['qty'],
+                    'qty_received' => $row['qty_received'] ?? $row['qty'],
+                    'qty_good' => $row['qty_good'] ?? $row['qty'],
+                    'qty_damaged' => $row['qty_damaged'] ?? 0,
                     'note' => $row['note'] ?? null,
                 ]);
 
@@ -476,7 +500,7 @@ class InboundController extends Controller
 
     private function update(Request $request, string $type, int $id)
     {
-        $validated = $this->validatePayload($request);
+        $validated = $this->validatePayload($request, $type);
 
         DB::beginTransaction();
         try {
@@ -501,6 +525,9 @@ class InboundController extends Controller
                     'inbound_transaction_id' => $tx->id,
                     'item_id' => $row['item_id'],
                     'qty' => $row['qty'],
+                    'qty_received' => $row['qty_received'] ?? $row['qty'],
+                    'qty_good' => $row['qty_good'] ?? $row['qty'],
+                    'qty_damaged' => $row['qty_damaged'] ?? 0,
                     'note' => $row['note'] ?? null,
                 ]);
 
@@ -594,12 +621,17 @@ class InboundController extends Controller
 
     private function postStockMovements(InboundTransaction $tx, string $type): void
     {
+        if ($type === 'return') {
+            $this->postInboundReturnToDamagedStock($tx);
+            return;
+        }
+
         $tx->loadMissing('items');
         foreach ($tx->items as $row) {
             StockService::mutate([
                 'item_id' => $row->item_id,
                 'direction' => 'in',
-                'qty' => $row->qty,
+                'qty' => (int) ($row->qty_good ?: $row->qty),
                 'source_type' => 'inbound',
                 'source_subtype' => $type,
                 'source_id' => $tx->id,
@@ -612,24 +644,135 @@ class InboundController extends Controller
         }
     }
 
-    private function validatePayload(Request $request): array
+    private function postInboundReturnToDamagedStock(InboundTransaction $tx): void
     {
-        $validated = $request->validate([
+        $tx->loadMissing('items');
+
+        $hasDamagedItems = $tx->items->contains(fn ($row) => (int) ($row->qty_damaged ?? 0) > 0);
+        $damage = null;
+
+        if ($hasDamagedItems) {
+            $damage = DamagedGood::where('source_type', 'inbound_return')
+                ->where('source_ref', $tx->code)
+                ->lockForUpdate()
+                ->first();
+
+            if (!$damage) {
+                $damage = DamagedGood::create([
+                    'code' => $this->generateCode('DMG-RET'),
+                    'source_type' => 'inbound_return',
+                    'source_ref' => $tx->code,
+                    'transacted_at' => $tx->transacted_at ?? now(),
+                    'note' => 'Otomatis dari inbound retur '.$tx->code,
+                    'created_by' => auth()->id(),
+                    'status' => 'approved',
+                    'approved_at' => now(),
+                    'approved_by' => auth()->id(),
+                ]);
+
+                foreach ($tx->items as $row) {
+                    $damagedQty = (int) ($row->qty_damaged ?? 0);
+                    if ($damagedQty <= 0) {
+                        continue;
+                    }
+
+                    DamagedGoodItem::create([
+                        'damaged_good_id' => $damage->id,
+                        'item_id' => $row->item_id,
+                        'qty' => $damagedQty,
+                        'note' => $row->note ?? null,
+                    ]);
+                }
+            } elseif (($damage->status ?? 'pending') !== 'approved') {
+                $damage->status = 'approved';
+                $damage->approved_at = now();
+                $damage->approved_by = auth()->id();
+                $damage->save();
+            }
+        }
+
+        foreach ($tx->items as $row) {
+            $goodQty = (int) ($row->qty_good ?? 0);
+            if ($goodQty > 0) {
+                StockService::mutate([
+                    'item_id' => $row->item_id,
+                    'direction' => 'in',
+                    'qty' => $goodQty,
+                    'source_type' => 'inbound',
+                    'source_subtype' => 'return_good',
+                    'source_id' => $tx->id,
+                    'source_code' => $tx->code,
+                    'note' => $row->note ?? 'Inbound retur barang bagus',
+                    'occurred_at' => $tx->transacted_at ?? now(),
+                    'created_by' => auth()->id(),
+                    'idempotency_key' => StockService::idempotencyKey(['stock', 'inbound-return-good', $tx->id, $row->item_id]),
+                ]);
+            }
+
+            $damagedQty = (int) ($row->qty_damaged ?? 0);
+            if ($damagedQty > 0) {
+                DamagedStockService::mutate([
+                    'item_id' => $row->item_id,
+                    'direction' => 'in',
+                    'qty' => $damagedQty,
+                    'source_type' => 'inbound_return',
+                    'source_subtype' => 'approval',
+                    'source_id' => $tx->id,
+                    'source_code' => $tx->code,
+                    'note' => $row->note ?? 'Inbound retur masuk stok barang rusak',
+                    'occurred_at' => $tx->transacted_at ?? now(),
+                    'created_by' => auth()->id(),
+                    'idempotency_key' => DamagedStockService::idempotencyKey(['damaged-stock', 'inbound-return', $tx->id, $row->item_id]),
+                ]);
+            }
+        }
+    }
+
+    private function validatePayload(Request $request, ?string $type = null): array
+    {
+        $isReturn = $type === 'return';
+        $rules = [
             'items' => ['required', 'array', 'min:1'],
             'items.*.item_id' => ['required', 'integer', 'exists:items,id'],
-            'items.*.qty' => ['required', 'integer', 'min:1'],
             'items.*.note' => ['nullable', 'string'],
             'ref_no' => ['nullable', 'string', 'max:100'],
             'note' => ['nullable', 'string'],
             'transacted_at' => ['required', 'date'],
-        ]);
+        ];
+        if ($isReturn) {
+            $rules['items.*.qty_received'] = ['required', 'integer', 'min:1'];
+            $rules['items.*.qty_good'] = ['required', 'integer', 'min:0'];
+            $rules['items.*.qty_damaged'] = ['required', 'integer', 'min:0'];
+        } else {
+            $rules['items.*.qty'] = ['required', 'integer', 'min:1'];
+        }
+
+        $validated = $request->validate($rules);
 
         $items = collect($validated['items'] ?? [])
-            ->filter(fn ($row) => (int) ($row['qty'] ?? 0) > 0 && (int) ($row['item_id'] ?? 0) > 0)
-            ->map(function ($row) {
+            ->filter(fn ($row) => (int) ($row['item_id'] ?? 0) > 0)
+            ->map(function ($row) use ($isReturn) {
+                if ($isReturn) {
+                    $received = (int) ($row['qty_received'] ?? 0);
+                    $good = (int) ($row['qty_good'] ?? 0);
+                    $damaged = (int) ($row['qty_damaged'] ?? 0);
+                    return [
+                        'item_id' => (int) $row['item_id'],
+                        'qty' => $received,
+                        'qty_received' => $received,
+                        'qty_good' => $good,
+                        'qty_damaged' => $damaged,
+                        'note' => $row['note'] ?? null,
+                    ];
+                }
+
+                $qty = (int) ($row['qty'] ?? 0);
                 return [
                     'item_id' => (int) $row['item_id'],
-                    'qty' => (int) $row['qty'],
+                    'qty' => $qty,
+                    'qty_received' => $qty,
+                    'qty_good' => $qty,
+                    'qty_damaged' => 0,
                     'note' => $row['note'] ?? null,
                 ];
             })->values();
@@ -638,6 +781,17 @@ class InboundController extends Controller
             throw ValidationException::withMessages([
                 'items' => 'Minimal 1 item diperlukan',
             ]);
+        }
+
+        if ($isReturn) {
+            foreach ($items as $idx => $row) {
+                if ((int) $row['qty_received'] <= 0) {
+                    throw ValidationException::withMessages(["items.{$idx}.qty_received" => 'Qty diterima wajib lebih dari 0']);
+                }
+                if ((int) $row['qty_good'] + (int) $row['qty_damaged'] !== (int) $row['qty_received']) {
+                    throw ValidationException::withMessages(["items.{$idx}.qty_received" => 'Qty bagus + qty rusak harus sama dengan qty diterima']);
+                }
+            }
         }
 
         $duplicates = $items->groupBy('item_id')->filter(fn ($rows) => $rows->count() > 1);
@@ -649,10 +803,16 @@ class InboundController extends Controller
 
         $normalized = $items->groupBy('item_id')->map(function ($rows, $itemId) {
             $qty = $rows->sum('qty');
+            $qtyReceived = $rows->sum('qty_received');
+            $qtyGood = $rows->sum('qty_good');
+            $qtyDamaged = $rows->sum('qty_damaged');
             $note = $rows->pluck('note')->first(fn ($n) => $n !== null && $n !== '') ?? null;
             return [
                 'item_id' => (int) $itemId,
                 'qty' => $qty,
+                'qty_received' => $qtyReceived,
+                'qty_good' => $qtyGood,
+                'qty_damaged' => $qtyDamaged,
                 'note' => $note,
             ];
         })->values()->all();
