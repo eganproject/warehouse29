@@ -257,6 +257,13 @@
 
     const canUseScan = () => state.session && state.session.status === 'draft';
 
+    const makeRequestId = () => {
+        if (window.crypto?.randomUUID) {
+            return window.crypto.randomUUID();
+        }
+        return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    };
+
     const setSaveStatus = (text, pending = false) => {
         el.saveStatus.textContent = text;
         el.saveStatus.style.color = pending ? '#f97316' : '#6b7280';
@@ -439,6 +446,7 @@
             const payload = new FormData();
             payload.append('item_id', itemId);
             payload.append('qty', 1);
+            payload.append('request_id', makeRequestId());
             const json = await fetchJson(routes.itemsStore, {
                 method: 'POST',
                 body: payload,
@@ -778,6 +786,7 @@
             try {
                 const payload = new FormData();
                 payload.append('code', code);
+                payload.append('request_id', makeRequestId());
                 const json = await fetchJson(routes.scanItem, {
                     method: 'POST',
                     body: payload,

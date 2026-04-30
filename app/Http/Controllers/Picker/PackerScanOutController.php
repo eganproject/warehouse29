@@ -211,19 +211,17 @@ class PackerScanOutController extends Controller
                 ]);
 
                 if (!$transit) {
-                    PackerTransitHistory::create([
-                        'resi_id' => $resi->id,
-                        'id_pesanan' => $resi->id_pesanan,
-                        'no_resi' => $resi->no_resi,
-                        'status' => 'selesai',
-                    ]);
-                } else {
-                    $transit->status = 'selesai';
-                    if (empty($transit->no_resi) && !empty($resi->no_resi)) {
-                        $transit->no_resi = $resi->no_resi;
-                    }
-                    $transit->save();
+                    DB::rollBack();
+                    return response()->json([
+                        'message' => 'Data transit picker untuk resi ini tidak ditemukan. Resi tidak bisa scan out sebelum data transitnya valid.',
+                    ], 422);
                 }
+
+                $transit->status = 'selesai';
+                if (empty($transit->no_resi) && !empty($resi->no_resi)) {
+                    $transit->no_resi = $resi->no_resi;
+                }
+                $transit->save();
 
                 DB::commit();
 

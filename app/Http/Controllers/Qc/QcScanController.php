@@ -8,33 +8,28 @@ use App\Models\PickingList;
 use App\Models\PickingListException;
 use App\Models\QcScanResi;
 use App\Models\QcScanResiItem;
-use App\Models\QcScanSession;
 use App\Models\QcTransitItem;
 use App\Models\Resi;
+use App\Models\StockMutation;
 use App\Support\StockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class QcScanController extends Controller
 {
     public function current()
     {
-        $session = $this->currentSession();
-
         return response()->json([
-            'session' => $session ? $this->serializeSession($session) : null,
+            'session' => $this->serializeDailyScanSummary(),
         ]);
     }
 
     public function start()
     {
-        $session = $this->ensureSession();
-
         return response()->json([
-            'session' => $this->serializeSession($session),
+            'session' => $this->serializeDailyScanSummary(),
         ]);
     }
 
@@ -73,18 +68,21 @@ class QcScanController extends Controller
         $ledgerQty = [];
         $alreadyScanned = false;
         $isComplete = false;
-        $session = $this->currentSession();
-        if ($session) {
-            $qcResi = QcScanResi::where('qc_scan_session_id', $session->id)
-                ->where('resi_id', $resi->id)
-                ->with('items')
-                ->first();
-            if ($qcResi) {
-                $alreadyScanned = true;
-                $isComplete = ($qcResi->status === 'completed');
-                foreach ($qcResi->items as $item) {
-                    $ledgerQty[$item->sku] = (int) $item->scanned_qty;
-                }
+        $qcResi = QcScanResi::where('resi_id', $resi->id)
+            ->with(['items', 'scanner'])
+            ->first();
+        if ($qcResi) {
+            if ((int) $qcResi->scanned_by !== (int) auth()->id()) {
+                $scannerName = $qcResi->scanner?->name ?? 'petugas lain';
+                return response()->json([
+                    'message' => "Resi ini sedang/ sudah tercatat QC oleh {$scannerName}.",
+                ], 422);
+            }
+
+            $alreadyScanned = true;
+            $isComplete = ($qcResi->status === 'completed');
+            foreach ($qcResi->items as $item) {
+                $ledgerQty[$item->sku] = (int) $item->scanned_qty;
             }
         }
 
@@ -114,20 +112,19 @@ class QcScanController extends Controller
             'resi_id' => ['required', 'integer', 'exists:resis,id'],
         ]);
 
-        $session = $this->ensureSession();
-        $qcResi = DB::transaction(function () use ($session, $validated) {
+        $qcResi = DB::transaction(function () use ($validated) {
             $resi = Resi::with('details')->lockForUpdate()->findOrFail((int) $validated['resi_id']);
             if (($resi->status ?? 'active') === 'canceled') {
                 throw ValidationException::withMessages(['resi' => 'Resi sudah dibatalkan, tidak bisa di-QC.']);
             }
 
-            return $this->ensureQcResi($session, $resi);
+            return $this->ensureQcResi($resi);
         });
 
         return response()->json([
-            'message' => 'Resi tercatat dalam sesi QC.',
+            'message' => 'Resi tercatat untuk QC.',
             'status' => $qcResi->status,
-            'session' => $this->serializeSession($session->fresh(['resis.resi.kurir', 'resis.items.item'])),
+            'session' => $this->serializeDailyScanSummary(),
         ]);
     }
 
@@ -137,13 +134,19 @@ class QcScanController extends Controller
             'code' => ['required', 'string'],
             'qty' => ['nullable', 'integer', 'min:1'],
             'resi_id' => ['required', 'integer', 'exists:resis,id'],
+            'request_id' => ['nullable', 'string', 'max:120'],
         ]);
 
         $code = trim((string) $validated['code']);
         $qty = (int) ($validated['qty'] ?? 1);
+        $idempotencyKey = $this->requestIdempotencyKey('qc.scan-item', $validated['request_id'] ?? null);
 
         try {
-            $session = DB::transaction(function () use ($validated, $code, $qty) {
+            $summary = DB::transaction(function () use ($validated, $code, $qty, $idempotencyKey) {
+                if ($idempotencyKey && StockMutation::where('idempotency_key', $idempotencyKey)->lockForUpdate()->exists()) {
+                    return $this->serializeDailyScanSummary();
+                }
+
                 $item = Item::where('sku', $code)->lockForUpdate()->first();
                 if (!$item) {
                     throw ValidationException::withMessages(['code' => 'SKU tidak ditemukan pada master item.']);
@@ -154,8 +157,7 @@ class QcScanController extends Controller
                     throw ValidationException::withMessages(['resi' => 'Resi sudah dibatalkan, tidak bisa di-QC.']);
                 }
 
-                $session = $this->ensureSession();
-                $qcResi = $this->ensureQcResi($session, $resi);
+                $qcResi = $this->ensureQcResi($resi);
                 if ($qcResi->status === 'completed') {
                     throw ValidationException::withMessages(['resi' => 'Resi sudah selesai di-QC.']);
                 }
@@ -179,7 +181,7 @@ class QcScanController extends Controller
                 }
 
                 $scanAt = now();
-                $date = $session->started_at?->toDateString() ?? $scanAt->toDateString();
+                $date = $qcResi->scanned_at?->toDateString() ?? $scanAt->toDateString();
 
                 $this->ensurePickingListCapacity($date, $item->sku, $qty);
 
@@ -218,15 +220,13 @@ class QcScanController extends Controller
                     'note' => 'QC scan resi',
                     'occurred_at' => $scanAt,
                     'created_by' => auth()->id(),
+                    'idempotency_key' => $idempotencyKey,
                 ]);
 
                 $this->adjustPickingRemaining($date, $item->sku, $qty);
                 $this->markCompletedIfReady($qcResi);
 
-                $session->last_scan_at = $scanAt;
-                $session->save();
-
-                return $session->fresh(['resis.resi.kurir', 'resis.items.item']);
+                return $this->serializeDailyScanSummary();
             });
         } catch (ValidationException $e) {
             return response()->json([
@@ -242,8 +242,18 @@ class QcScanController extends Controller
 
         return response()->json([
             'message' => 'Item berhasil discan.',
-            'session' => $this->serializeSession($session),
+            'session' => $summary,
         ]);
+    }
+
+    private function requestIdempotencyKey(string $action, ?string $requestId): ?string
+    {
+        $requestId = trim((string) ($requestId ?? ''));
+        if ($requestId === '') {
+            return null;
+        }
+
+        return StockService::idempotencyKey(['request', $action, auth()->id(), $requestId]);
     }
 
     public function searchItems(Request $request)
@@ -259,49 +269,24 @@ class QcScanController extends Controller
         ]);
     }
 
-    private function currentSession(): ?QcScanSession
+    private function ensureQcResi(Resi $resi): QcScanResi
     {
-        return QcScanSession::with(['resis.resi.kurir', 'resis.items.item'])
-            ->where('user_id', auth()->id())
-            ->where('status', 'active')
-            ->whereDate('started_at', now()->toDateString())
-            ->latest('id')
-            ->first();
-    }
-
-    private function ensureSession(): QcScanSession
-    {
-        return DB::transaction(function () {
-            $session = QcScanSession::where('user_id', auth()->id())
-                ->where('status', 'active')
-                ->whereDate('started_at', now()->toDateString())
-                ->lockForUpdate()
-                ->latest('id')
-                ->first();
-
-            return $session ?: QcScanSession::create([
-                'code' => 'QC-'.Carbon::now()->format('YmdHis').'-'.Str::upper(Str::random(4)),
-                'user_id' => auth()->id(),
-                'status' => 'active',
-                'started_at' => now(),
-            ]);
-        });
-    }
-
-    private function ensureQcResi(QcScanSession $session, Resi $resi): QcScanResi
-    {
-        $qcResi = QcScanResi::where('qc_scan_session_id', $session->id)
-            ->where('resi_id', $resi->id)
+        $qcResi = QcScanResi::where('resi_id', $resi->id)
             ->lockForUpdate()
             ->first();
 
         if (!$qcResi) {
             $qcResi = QcScanResi::create([
-                'qc_scan_session_id' => $session->id,
                 'resi_id' => $resi->id,
                 'status' => 'in_progress',
                 'scanned_at' => now(),
                 'scanned_by' => auth()->id(),
+            ]);
+        } elseif ((int) $qcResi->scanned_by !== (int) auth()->id()) {
+            $qcResi->loadMissing('scanner:id,name');
+            $scannerName = $qcResi->scanner?->name ?? 'petugas lain';
+            throw ValidationException::withMessages([
+                'resi' => "Resi ini sedang/ sudah tercatat QC oleh {$scannerName}.",
             ]);
         }
 
@@ -358,10 +343,15 @@ class QcScanController extends Controller
         }
     }
 
-    private function serializeSession(QcScanSession $session): array
+    private function serializeDailyScanSummary(): array
     {
-        $session->loadMissing(['resis.resi.kurir', 'resis.items.item']);
-        $resis = $session->resis;
+        $resis = QcScanResi::with(['resi.kurir', 'items.item'])
+            ->where('scanned_by', auth()->id())
+            ->whereDate('scanned_at', now()->toDateString())
+            ->orderByDesc('scanned_at')
+            ->orderByDesc('id')
+            ->get();
+
         $items = $resis->flatMap(fn ($resi) => $resi->items)->groupBy('sku')->map(function ($rows, $sku) {
             $first = $rows->first();
             return [
@@ -371,13 +361,17 @@ class QcScanController extends Controller
                 'required_qty' => (int) $rows->sum('required_qty'),
             ];
         })->values();
+        $firstScanAt = $resis->min('scanned_at');
+        $lastScanAt = $resis->max(function ($row) {
+            return $row->completed_at ?: $row->updated_at ?: $row->scanned_at;
+        });
 
         return [
-            'id' => $session->id,
-            'code' => $session->code,
-            'status' => $session->status,
-            'started_at' => $session->started_at?->format('Y-m-d H:i'),
-            'last_scan_at' => $session->last_scan_at?->format('Y-m-d H:i'),
+            'id' => null,
+            'code' => null,
+            'status' => 'active',
+            'started_at' => $firstScanAt ? Carbon::parse($firstScanAt)->format('Y-m-d H:i') : null,
+            'last_scan_at' => $lastScanAt ? Carbon::parse($lastScanAt)->format('Y-m-d H:i') : null,
             'items' => $items,
             'resis' => $resis->map(function ($row) {
                 $requiredQty = (int) $row->items->sum('required_qty');
@@ -390,6 +384,8 @@ class QcScanController extends Controller
                     'tanggal_pesanan' => $row->resi?->tanggal_pesanan?->format('Y-m-d'),
                     'kurir_name' => $row->resi?->kurir?->name ?? '-',
                     'status' => $row->status,
+                    'scanned_at' => $row->scanned_at?->format('Y-m-d H:i'),
+                    'completed_at' => $row->completed_at?->format('Y-m-d H:i'),
                     'required_qty' => $requiredQty,
                     'scanned_qty' => $scannedQty,
                     'progress' => $requiredQty > 0 ? (int) floor(min(100, ($scannedQty / $requiredQty) * 100)) : 0,

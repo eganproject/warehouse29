@@ -22,7 +22,7 @@ class PickerTransitStatusExport implements FromCollection, WithHeadings, WithMap
     public function collection(): Collection
     {
         $query = QcScanResi::query()
-            ->with(['session.user', 'resi', 'items.item'])
+            ->with(['scanner', 'resi', 'items.item'])
             ->whereHas('resi', function ($q) {
                 $q->whereNull('status')
                     ->orWhere('status', '!=', 'canceled');
@@ -37,7 +37,7 @@ class PickerTransitStatusExport implements FromCollection, WithHeadings, WithMap
                     $resiQ->where('no_resi', 'like', "%{$search}%")
                         ->orWhere('id_pesanan', 'like', "%{$search}%");
                 })
-                    ->orWhereHas('session', fn ($sessionQ) => $sessionQ->where('code', 'like', "%{$search}%"))
+                    ->orWhereHas('scanner', fn ($scannerQ) => $scannerQ->where('name', 'like', "%{$search}%"))
                     ->orWhereHas('items', function ($itemQ) use ($search) {
                         $itemQ->where('sku', 'like', "%{$search}%")
                             ->orWhereHas('item', fn ($masterQ) => $masterQ->where('name', 'like', "%{$search}%"));
@@ -76,7 +76,7 @@ class PickerTransitStatusExport implements FromCollection, WithHeadings, WithMap
 
     public function headings(): array
     {
-        return ['Tanggal QC', 'ID Pesanan', 'No Resi', 'Kode Sesi', 'Petugas QC', 'SKU Dalam Resi', 'Qty Scan', 'Qty Wajib', 'Progress QC', 'Status QC', 'Status Scan Out', 'Scan Out At'];
+        return ['Tanggal QC', 'ID Pesanan', 'No Resi', 'Petugas QC', 'SKU Dalam Resi', 'Qty Scan', 'Qty Wajib', 'Progress QC', 'Status QC', 'Status Scan Out', 'Scan Out At'];
     }
 
     public function map($row): array
@@ -99,8 +99,7 @@ class PickerTransitStatusExport implements FromCollection, WithHeadings, WithMap
             $row->scanned_at?->format('Y-m-d H:i') ?? '-',
             $row->resi?->id_pesanan ?? '-',
             $row->resi?->no_resi ?? '-',
-            $row->session?->code ?? '-',
-            $row->session?->user?->name ?? '-',
+            $row->scanner?->name ?? '-',
             $skuSummary ?: '-',
             $scannedQty,
             $requiredQty,

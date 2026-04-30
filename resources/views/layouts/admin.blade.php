@@ -5,6 +5,7 @@
     <base href="">
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="login-url" content="{{ route('login') }}" />
     <title>@yield('title', 'Import Analytics')</title>
     <link rel="shortcut icon" href="{{ asset('metronic/media/logos/favicon.png') }}" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
@@ -40,6 +41,119 @@
             min-height: 42px;
             border-radius: 0.475rem;
             border: 1px solid #e4e6ef;
+        }
+
+        .modal {
+            --bs-modal-margin: 0.75rem;
+        }
+
+        .modal-dialog {
+            max-width: min(calc(100% - 1.5rem), var(--bs-modal-width, 500px));
+        }
+
+        .modal-dialog.modal-lg {
+            --bs-modal-width: 1100px;
+        }
+
+        .modal-dialog.modal-xl {
+            --bs-modal-width: 1400px;
+            width: min(96vw, 1400px);
+            max-width: calc(100vw - 1.5rem) !important;
+        }
+
+        .modal-dialog.mw-500px {
+            --bs-modal-width: 640px;
+            width: min(94vw, 640px);
+            max-width: calc(100vw - 1.5rem) !important;
+        }
+
+        .modal-dialog.mw-650px {
+            --bs-modal-width: 820px;
+            width: min(94vw, 820px);
+            max-width: calc(100vw - 1.5rem) !important;
+        }
+
+        .modal-dialog.mw-700px {
+            --bs-modal-width: 920px;
+            width: min(94vw, 920px);
+            max-width: calc(100vw - 1.5rem) !important;
+        }
+
+        .modal-dialog.mw-900px {
+            --bs-modal-width: 1200px;
+            width: min(96vw, 1200px);
+            max-width: calc(100vw - 1.5rem) !important;
+        }
+
+        .modal .modal-content,
+        .modal-dialog-scrollable .modal-content {
+            max-height: calc(100dvh - 1.5rem);
+        }
+
+        .modal .modal-body {
+            overflow-y: auto;
+        }
+
+        .modal-dialog.mw-900px .modal-body,
+        .modal-dialog.modal-lg .modal-body,
+        .modal-dialog.modal-xl .modal-body {
+            padding-left: clamp(1rem, 2vw, 2.25rem) !important;
+            padding-right: clamp(1rem, 2vw, 2.25rem) !important;
+        }
+
+        .modal-dialog-scrollable .modal-body,
+        .modal-body.scroll-y {
+            overscroll-behavior: contain;
+        }
+
+        .modal .select2-container {
+            max-width: 100%;
+        }
+
+        .modal .select2-container--open,
+        .select2-container--open {
+            z-index: 1065;
+        }
+
+        .select2-dropdown {
+            z-index: 1066;
+        }
+
+        .flatpickr-calendar {
+            z-index: 1067 !important;
+        }
+
+        @media (max-width: 575.98px) {
+            .modal-dialog,
+            .modal-dialog.modal-lg,
+            .modal-dialog.modal-xl,
+            .modal-dialog.mw-500px,
+            .modal-dialog.mw-650px,
+            .modal-dialog.mw-700px,
+            .modal-dialog.mw-900px {
+                width: calc(100% - 1rem);
+                max-width: calc(100% - 1rem);
+                margin: 0.5rem auto;
+            }
+
+            .modal-content {
+                max-height: calc(100dvh - 1rem);
+            }
+
+            .modal-body {
+                padding-left: 1rem !important;
+                padding-right: 1rem !important;
+                overflow-x: hidden;
+            }
+
+            .modal-footer {
+                flex-wrap: wrap;
+                gap: 0.5rem;
+            }
+
+            .modal-footer .btn {
+                flex: 1 1 auto;
+            }
         }
     </style>
     @stack('styles')
@@ -95,8 +209,151 @@
                 modalEl.setAttribute('data-bs-backdrop', 'static');
             };
 
+            const loginUrl = document.querySelector('meta[name="login-url"]')?.getAttribute('content') || '/login';
+
+            const redirectToLogin = () => {
+                window.location.href = loginUrl;
+            };
+
+            const isInsideModal = (el) => el?.closest?.('.modal') || null;
+
+            const activeScrollableModalBody = (modalEl) => {
+                if (!modalEl) return null;
+                return modalEl.querySelector('.modal-body.scroll-y, .modal-dialog-scrollable .modal-body, .modal-body');
+            };
+
+            const patchSelect2ForModals = () => {
+                if (!window.jQuery || !jQuery.fn || !jQuery.fn.select2 || jQuery.fn.select2.__modalResponsivePatched) {
+                    return;
+                }
+
+                const originalSelect2 = jQuery.fn.select2;
+                jQuery.fn.select2 = function (...args) {
+                    if (args.length === 0 || (args[0] && typeof args[0] === 'object' && !Array.isArray(args[0]))) {
+                        const incoming = args[0] || {};
+                        this.each(function () {
+                            const modalEl = isInsideModal(this);
+                            if (modalEl && !incoming.dropdownParent) {
+                                jQuery(this).data('select2-modal-parent', modalEl);
+                            }
+                        });
+                        const firstModal = this.first().data('select2-modal-parent');
+                        if (firstModal && !incoming.dropdownParent) {
+                            args[0] = { ...incoming, dropdownParent: jQuery(firstModal) };
+                        }
+                    }
+
+                    return originalSelect2.apply(this, args);
+                };
+
+                Object.keys(originalSelect2).forEach((key) => {
+                    jQuery.fn.select2[key] = originalSelect2[key];
+                });
+                jQuery.fn.select2.__modalResponsivePatched = true;
+            };
+
+            const patchFlatpickrForModals = () => {
+                if (!window.flatpickr || window.flatpickr.__modalResponsivePatched) {
+                    return;
+                }
+
+                const originalFlatpickr = window.flatpickr;
+                const asFlatpickrHooks = (hook) => Array.isArray(hook) ? hook : (hook ? [hook] : []);
+                const repositionFlatpickr = (instance) => {
+                    requestAnimationFrame(() => {
+                        if (instance?.isOpen) {
+                            instance._positionCalendar?.();
+                        }
+                    });
+                };
+                const bindFlatpickrToModal = (instance) => {
+                    const modalEl = isInsideModal(instance?.input);
+                    if (!modalEl || instance.__modalResponsiveBound) return;
+
+                    const reposition = () => repositionFlatpickr(instance);
+                    const modalBody = activeScrollableModalBody(modalEl);
+
+                    modalBody?.addEventListener('scroll', reposition, { passive: true });
+                    modalEl.addEventListener('scroll', reposition, true);
+                    modalEl.addEventListener('shown.bs.modal', reposition);
+                    instance.input?.addEventListener('focus', reposition);
+                    instance.input?.addEventListener('click', reposition);
+                    window.addEventListener('resize', reposition);
+
+                    instance.__modalResponsiveBound = true;
+                };
+                const patchedFlatpickr = function (selector, config = {}) {
+                    const elements = typeof selector === 'string'
+                        ? Array.from(document.querySelectorAll(selector))
+                        : (selector instanceof Element ? [selector] : Array.from(selector || []));
+
+                    const shouldPatch = elements.some((el) => isInsideModal(el));
+                    if (shouldPatch && config && typeof config === 'object') {
+                        const modalEl = isInsideModal(elements[0]);
+                        config = {
+                            ...config,
+                            ...(!config.appendTo && modalEl ? { appendTo: modalEl } : {}),
+                            onReady: [
+                                ...asFlatpickrHooks(config.onReady),
+                                (_selectedDates, _dateStr, instance) => {
+                                    bindFlatpickrToModal(instance);
+                                    instance.calendarContainer?.addEventListener('mousedown', (event) => event.stopPropagation());
+                                    instance.calendarContainer?.addEventListener('click', (event) => event.stopPropagation());
+                                },
+                            ],
+                            onOpen: [
+                                ...asFlatpickrHooks(config.onOpen),
+                                (_selectedDates, _dateStr, instance) => {
+                                    bindFlatpickrToModal(instance);
+                                    repositionFlatpickr(instance);
+                                },
+                            ],
+                            onMonthChange: [
+                                ...asFlatpickrHooks(config.onMonthChange),
+                                (_selectedDates, _dateStr, instance) => repositionFlatpickr(instance),
+                            ],
+                            onYearChange: [
+                                ...asFlatpickrHooks(config.onYearChange),
+                                (_selectedDates, _dateStr, instance) => repositionFlatpickr(instance),
+                            ],
+                        };
+                    }
+
+                    return originalFlatpickr(selector, config);
+                };
+
+                Object.keys(originalFlatpickr).forEach((key) => {
+                    patchedFlatpickr[key] = originalFlatpickr[key];
+                });
+                patchedFlatpickr.__modalResponsivePatched = true;
+                window.flatpickr = patchedFlatpickr;
+            };
+
+            const repositionOpenFlatpickrs = (modalEl) => {
+                if (!modalEl) return;
+                modalEl.querySelectorAll('input.flatpickr-input').forEach((input) => {
+                    input._flatpickr?._positionCalendar?.();
+                });
+            };
+
+            const bindModalResponsiveEvents = (modalEl) => {
+                if (!modalEl || modalEl.__responsiveEventsBound) return;
+                const modalBody = activeScrollableModalBody(modalEl);
+                modalBody?.addEventListener('scroll', () => {
+                    repositionOpenFlatpickrs(modalEl);
+                    window.jQuery?.('.select2-hidden-accessible').select2?.('close');
+                }, { passive: true });
+                modalEl.addEventListener('shown.bs.modal', () => {
+                    repositionOpenFlatpickrs(modalEl);
+                });
+                modalEl.__responsiveEventsBound = true;
+            };
+
             const enforceModalBackdrops = () => {
-                document.querySelectorAll('.modal').forEach(applyModalStaticBackdrop);
+                document.querySelectorAll('.modal').forEach((modalEl) => {
+                    applyModalStaticBackdrop(modalEl);
+                    bindModalResponsiveEvents(modalEl);
+                });
             };
 
             const enforceSweetalertBackdrop = () => {
@@ -122,6 +379,30 @@
 
             enforceModalBackdrops();
             enforceSweetalertBackdrop();
+            patchSelect2ForModals();
+            patchFlatpickrForModals();
+
+            if (!window.__pageExpiredRedirectPatched) {
+                const originalFetch = window.fetch?.bind(window);
+                if (originalFetch) {
+                    window.fetch = async (...args) => {
+                        const response = await originalFetch(...args);
+                        if (response.status === 419) {
+                            redirectToLogin();
+                        }
+                        return response;
+                    };
+                }
+
+                if (window.jQuery) {
+                    jQuery(document).ajaxError((_event, xhr) => {
+                        if (xhr?.status === 419) {
+                            redirectToLogin();
+                        }
+                    });
+                }
+                window.__pageExpiredRedirectPatched = true;
+            }
 
             if (!window.AppSwal) {
                 window.AppSwal = {
@@ -155,6 +436,8 @@
             }
 
             document.addEventListener('DOMContentLoaded', () => {
+                patchSelect2ForModals();
+                patchFlatpickrForModals();
                 enforceModalBackdrops();
                 if (document.body && !window.__modalBackdropObserver) {
                     const observer = new MutationObserver((mutations) => {
@@ -163,8 +446,12 @@
                                 if (!node || node.nodeType !== 1) return;
                                 if (node.classList?.contains('modal')) {
                                     applyModalStaticBackdrop(node);
+                                    bindModalResponsiveEvents(node);
                                 }
-                                node.querySelectorAll?.('.modal')?.forEach(applyModalStaticBackdrop);
+                                node.querySelectorAll?.('.modal')?.forEach((modalEl) => {
+                                    applyModalStaticBackdrop(modalEl);
+                                    bindModalResponsiveEvents(modalEl);
+                                });
                             });
                         });
                     });

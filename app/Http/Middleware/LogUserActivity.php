@@ -3,9 +3,11 @@
 namespace App\Http\Middleware;
 
 use App\Models\ActivityLog;
+use App\Support\ActivityLogMessage;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -16,6 +18,8 @@ class LogUserActivity
     public function handle(Request $request, Closure $next): Response
     {
         $userBefore = $request->user();
+        $message = new ActivityLogMessage();
+        $snapshot = $message->snapshot($request);
         $response = $next($request);
 
         if (!$this->shouldLog($request)) {
@@ -30,16 +34,18 @@ class LogUserActivity
         $route = $request->route();
         $routeName = $route?->getName();
         $method = strtoupper($request->method());
+        $payload = $this->sanitizePayload($request);
+        $userId = DB::table('users')->where('id', $user->id)->exists() ? $user->id : null;
 
         ActivityLog::create([
-            'user_id' => $user->id,
-            'action' => trim($method.' '.($routeName ?: $request->path())),
+            'user_id' => $userId,
+            'action' => $message->build($request, $response, $user, $snapshot, $payload),
             'route_name' => $routeName,
             'method' => $method,
             'url' => $request->fullUrl(),
             'ip_address' => $request->ip(),
             'user_agent' => $request->userAgent(),
-            'payload' => $this->sanitizePayload($request),
+            'payload' => $payload,
         ]);
 
         return $response;

@@ -122,18 +122,6 @@ class StockAdjustmentController extends Controller
                     'note' => $row['note'] ?? null,
                 ]);
 
-                StockService::mutate([
-                    'item_id' => $row['item_id'],
-                    'direction' => $row['direction'],
-                    'qty' => $row['qty'],
-                    'source_type' => 'adjustment',
-                    'source_subtype' => 'manual',
-                    'source_id' => $adjustment->id,
-                    'source_code' => $adjustment->code,
-                    'note' => $row['note'] ?? null,
-                    'occurred_at' => $transactedAt,
-                    'created_by' => auth()->id(),
-                ]);
             }
 
             DB::commit();
@@ -200,18 +188,6 @@ class StockAdjustmentController extends Controller
                 ]);
                 $createdItems++;
 
-                StockService::mutate([
-                    'item_id' => $row['item_id'],
-                    'direction' => $row['direction'],
-                    'qty' => $row['qty'],
-                    'source_type' => 'adjustment',
-                    'source_subtype' => 'import',
-                    'source_id' => $adjustment->id,
-                    'source_code' => $adjustment->code,
-                    'note' => $row['note'] ?? null,
-                    'occurred_at' => $transactedAt,
-                    'created_by' => auth()->id(),
-                ]);
             }
 
             DB::commit();
@@ -286,18 +262,6 @@ class StockAdjustmentController extends Controller
                     'note' => $row['note'] ?? null,
                 ]);
 
-                StockService::mutate([
-                    'item_id' => $row['item_id'],
-                    'direction' => $row['direction'],
-                    'qty' => $row['qty'],
-                    'source_type' => 'adjustment',
-                    'source_subtype' => 'manual',
-                    'source_id' => $adjustment->id,
-                    'source_code' => $adjustment->code,
-                    'note' => $row['note'] ?? null,
-                    'occurred_at' => $validated['transacted_at'] ?? now(),
-                    'created_by' => auth()->id(),
-                ]);
             }
 
             DB::commit();
@@ -349,16 +313,54 @@ class StockAdjustmentController extends Controller
 
     public function approve(int $id)
     {
-        $adjustment = StockAdjustment::findOrFail($id);
-        if (($adjustment->status ?? 'pending') === 'approved') {
-            return response()->json(['message' => 'Data sudah disetujui']);
+        DB::beginTransaction();
+        try {
+            $adjustment = StockAdjustment::where('id', $id)->lockForUpdate()->firstOrFail();
+            if (($adjustment->status ?? 'pending') === 'approved') {
+                DB::commit();
+                return response()->json(['message' => 'Data sudah disetujui']);
+            }
+
+            $this->postStockMovements($adjustment);
+
+            $adjustment->status = 'approved';
+            $adjustment->approved_at = now();
+            $adjustment->approved_by = auth()->id();
+            $adjustment->save();
+
+            DB::commit();
+        } catch (ValidationException $e) {
+            DB::rollBack();
+            throw $e;
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Gagal menyetujui penyesuaian stok',
+                'error' => $e->getMessage(),
+            ], 500);
         }
-        $adjustment->status = 'approved';
-        $adjustment->approved_at = now();
-        $adjustment->approved_by = auth()->id();
-        $adjustment->save();
 
         return response()->json(['message' => 'Penyesuaian stok berhasil disetujui']);
+    }
+
+    private function postStockMovements(StockAdjustment $adjustment): void
+    {
+        $adjustment->loadMissing('items');
+        foreach ($adjustment->items as $row) {
+            StockService::mutate([
+                'item_id' => $row->item_id,
+                'direction' => $row->direction,
+                'qty' => $row->qty,
+                'source_type' => 'adjustment',
+                'source_subtype' => 'manual',
+                'source_id' => $adjustment->id,
+                'source_code' => $adjustment->code,
+                'note' => $row->note ?? null,
+                'occurred_at' => $adjustment->transacted_at ?? now(),
+                'created_by' => auth()->id(),
+                'idempotency_key' => StockService::idempotencyKey(['stock', 'adjustment', $adjustment->id, $row->item_id, $row->direction]),
+            ]);
+        }
     }
 
     private function validatePayload(Request $request): array

@@ -7,6 +7,8 @@ use App\Console\Commands\RecalculatePoLineFulfillment;
 use App\Console\Commands\MovePickingDate;
 use App\Console\Commands\MovePackerScanDates;
 use App\Console\Commands\MovePackerTransitDate;
+use Illuminate\Http\Request;
+use Illuminate\Session\TokenMismatchException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -31,5 +33,14 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->appendToGroup('web', 'activity.log');
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        $exceptions->render(function (TokenMismatchException $e, Request $request) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'message' => 'Sesi berakhir. Silakan login kembali.',
+                    'redirect' => route('login'),
+                ], 419);
+            }
+
+            return redirect()->guest(route('login'));
+        });
     })->create();

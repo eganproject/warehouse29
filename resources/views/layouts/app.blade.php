@@ -4,6 +4,7 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="csrf-token" content="{{ csrf_token() }}">
+        <meta name="login-url" content="{{ route('login') }}">
 
         <title>{{ config('app.name', 'Laravel') }}</title>
 
@@ -32,5 +33,22 @@
                 {{ $slot }}
             </main>
         </div>
+        <script>
+            (function () {
+                if (window.__pageExpiredRedirectPatched) return;
+                const loginUrl = document.querySelector('meta[name="login-url"]')?.getAttribute('content') || '/login';
+                const originalFetch = window.fetch?.bind(window);
+                if (originalFetch) {
+                    window.fetch = async (...args) => {
+                        const response = await originalFetch(...args);
+                        if (response.status === 419) {
+                            window.location.href = loginUrl;
+                        }
+                        return response;
+                    };
+                }
+                window.__pageExpiredRedirectPatched = true;
+            })();
+        </script>
     </body>
 </html>

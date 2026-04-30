@@ -9,6 +9,7 @@ use App\Models\PickerSessionItem;
 use App\Models\PickerTransitItem;
 use App\Models\PickingList;
 use App\Models\PickingListException;
+use App\Models\StockMutation;
 use App\Support\StockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -66,13 +67,15 @@ class PickerSessionController extends Controller
             'item_id' => ['required', 'integer', 'exists:items,id'],
             'qty' => ['required', 'integer', 'min:1'],
             'note' => ['nullable', 'string'],
+            'request_id' => ['nullable', 'string', 'max:120'],
         ]);
 
         try {
             $session = $this->addItemToSession(
                 (int) $validated['item_id'],
                 (int) $validated['qty'],
-                $validated['note'] ?? null
+                $validated['note'] ?? null,
+                $validated['request_id'] ?? null
             );
         } catch (ValidationException $e) {
             return response()->json([
@@ -355,6 +358,7 @@ class PickerSessionController extends Controller
         $validated = $request->validate([
             'code' => ['required', 'string'],
             'qty' => ['nullable', 'integer', 'min:1'],
+            'request_id' => ['nullable', 'string', 'max:120'],
         ]);
 
         $code = trim($validated['code']);
@@ -371,7 +375,7 @@ class PickerSessionController extends Controller
         }
 
         try {
-            $session = $this->addItemToSession($item->id, $qty);
+            $session = $this->addItemToSession($item->id, $qty, null, $validated['request_id'] ?? null);
         } catch (ValidationException $e) {
             return response()->json([
                 'message' => $e->getMessage(),
@@ -424,7 +428,7 @@ class PickerSessionController extends Controller
         });
     }
 
-    private function addItemToSession(int $itemId, int $qty, ?string $note = null): PickerSession
+    private function addItemToSession(int $itemId, int $qty, ?string $note = null, ?string $requestId = null): PickerSession
     {
         if ($qty <= 0) {
             throw ValidationException::withMessages([
@@ -433,9 +437,15 @@ class PickerSessionController extends Controller
         }
 
         $session = $this->ensureDraftSession();
+        $idempotencyKey = $this->requestIdempotencyKey('picker.add-item', $requestId);
 
         DB::beginTransaction();
         try {
+            if ($idempotencyKey && StockMutation::where('idempotency_key', $idempotencyKey)->lockForUpdate()->exists()) {
+                DB::commit();
+                return $session->fresh('items.item');
+            }
+
             $deltaQty = $qty;
             $occurredAt = now();
             $pickedDate = $session->started_at?->toDateString() ?? $occurredAt->toDateString();
@@ -495,6 +505,7 @@ class PickerSessionController extends Controller
                 'note' => $note,
                 'occurred_at' => $occurredAt,
                 'created_by' => auth()->id(),
+                'idempotency_key' => $idempotencyKey,
             ]);
 
             $this->adjustPickingRemaining($pickedDate, $sku, $deltaQty);
@@ -508,6 +519,16 @@ class PickerSessionController extends Controller
         $session->load('items.item');
 
         return $session;
+    }
+
+    private function requestIdempotencyKey(string $action, ?string $requestId): ?string
+    {
+        $requestId = trim((string) ($requestId ?? ''));
+        if ($requestId === '') {
+            return null;
+        }
+
+        return StockService::idempotencyKey(['request', $action, auth()->id(), $requestId]);
     }
 
     private function serializeSession(PickerSession $session): array

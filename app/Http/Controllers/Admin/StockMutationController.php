@@ -249,14 +249,14 @@ class StockMutationController extends Controller
                 }
                 break;
             case 'qc_resi':
-                $qcResi = QcScanResi::with(['session.user', 'resi', 'items.item'])->find($mutation->source_id);
+                $qcResi = QcScanResi::with(['scanner', 'resi', 'items.item'])->find($mutation->source_id);
                 if ($qcResi) {
                     $sourceSummary = [
                         'label' => 'QC Scan Resi',
-                        'code' => $qcResi->session?->code ?? '-',
+                        'code' => $qcResi->resi?->no_resi ?? $qcResi->resi?->id_pesanan ?? '-',
                         'ref' => $qcResi->resi?->no_resi ?? $qcResi->resi?->id_pesanan ?? '-',
                         'date' => ($qcResi->completed_at ?? $qcResi->scanned_at)?->format('Y-m-d H:i'),
-                        'note' => $qcResi->session?->user?->name ?? '-',
+                        'note' => $qcResi->scanner?->name ?? '-',
                     ];
                     $sourceItems = $qcResi->items->map(function ($row) {
                         return [

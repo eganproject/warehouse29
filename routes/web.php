@@ -56,7 +56,14 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
-Route::middleware('auth')->prefix('picker')->as('picker.')->group(function () {
+Route::middleware('auth')->get('/picker/{path?}', function (?string $path = null) {
+    $target = '/mobile'.($path ? '/'.$path : '');
+    $query = request()->getQueryString();
+
+    return redirect($query ? $target.'?'.$query : $target);
+})->where('path', '.*');
+
+Route::middleware('auth')->prefix('mobile')->as('picker.')->group(function () {
     Route::get('/dashboard', [PickerDashboardController::class, 'index'])->name('dashboard');
     Route::get('/scan-out', [PackerScanOutController::class, 'index'])->name('scan-out.index');
     Route::post('/scan-out/scan', [PackerScanOutController::class, 'scan'])->name('scan-out.scan');

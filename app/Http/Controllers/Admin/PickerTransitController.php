@@ -29,7 +29,7 @@ class PickerTransitController extends Controller
     public function data(Request $request)
     {
         $baseQuery = QcScanResi::query()
-            ->with(['session.user', 'resi', 'items.item'])
+            ->with(['scanner', 'resi', 'items.item'])
             ->whereHas('resi', function ($q) {
                 $q->whereNull('status')
                     ->orWhere('status', '!=', 'canceled');
@@ -44,7 +44,7 @@ class PickerTransitController extends Controller
                     $resiQ->where('no_resi', 'like', "%{$search}%")
                         ->orWhere('id_pesanan', 'like', "%{$search}%");
                 })
-                    ->orWhereHas('session', fn ($sessionQ) => $sessionQ->where('code', 'like', "%{$search}%"))
+                    ->orWhereHas('scanner', fn ($scannerQ) => $scannerQ->where('name', 'like', "%{$search}%"))
                     ->orWhereHas('items', function ($itemQ) use ($search) {
                         $itemQ->where('sku', 'like', "%{$search}%")
                             ->orWhereHas('item', fn ($masterQ) => $masterQ->where('name', 'like', "%{$search}%"));
@@ -93,8 +93,7 @@ class PickerTransitController extends Controller
                 'date' => $row->scanned_at?->format('Y-m-d') ?? '-',
                 'id_pesanan' => $row->resi?->id_pesanan ?? '-',
                 'no_resi' => $row->resi?->no_resi ?? '-',
-                'session_code' => $row->session?->code ?? '-',
-                'scanner_name' => $row->session?->user?->name ?? '-',
+                'scanner_name' => $row->scanner?->name ?? '-',
                 'sku_count' => $row->items->count(),
                 'sku_summary' => $skuSummary ?: '-',
                 'qc_required_qty' => $requiredQty,
@@ -124,7 +123,7 @@ class PickerTransitController extends Controller
         ]);
 
         $search = strtolower(trim((string) ($validated['q'] ?? '')));
-        $qcResi = QcScanResi::with(['session.user', 'resi', 'items.item'])
+        $qcResi = QcScanResi::with(['scanner', 'resi', 'items.item'])
             ->findOrFail((int) $validated['qc_resi_id']);
 
         $items = $qcResi->items;
@@ -148,8 +147,7 @@ class PickerTransitController extends Controller
                 'scanned_qty' => $scannedQty,
                 'progress' => $progress,
                 'qc_status' => $qcStatus,
-                'session_code' => $qcResi->session?->code ?? '-',
-                'scanner_name' => $qcResi->session?->user?->name ?? '-',
+                'scanner_name' => $qcResi->scanner?->name ?? '-',
                 'scanned_at' => $qcResi->scanned_at ? Carbon::parse($qcResi->scanned_at)->format('Y-m-d H:i') : '-',
                 'completed_at' => $qcResi->completed_at ? Carbon::parse($qcResi->completed_at)->format('Y-m-d H:i') : '-',
             ];
@@ -353,7 +351,7 @@ class PickerTransitController extends Controller
             if ($isException) {
                 $suspect = 'SKU ada di exception scan out, sehingga tidak mengurangi QC transit';
             } elseif ($scannedOutUploadQty >= $pickedQty && $remainingQty > 0) {
-                $suspect = 'Semua resi batch tanggal ini sudah scan out, tapi remaining masih ada (indikasi mismatch alokasi tanggal/row transit)';
+                $suspect = 'Semua resi QC tanggal ini sudah scan out, tapi remaining masih ada (indikasi mismatch alokasi tanggal/row transit)';
             } elseif ($scannedOutScanQty >= $pickedQty && $remainingQty > 0) {
                 $suspect = 'Scan out hari ini sudah cukup, tapi remaining masih ada (indikasi QC transit belum ter-reduce penuh)';
             }

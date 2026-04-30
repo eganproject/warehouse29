@@ -7,6 +7,7 @@ use App\Models\Item;
 use App\Models\ItemStock;
 use App\Models\StockOpname;
 use App\Models\StockOpnameItem;
+use App\Models\StockMutation;
 use App\Support\StockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -109,6 +110,8 @@ class StockOpnameMobileController extends Controller
 
         DB::beginTransaction();
         try {
+            $this->clearOpenOpnameMutations($opname);
+
             $exists = StockOpnameItem::where('stock_opname_id', $opname->id)
                 ->where('item_id', $validated['item_id'])
                 ->lockForUpdate()
@@ -138,21 +141,6 @@ class StockOpnameMobileController extends Controller
                 'note' => $validated['note'] ?? null,
                 'created_by' => auth()->id(),
             ]);
-
-            if ($adjustment !== 0) {
-                StockService::mutate([
-                    'item_id' => $validated['item_id'],
-                    'direction' => $adjustment > 0 ? 'in' : 'out',
-                    'qty' => abs($adjustment),
-                    'source_type' => 'opname',
-                    'source_subtype' => 'mobile',
-                    'source_id' => $opname->id,
-                    'source_code' => $opname->code,
-                    'note' => $validated['note'] ?? null,
-                    'occurred_at' => $opname->transacted_at ?? now(),
-                    'created_by' => auth()->id(),
-                ]);
-            }
 
             DB::commit();
         } catch (ValidationException $e) {
@@ -188,6 +176,8 @@ class StockOpnameMobileController extends Controller
 
         DB::beginTransaction();
         try {
+            $this->clearOpenOpnameMutations($opname);
+
             $item = StockOpnameItem::where('stock_opname_id', $opname->id)
                 ->where('id', $id)
                 ->lockForUpdate()
@@ -196,21 +186,6 @@ class StockOpnameMobileController extends Controller
             $newCounted = (int) $validated['counted_qty'];
             $newAdjustment = $newCounted - (int) $item->system_qty;
             $delta = $newAdjustment - (int) $item->adjustment;
-
-            if ($delta !== 0) {
-                StockService::mutate([
-                    'item_id' => $item->item_id,
-                    'direction' => $delta > 0 ? 'in' : 'out',
-                    'qty' => abs($delta),
-                    'source_type' => 'opname',
-                    'source_subtype' => 'mobile',
-                    'source_id' => $opname->id,
-                    'source_code' => $opname->code,
-                    'note' => $validated['note'] ?? $item->note,
-                    'occurred_at' => $opname->transacted_at ?? now(),
-                    'created_by' => auth()->id(),
-                ]);
-            }
 
             $item->counted_qty = $newCounted;
             $item->adjustment = $newAdjustment;
@@ -246,26 +221,12 @@ class StockOpnameMobileController extends Controller
 
         DB::beginTransaction();
         try {
+            $this->clearOpenOpnameMutations($opname);
+
             $item = StockOpnameItem::where('stock_opname_id', $opname->id)
                 ->where('id', $id)
                 ->lockForUpdate()
                 ->firstOrFail();
-
-            $adjustment = (int) $item->adjustment;
-            if ($adjustment !== 0) {
-                StockService::mutate([
-                    'item_id' => $item->item_id,
-                    'direction' => $adjustment > 0 ? 'out' : 'in',
-                    'qty' => abs($adjustment),
-                    'source_type' => 'opname',
-                    'source_subtype' => 'mobile',
-                    'source_id' => $opname->id,
-                    'source_code' => $opname->code,
-                    'note' => $item->note,
-                    'occurred_at' => $opname->transacted_at ?? now(),
-                    'created_by' => auth()->id(),
-                ]);
-            }
 
             $item->delete();
             DB::commit();
@@ -329,5 +290,19 @@ class StockOpnameMobileController extends Controller
     private function generateCode(string $prefix): string
     {
         return $prefix.'-'.now()->format('YmdHis').'-'.Str::upper(Str::random(4));
+    }
+
+    private function clearOpenOpnameMutations(StockOpname $opname): void
+    {
+        if (($opname->status ?? 'open') !== 'open') {
+            return;
+        }
+
+        if (!StockMutation::where('source_type', 'opname')->where('source_id', $opname->id)->exists()) {
+            return;
+        }
+
+        StockService::rollbackBySource('opname', $opname->id);
+        StockMutation::where('source_type', 'opname')->where('source_id', $opname->id)->delete();
     }
 }

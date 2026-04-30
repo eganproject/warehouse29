@@ -31,14 +31,12 @@ class RestrictPickerAccess
         $routeName = $request->route()?->getName() ?? '';
         $path = trim($request->path(), '/');
 
-        $isDashboardRoute = $routeName === 'picker.dashboard' || $path === 'picker/dashboard';
-        $isPackerRoute = str_starts_with($routeName, 'picker.packer') || str_starts_with($path, 'picker/packer');
+        $isDashboardRoute = $routeName === 'picker.dashboard' || $path === 'mobile/dashboard';
         $isScanOutRoute = str_starts_with($routeName, 'picker.scan-out')
             || str_starts_with($routeName, 'picker.scan-out-v2')
-            || str_starts_with($path, 'picker/scan-out')
-            || str_starts_with($path, 'picker/scan-out-v2');
-        $isPickerRoute = (str_starts_with($routeName, 'picker.') || str_starts_with($path, 'picker'))
-            && !$isPackerRoute
+            || str_starts_with($path, 'mobile/scan-out')
+            || str_starts_with($path, 'mobile/scan-out-v2');
+        $isPickerRoute = (str_starts_with($routeName, 'picker.') || str_starts_with($path, 'mobile'))
             && !$isScanOutRoute
             && !$isDashboardRoute;
         $isOpnameRoute = str_starts_with($routeName, 'opname.') || str_starts_with($path, 'opname');
@@ -50,7 +48,6 @@ class RestrictPickerAccess
             if (
                 ($hasPicker && $isAdminQcScanRoute)
                 || $isPickerRoute
-                || $isPackerRoute
                 || $isScanOutRoute
                 || $isQcRoute
                 || $isOpnameRoute

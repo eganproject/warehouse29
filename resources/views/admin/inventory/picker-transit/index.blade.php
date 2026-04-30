@@ -3,6 +3,23 @@
 @section('title', 'QC Transit')
 @section('page_title', 'QC Transit')
 
+@push('styles')
+<style>
+    .modal-picker-transit-detail {
+        --bs-modal-width: 1500px;
+        width: min(96vw, 1500px);
+        max-width: calc(100vw - 1.5rem);
+    }
+
+    @media (max-width: 575.98px) {
+        .modal-picker-transit-detail {
+            width: calc(100% - 1rem);
+            max-width: calc(100% - 1rem);
+        }
+    }
+</style>
+@endpush
+
 @section('content')
 <div class="card">
     <div class="card-header border-0 pt-6">
@@ -146,7 +163,7 @@
 </div>
 
 <div class="modal fade" id="modal_picker_transit_detail" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
+    <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable modal-picker-transit-detail">
         <div class="modal-content">
             <div class="modal-header">
                 <div>
@@ -359,7 +376,7 @@
                     }
                     return '<span class="badge badge-light-warning">Belum Scan Out</span>';
                 }},
-                { data: 'scanner_name', render: (data, type, row) => `<div class="fw-semibold">${data || '-'}</div><div class="text-muted fs-9">${row.session_code || '-'}</div>` },
+                { data: 'scanner_name', render: data => `<div class="fw-semibold">${data || '-'}</div>` },
                 { data: null, orderable: false, searchable: false, render: (data, type, row) => {
                     const id = row?.id || '';
                     const disabled = !id ? 'disabled' : '';
@@ -604,7 +621,6 @@
                     </td>
                     <td>
                         <div class="fw-semibold">${r.scanner_name || '-'}</div>
-                        <div class="text-muted fs-9">${r.session_code || '-'}</div>
                     </td>
                     <td>${qcBadge}<div class="text-muted fs-9 mt-1">${r.completed_at && r.completed_at !== '-' ? r.completed_at : r.scanned_at}</div></td>
                 </tr>`;

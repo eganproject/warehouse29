@@ -9,6 +9,7 @@ use App\Models\PickingList;
 use App\Models\PickingListException;
 use App\Models\PackerScanException;
 use App\Models\QcTransitItem;
+use App\Models\StockMutation;
 use App\Support\StockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -140,14 +141,23 @@ class PickingListController extends Controller
             'list_date' => ['required', 'date'],
             'sku' => ['required', 'string', 'max:100'],
             'qty' => ['required', 'integer', 'min:1'],
+            'request_id' => ['nullable', 'string', 'max:120'],
         ]);
 
         $listDate = Carbon::parse($validated['list_date'])->toDateString();
         $sku = trim($validated['sku']);
         $qty = (int) $validated['qty'];
+        $idempotencyKey = $this->requestIdempotencyKey('picking-exception.return', $validated['request_id'] ?? null);
 
         DB::beginTransaction();
         try {
+            if ($idempotencyKey && StockMutation::where('idempotency_key', $idempotencyKey)->lockForUpdate()->exists()) {
+                DB::commit();
+                return response()->json([
+                    'message' => 'Stok berhasil dikembalikan.',
+                ]);
+            }
+
             $exception = PickingListException::where('list_date', $listDate)
                 ->where('sku', $sku)
                 ->lockForUpdate()
@@ -213,6 +223,7 @@ class PickingListController extends Controller
                 'note' => 'Retur dari picking exception',
                 'occurred_at' => now(),
                 'created_by' => auth()->id(),
+                'idempotency_key' => $idempotencyKey,
             ]);
 
             DB::commit();
@@ -230,6 +241,16 @@ class PickingListController extends Controller
         return response()->json([
             'message' => 'Stok berhasil dikembalikan.',
         ]);
+    }
+
+    private function requestIdempotencyKey(string $action, ?string $requestId): ?string
+    {
+        $requestId = trim((string) ($requestId ?? ''));
+        if ($requestId === '') {
+            return null;
+        }
+
+        return StockService::idempotencyKey(['request', $action, auth()->id(), $requestId]);
     }
 
     public function recalculate(Request $request)

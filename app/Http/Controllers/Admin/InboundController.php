@@ -149,18 +149,6 @@ class InboundController extends Controller
                     ]);
                     $createdItems++;
 
-                    StockService::mutate([
-                        'item_id' => $row['item_id'],
-                        'direction' => 'in',
-                        'qty' => $row['qty'],
-                        'source_type' => 'inbound',
-                        'source_subtype' => 'return',
-                        'source_id' => $tx->id,
-                        'source_code' => $tx->code,
-                        'note' => $row['note'] ?? null,
-                        'occurred_at' => $transactedAt,
-                        'created_by' => auth()->id(),
-                    ]);
                 }
             }
 
@@ -233,18 +221,6 @@ class InboundController extends Controller
                     ]);
                     $createdItems++;
 
-                    StockService::mutate([
-                        'item_id' => $row['item_id'],
-                        'direction' => 'in',
-                        'qty' => $row['qty'],
-                        'source_type' => 'inbound',
-                        'source_subtype' => 'receipt',
-                        'source_id' => $tx->id,
-                        'source_code' => $tx->code,
-                        'note' => $row['note'] ?? null,
-                        'occurred_at' => $transactedAt,
-                        'created_by' => auth()->id(),
-                    ]);
                 }
             }
 
@@ -479,18 +455,6 @@ class InboundController extends Controller
                     'note' => $row['note'] ?? null,
                 ]);
 
-                StockService::mutate([
-                    'item_id' => $row['item_id'],
-                    'direction' => 'in',
-                    'qty' => $row['qty'],
-                    'source_type' => 'inbound',
-                    'source_subtype' => $type,
-                    'source_id' => $tx->id,
-                    'source_code' => $tx->code,
-                    'note' => $row['note'] ?? null,
-                    'occurred_at' => $transactedAt,
-                    'created_by' => auth()->id(),
-                ]);
             }
 
             DB::commit();
@@ -540,18 +504,6 @@ class InboundController extends Controller
                     'note' => $row['note'] ?? null,
                 ]);
 
-                StockService::mutate([
-                    'item_id' => $row['item_id'],
-                    'direction' => 'in',
-                    'qty' => $row['qty'],
-                    'source_type' => 'inbound',
-                    'source_subtype' => $type,
-                    'source_id' => $tx->id,
-                    'source_code' => $tx->code,
-                    'note' => $row['note'] ?? null,
-                    'occurred_at' => $validated['transacted_at'] ?? $tx->transacted_at,
-                    'created_by' => auth()->id(),
-                ]);
             }
 
             DB::commit();
@@ -607,16 +559,57 @@ class InboundController extends Controller
 
     private function approve(string $type, int $id)
     {
-        $tx = InboundTransaction::where('type', $type)->findOrFail($id);
-        if (($tx->status ?? 'pending') === 'approved') {
-            return response()->json(['message' => 'Data sudah disetujui']);
+        DB::beginTransaction();
+        try {
+            $tx = InboundTransaction::where('type', $type)
+                ->lockForUpdate()
+                ->findOrFail($id);
+
+            if (($tx->status ?? 'pending') === 'approved') {
+                DB::commit();
+                return response()->json(['message' => 'Data sudah disetujui']);
+            }
+
+            $this->postStockMovements($tx, $type);
+
+            $tx->status = 'approved';
+            $tx->approved_at = now();
+            $tx->approved_by = auth()->id();
+            $tx->save();
+
+            DB::commit();
+        } catch (ValidationException $e) {
+            DB::rollBack();
+            throw $e;
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Gagal menyetujui inbound',
+                'error' => $e->getMessage(),
+            ], 500);
         }
-        $tx->status = 'approved';
-        $tx->approved_at = now();
-        $tx->approved_by = auth()->id();
-        $tx->save();
 
         return response()->json(['message' => 'Inbound berhasil disetujui']);
+    }
+
+    private function postStockMovements(InboundTransaction $tx, string $type): void
+    {
+        $tx->loadMissing('items');
+        foreach ($tx->items as $row) {
+            StockService::mutate([
+                'item_id' => $row->item_id,
+                'direction' => 'in',
+                'qty' => $row->qty,
+                'source_type' => 'inbound',
+                'source_subtype' => $type,
+                'source_id' => $tx->id,
+                'source_code' => $tx->code,
+                'note' => $row->note ?? null,
+                'occurred_at' => $tx->transacted_at ?? now(),
+                'created_by' => auth()->id(),
+                'idempotency_key' => StockService::idempotencyKey(['stock', 'inbound', $type, $tx->id, $row->item_id]),
+            ]);
+        }
     }
 
     private function validatePayload(Request $request): array

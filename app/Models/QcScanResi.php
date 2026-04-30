@@ -7,7 +7,6 @@ use Illuminate\Database\Eloquent\Model;
 class QcScanResi extends Model
 {
     protected $fillable = [
-        'qc_scan_session_id',
         'resi_id',
         'status',
         'scanned_at',
@@ -20,11 +19,6 @@ class QcScanResi extends Model
         'scanned_at' => 'datetime',
         'completed_at' => 'datetime',
     ];
-
-    public function session()
-    {
-        return $this->belongsTo(QcScanSession::class, 'qc_scan_session_id');
-    }
 
     public function resi()
     {

@@ -119,20 +119,6 @@ class DamagedGoodsController extends Controller
                     'note' => $row['note'] ?? null,
                 ]);
 
-                if ($validated['source_type'] === 'display') {
-                    StockService::mutate([
-                        'item_id' => $row['item_id'],
-                        'direction' => 'out',
-                        'qty' => $row['qty'],
-                        'source_type' => 'damaged',
-                        'source_subtype' => $validated['source_type'],
-                        'source_id' => $damage->id,
-                        'source_code' => $damage->code,
-                        'note' => $row['note'] ?? null,
-                        'occurred_at' => $transactedAt,
-                        'created_by' => auth()->id(),
-                    ]);
-                }
             }
 
             DB::commit();
@@ -208,20 +194,6 @@ class DamagedGoodsController extends Controller
                     'note' => $row['note'] ?? null,
                 ]);
 
-                if ($validated['source_type'] === 'display') {
-                    StockService::mutate([
-                        'item_id' => $row['item_id'],
-                        'direction' => 'out',
-                        'qty' => $row['qty'],
-                        'source_type' => 'damaged',
-                        'source_subtype' => $validated['source_type'],
-                        'source_id' => $damage->id,
-                        'source_code' => $damage->code,
-                        'note' => $row['note'] ?? null,
-                        'occurred_at' => $validated['transacted_at'] ?? now(),
-                        'created_by' => auth()->id(),
-                    ]);
-                }
             }
 
             DB::commit();
@@ -273,16 +245,58 @@ class DamagedGoodsController extends Controller
 
     public function approve(int $id)
     {
-        $damage = DamagedGood::findOrFail($id);
-        if (($damage->status ?? 'pending') === 'approved') {
-            return response()->json(['message' => 'Data sudah disetujui']);
+        DB::beginTransaction();
+        try {
+            $damage = DamagedGood::where('id', $id)->lockForUpdate()->firstOrFail();
+            if (($damage->status ?? 'pending') === 'approved') {
+                DB::commit();
+                return response()->json(['message' => 'Data sudah disetujui']);
+            }
+
+            $this->postStockMovements($damage);
+
+            $damage->status = 'approved';
+            $damage->approved_at = now();
+            $damage->approved_by = auth()->id();
+            $damage->save();
+
+            DB::commit();
+        } catch (ValidationException $e) {
+            DB::rollBack();
+            throw $e;
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Gagal menyetujui barang rusak',
+                'error' => $e->getMessage(),
+            ], 500);
         }
-        $damage->status = 'approved';
-        $damage->approved_at = now();
-        $damage->approved_by = auth()->id();
-        $damage->save();
 
         return response()->json(['message' => 'Barang rusak berhasil disetujui']);
+    }
+
+    private function postStockMovements(DamagedGood $damage): void
+    {
+        if ($damage->source_type !== 'display') {
+            return;
+        }
+
+        $damage->loadMissing('items');
+        foreach ($damage->items as $row) {
+            StockService::mutate([
+                'item_id' => $row->item_id,
+                'direction' => 'out',
+                'qty' => $row->qty,
+                'source_type' => 'damaged',
+                'source_subtype' => $damage->source_type,
+                'source_id' => $damage->id,
+                'source_code' => $damage->code,
+                'note' => $row->note ?? null,
+                'occurred_at' => $damage->transacted_at ?? now(),
+                'created_by' => auth()->id(),
+                'idempotency_key' => StockService::idempotencyKey(['stock', 'damaged', $damage->source_type, $damage->id, $row->item_id]),
+            ]);
+        }
     }
 
     private function validatePayload(Request $request): array

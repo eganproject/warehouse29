@@ -4,6 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <meta name="login-url" content="{{ route('login') }}">
     <title>@yield('title', 'Operasional Mobile')</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -282,5 +283,22 @@
 <body>
     @yield('content')
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        (function () {
+            if (window.__pageExpiredRedirectPatched) return;
+            const loginUrl = document.querySelector('meta[name="login-url"]')?.getAttribute('content') || '/login';
+            const originalFetch = window.fetch?.bind(window);
+            if (originalFetch) {
+                window.fetch = async (...args) => {
+                    const response = await originalFetch(...args);
+                    if (response.status === 419) {
+                        window.location.href = loginUrl;
+                    }
+                    return response;
+                };
+            }
+            window.__pageExpiredRedirectPatched = true;
+        })();
+    </script>
 </body>
 </html>

@@ -20,6 +20,7 @@ class StockMutation extends Model
         'note',
         'occurred_at',
         'created_by',
+        'idempotency_key',
     ];
 
     protected $casts = [

@@ -13,6 +13,7 @@ use App\Support\StockService;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -174,9 +175,16 @@ class ItemController extends Controller
     {
         DB::beginTransaction();
         try {
+            $this->assertItemCanBeDeleted($item);
             $item->delete();
             DB::commit();
             return response()->json(['message' => 'Item berhasil dihapus']);
+        } catch (ValidationException $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => $e->getMessage(),
+                'errors' => $e->errors(),
+            ], 422);
         } catch (\Throwable $e) {
             DB::rollBack();
             return response()->json([
@@ -213,6 +221,9 @@ class ItemController extends Controller
                     'note' => 'Saldo awal dari import items',
                     'transacted_at' => $transactedAt,
                     'created_by' => auth()->id(),
+                    'status' => 'approved',
+                    'approved_at' => $transactedAt,
+                    'approved_by' => auth()->id(),
                 ]);
 
                 foreach ($initialStocks as $itemId => $qty) {
@@ -238,6 +249,7 @@ class ItemController extends Controller
                         'note' => 'Saldo awal import',
                         'occurred_at' => $transactedAt,
                         'created_by' => auth()->id(),
+                        'idempotency_key' => StockService::idempotencyKey(['stock', 'inbound', 'opening', $tx->id, $itemId]),
                     ]);
                 }
             }
@@ -276,6 +288,58 @@ class ItemController extends Controller
             'name' => $trimmed,
             'parent_id' => $parentId,
         ]);
+    }
+
+    private function assertItemCanBeDeleted(Item $item): void
+    {
+        $references = [];
+
+        $itemTables = [
+            'inbound_items' => 'penerimaan barang',
+            'outbound_items' => 'barang keluar',
+            'stock_mutations' => 'mutasi stok',
+            'stock_adjustment_items' => 'penyesuaian stok',
+            'stock_opname_items' => 'stock opname',
+            'damaged_good_items' => 'barang rusak',
+            'qc_scan_resi_items' => 'QC scan resi',
+            'qc_transit_items' => 'transit QC',
+            'picker_session_items' => 'sesi picker',
+            'picker_transit_items' => 'transit picker',
+        ];
+
+        foreach ($itemTables as $table => $label) {
+            if (Schema::hasTable($table) && DB::table($table)->where('item_id', $item->id)->exists()) {
+                $references[] = $label;
+            }
+        }
+
+        if (Schema::hasTable('item_stocks')) {
+            $stockQty = (int) DB::table('item_stocks')
+                ->where('item_id', $item->id)
+                ->value('stock');
+            if ($stockQty > 0) {
+                $references[] = 'stok berjalan '.$stockQty.' pcs';
+            }
+        }
+
+        $skuTables = [
+            'resi_details' => 'detail resi',
+            'picking_lists' => 'picking list',
+            'picking_list_exceptions' => 'exception picking list',
+        ];
+
+        foreach ($skuTables as $table => $label) {
+            if (Schema::hasTable($table) && DB::table($table)->where('sku', $item->sku)->exists()) {
+                $references[] = $label;
+            }
+        }
+
+        if (!empty($references)) {
+            $references = array_values(array_unique($references));
+            throw ValidationException::withMessages([
+                'item' => 'Item tidak bisa dihapus karena sudah dipakai pada '.implode(', ', $references).'. Nonaktifkan atau ubah data terkait jika memang diperlukan.',
+            ]);
+        }
     }
 
     protected function getDefaultCategoryId(): int

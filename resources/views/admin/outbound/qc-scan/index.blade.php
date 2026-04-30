@@ -218,6 +218,44 @@
                     </div>
                 </div>
             </div>
+
+            <div class="card mt-4">
+                <div class="card-header border-0 pt-5 pb-0">
+                    <div class="card-title">
+                        <div>
+                            <div class="fw-bold fs-6">Riwayat Scan Resi</div>
+                            <div class="text-muted fs-8">Daftar resi yang kamu scan hari ini</div>
+                        </div>
+                    </div>
+                    <div class="card-toolbar gap-2">
+                        <div class="d-flex align-items-center position-relative">
+                            <i class="fa-solid fa-magnifying-glass position-absolute ms-3 text-gray-500 fs-8"></i>
+                            <input type="text" class="form-control form-control-solid form-control-sm w-175px ps-9" id="qc_resi_history_search" placeholder="Cari resi..." />
+                        </div>
+                        <button type="button" class="btn btn-sm btn-light" id="btn_refresh_resi_history" title="Muat ulang riwayat">
+                            <i class="fa-solid fa-rotate-right"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body pt-4 pb-5">
+                    <div class="table-responsive">
+                        <table class="table table-row-dashed align-middle fs-8 mb-0">
+                            <thead>
+                                <tr class="text-start text-gray-400 fw-bolder text-uppercase gs-0">
+                                    <th>Resi</th>
+                                    <th class="text-end">Progress</th>
+                                    <th class="text-end">Detail</th>
+                                </tr>
+                            </thead>
+                            <tbody id="qc_resi_history_body">
+                                <tr>
+                                    <td colspan="3" class="text-center text-muted py-6">Belum ada riwayat scan resi hari ini.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </div>
 
         {{-- ─── PHASE 2: Resi Loaded → Scan SKU ─── --}}
@@ -256,7 +294,7 @@
                     <div class="qc-alldone-banner d-none" id="alldone_banner">
                         <div class="fs-3 mb-1">✅</div>
                         <div class="fw-bold text-success fs-6">Semua SKU pada resi ini sudah selesai di-scan!</div>
-                        <div class="text-muted fs-8 mt-1">Kamu bisa scan resi lain atau selesaikan sesi QC.</div>
+                        <div class="text-muted fs-8 mt-1">Kamu bisa langsung scan resi berikutnya.</div>
                     </div>
 
                     {{-- Checklist --}}
@@ -325,7 +363,7 @@
                             <i class="fa-solid fa-crosshairs"></i>
                         </button>
                         <button type="button" class="btn btn-light-primary flex-grow-1" id="qc_btn_start">
-                            <i class="fa-solid fa-arrows-rotate me-2"></i>Muat Sesi QC Hari Ini
+                            <i class="fa-solid fa-arrows-rotate me-2"></i>Muat Scan QC Hari Ini
                         </button>
                     </div>
                     <div class="text-muted fs-8 mt-2">
@@ -342,7 +380,7 @@
         <div class="card h-100">
             <div class="card-header border-0 pt-6">
                 <div class="card-title">
-                    <div class="fw-bold fs-5">Sesi QC Scan</div>
+                    <div class="fw-bold fs-5">Scan QC Hari Ini</div>
                 </div>
                 <div class="card-toolbar gap-2">
                     <a href="{{ $routes['dashboard'] }}" class="btn btn-sm btn-light">Dashboard</a>
@@ -356,11 +394,7 @@
                         <span class="badge badge-light value" id="qc_session_status">Belum mulai</span>
                     </div>
                     <div class="qc-pill">
-                        <span class="label">Kode</span>
-                        <span class="value qc-mono" id="qc_session_code">-</span>
-                    </div>
-                    <div class="qc-pill">
-                        <span class="label">Mulai</span>
+                        <span class="label">Scan Pertama</span>
                         <span class="value" id="qc_session_started_at">-</span>
                     </div>
                     <div class="qc-pill">
@@ -396,7 +430,7 @@
                     </table>
                 </div>
 
-                <div class="fw-bold fs-7 text-uppercase text-muted mb-3">Akumulasi SKU Sesi</div>
+                <div class="fw-bold fs-7 text-uppercase text-muted mb-3">Akumulasi SKU Hari Ini</div>
                 <div class="table-responsive">
                     <table class="table table-row-dashed align-middle qc-items-table" id="qc_items_table">
                         <thead>
@@ -410,8 +444,43 @@
                             <tr>
                                 <td colspan="3" class="text-center text-muted py-10">
                                     <i class="fa-regular fa-clipboard fs-2 d-block mb-2 text-gray-300"></i>
-                                    Belum ada item pada sesi.
+                                    Belum ada item yang di-scan hari ini.
                                 </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modal_qc_resi_history_detail" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title fw-bold mb-1" id="qc_history_detail_title">Detail Resi</h5>
+                    <div class="text-muted fs-7" id="qc_history_detail_subtitle">-</div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="d-flex flex-wrap gap-2 mb-5" id="qc_history_detail_pills"></div>
+                <div class="table-responsive">
+                    <table class="table table-row-dashed align-middle fs-7 mb-0">
+                        <thead>
+                            <tr class="text-start text-gray-400 fw-bolder text-uppercase gs-0">
+                                <th width="8%">No</th>
+                                <th>SKU</th>
+                                <th>Nama Item</th>
+                                <th class="text-end">Scan / Wajib</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="qc_history_detail_items_body">
+                            <tr>
+                                <td colspan="5" class="text-center text-muted py-6">Tidak ada detail SKU.</td>
                             </tr>
                         </tbody>
                     </table>
@@ -477,13 +546,21 @@
 
         // Session panel
         sessionStatus:    document.getElementById('qc_session_status'),
-        sessionCode:      document.getElementById('qc_session_code'),
         sessionStartedAt: document.getElementById('qc_session_started_at'),
         totalItems:       document.getElementById('qc_total_items'),
         totalQty:         document.getElementById('qc_total_qty'),
         itemsBody:        document.getElementById('qc_items_body'),
         pendingResisBody: document.getElementById('qc_pending_resis_body'),
+        resiHistorySearch: document.getElementById('qc_resi_history_search'),
+        resiHistoryBody:  document.getElementById('qc_resi_history_body'),
+        btnRefreshHistory: document.getElementById('btn_refresh_resi_history'),
+        historyDetailModalEl: document.getElementById('modal_qc_resi_history_detail'),
+        historyDetailTitle: document.getElementById('qc_history_detail_title'),
+        historyDetailSubtitle: document.getElementById('qc_history_detail_subtitle'),
+        historyDetailPills: document.getElementById('qc_history_detail_pills'),
+        historyDetailItemsBody: document.getElementById('qc_history_detail_items_body'),
     };
+    const historyDetailModal = el.historyDetailModalEl ? new bootstrap.Modal(el.historyDetailModalEl) : null;
 
     /* ─────────────── AUDIO ─────────────── */
     const audio = { ctx: null };
@@ -544,6 +621,13 @@
     }
     function focusResi() {
         if (el.resiCode) { el.resiCode.focus(); el.resiCode.select?.(); }
+    }
+
+    function makeRequestId() {
+        if (window.crypto?.randomUUID) {
+            return window.crypto.randomUUID();
+        }
+        return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
     }
 
     async function fetchJson(url, opts = {}) {
@@ -635,12 +719,12 @@
         if (!s) {
             el.sessionStatus.textContent = 'Belum mulai';
             el.sessionStatus.className = 'badge badge-light value';
-            el.sessionCode.textContent = '-';
             el.sessionStartedAt.textContent = '-';
             el.totalItems.textContent = '0';
             el.totalQty.textContent   = '0';
             renderItems([]);
             renderPendingResis([]);
+            renderResiHistory([]);
             return;
         }
 
@@ -648,7 +732,6 @@
         el.sessionStatus.className   = isDraft
             ? 'badge badge-light-success value'
             : 'badge badge-light-warning value';
-        el.sessionCode.textContent      = s.code || '-';
         el.sessionStartedAt.textContent = s.started_at || '-';
 
         const items = Array.isArray(s.items) ? s.items : [];
@@ -662,7 +745,126 @@
         });
 
         renderItems(items);
-        renderPendingResis(Array.isArray(s.resis) ? s.resis : []);
+        const resis = Array.isArray(s.resis) ? s.resis : [];
+        renderPendingResis(resis);
+        renderResiHistory(resis);
+    }
+
+    function resiStatusBadge(status) {
+        if (status === 'completed') {
+            return '<span class="badge badge-light-success"><i class="fa-solid fa-circle-check me-1"></i>Selesai</span>';
+        }
+        return '<span class="badge badge-light-warning"><i class="fa-solid fa-hourglass-half me-1"></i>Belum Lengkap</span>';
+    }
+
+    function renderResiHistory(resis) {
+        if (!el.resiHistoryBody) return;
+        const rows = (Array.isArray(resis) ? [...resis] : [])
+            .filter(row => matchesResiHistorySearch(row))
+            .sort((a, b) => String(b.scanned_at || '').localeCompare(String(a.scanned_at || '')));
+
+        if (!rows.length) {
+            const hasKeyword = (el.resiHistorySearch?.value || '').trim() !== '';
+            el.resiHistoryBody.innerHTML = `
+                <tr>
+                    <td colspan="3" class="text-center text-muted py-6">${hasKeyword ? 'Tidak ada riwayat yang cocok.' : 'Belum ada riwayat scan resi hari ini.'}</td>
+                </tr>`;
+            return;
+        }
+
+        el.resiHistoryBody.innerHTML = rows.map(row => {
+            const pct = Number(row.progress || 0);
+            const label = row.no_resi || row.id_pesanan || '-';
+            const scanned = Number(row.scanned_qty || 0).toLocaleString('id-ID');
+            const required = Number(row.required_qty || 0).toLocaleString('id-ID');
+            const barClass = row.status === 'completed' ? 'bg-success' : 'bg-warning';
+            return `<tr>
+                <td>
+                    <div class="fw-bold qc-mono text-primary fs-8">${esc(label)}</div>
+                    <div class="text-muted fs-9">${esc(row.id_pesanan || '-')} · ${esc(row.scanned_at || '-')}</div>
+                </td>
+                <td class="text-end">
+                    <div class="d-flex align-items-center justify-content-end gap-2">
+                        <div class="progress w-75px h-6px bg-light">
+                            <div class="progress-bar ${barClass}" style="width:${pct}%"></div>
+                        </div>
+                        <span class="fw-semibold fs-9">${pct}%</span>
+                    </div>
+                    <div class="text-muted fs-9">${scanned}/${required} qty</div>
+                </td>
+                <td class="text-end">
+                    <button type="button" class="btn btn-sm btn-icon btn-light-primary btn-qc-resi-history-detail" data-id="${esc(String(row.id))}" title="Detail resi">
+                        <i class="fa-solid fa-circle-info"></i>
+                    </button>
+                </td>
+            </tr>`;
+        }).join('');
+    }
+
+    function matchesResiHistorySearch(row) {
+        const keyword = (el.resiHistorySearch?.value || '').trim().toLowerCase();
+        if (!keyword) return true;
+
+        const itemText = (row.items || []).map(item => `${item.sku || ''} ${item.name || ''}`).join(' ');
+        return [
+            row.no_resi,
+            row.id_pesanan,
+            row.kurir_name,
+            row.status,
+            row.scanned_at,
+            row.completed_at,
+            itemText,
+        ].some(value => String(value || '').toLowerCase().includes(keyword));
+    }
+
+    function showResiHistoryDetail(qcResiId) {
+        const row = (state.session?.resis || []).find(r => String(r.id) === String(qcResiId));
+        if (!row || !historyDetailModal) return;
+
+        const scanned = Number(row.scanned_qty || 0).toLocaleString('id-ID');
+        const required = Number(row.required_qty || 0).toLocaleString('id-ID');
+        if (el.historyDetailTitle) el.historyDetailTitle.textContent = row.no_resi || '-';
+        if (el.historyDetailSubtitle) {
+            el.historyDetailSubtitle.textContent = `${row.id_pesanan || '-'} · ${row.kurir_name || '-'} · ${row.scanned_at || '-'}`;
+        }
+        if (el.historyDetailPills) {
+            el.historyDetailPills.innerHTML = [
+                resiStatusBadge(row.status),
+                historyPill('fa-boxes-stacked', 'text-primary', 'Total SKU', Number(row.items?.length || 0).toLocaleString('id-ID')),
+                historyPill('fa-barcode', 'text-info', 'Scan / Wajib', `${scanned}/${required}`),
+                historyPill('fa-chart-simple', 'text-success', 'Progress', `${Number(row.progress || 0)}%`),
+                row.completed_at ? historyPill('fa-circle-check', 'text-success', 'Selesai', esc(row.completed_at)) : '',
+            ].filter(Boolean).join('');
+        }
+        if (el.historyDetailItemsBody) {
+            const items = Array.isArray(row.items) ? row.items : [];
+            if (!items.length) {
+                el.historyDetailItemsBody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-6">Tidak ada detail SKU.</td></tr>`;
+            } else {
+                el.historyDetailItemsBody.innerHTML = items.map((item, idx) => {
+                    const itemScanned = Number(item.scanned_qty || 0);
+                    const itemRequired = Number(item.required_qty || 0);
+                    const done = itemRequired > 0 && itemScanned >= itemRequired;
+                    return `<tr>
+                        <td class="text-muted">${idx + 1}</td>
+                        <td><span class="fw-bold qc-mono">${esc(item.sku || '-')}</span></td>
+                        <td>${esc(item.name || '-')}</td>
+                        <td class="text-end fw-semibold">${itemScanned.toLocaleString('id-ID')} / ${itemRequired.toLocaleString('id-ID')}</td>
+                        <td>${resiStatusBadge(done ? 'completed' : 'in_progress')}</td>
+                    </tr>`;
+                }).join('');
+            }
+        }
+
+        historyDetailModal.show();
+    }
+
+    function historyPill(icon, colorClass, label, value) {
+        return `<span class="d-inline-flex align-items-center gap-1 px-3 py-1 rounded bg-light">
+                    <i class="fa-solid ${esc(icon)} ${esc(colorClass)} fs-8"></i>
+                    <span class="text-muted fs-8">${esc(label)}:</span>
+                    <span class="fw-semibold fs-8">${value}</span>
+                </span>`;
     }
 
     function renderPendingResis(resis) {
@@ -699,7 +901,7 @@
                 <tr>
                     <td colspan="3" class="text-center text-muted py-10">
                         <i class="fa-regular fa-clipboard fs-2 d-block mb-2 text-gray-300"></i>
-                        Belum ada item pada sesi.
+                        Belum ada item yang di-scan hari ini.
                     </td>
                 </tr>`;
             return;
@@ -732,7 +934,7 @@
             renderSession();
             return !!(state.session?.status === 'active');
         } catch (e) {
-            setStatus(el.skuStatus, e.message || 'Gagal memuat sesi.', 'err');
+            setStatus(el.skuStatus, e.message || 'Gagal memuat scan QC hari ini.', 'err');
             window.AppSwal?.error?.(e.message);
             return false;
         } finally {
@@ -764,7 +966,7 @@
             state.checklist = (json.items || []).map(i => ({
                 sku: i.sku,
                 qty: i.qty,
-                scanned_qty: i.scanned_qty || 0,  // dipulihkan dari history session
+                scanned_qty: i.scanned_qty || 0,
             }));
 
             // Load item names from current session
@@ -789,7 +991,7 @@
                         await window.Swal.fire({
                             icon: 'error',
                             title: 'Resi Sudah Selesai Di-QC',
-                            html: `Resi <strong class="font-monospace">${esc(state.resi.no_resi || code)}</strong> sudah selesai di-scan pada sesi ini.<br><br>
+                            html: `Resi <strong class="font-monospace">${esc(state.resi.no_resi || code)}</strong> sudah selesai di-QC.<br><br>
                                 <span class="text-muted fs-7">Semua SKU telah terverifikasi secara fisik. Tidak perlu scan ulang.</span>`,
                             confirmButtonText: 'OK',
                             buttonsStyling: false,
@@ -905,7 +1107,7 @@
             setStatus(el.skuStatus, `Qty disesuaikan ke ${qty} — hanya ${remaining} lagi dibutuhkan untuk SKU ini.`, 'warn');
         }
 
-        // ── Pastikan sesi ada ──
+        // ── Pastikan ringkasan scan hari ini termuat ──
         if (!state.session || state.session.status !== 'active') {
             const ok = await startSession();
             if (!ok) { focusSku(); return; }
@@ -917,6 +1119,7 @@
             const form = new FormData();
             form.append('code', code);
             form.append('qty', String(qty));
+            form.append('request_id', makeRequestId());
             // Kirim resi_id agar backend bisa validasi SKU memang ada di resi ini
             if (state.resi?.id) form.append('resi_id', String(state.resi.id));
 
@@ -953,7 +1156,7 @@
                             html: `<div style="text-align:left;font-size:14px">
                                 Resi <strong class="font-monospace">${esc(state.resi?.no_resi || '-')}</strong> sudah selesai di-scan.<br>
                                 Semua <strong>${total}</strong> SKU telah diverifikasi secara fisik.<br><br>
-                                <span class="text-muted">Scan resi lain atau selesaikan sesi QC.</span>
+                                <span class="text-muted">Scan resi berikutnya jika masih ada paket QC.</span>
                             </div>`,
                             confirmButtonText: '🔄 Scan Resi Lain',
                             showCancelButton: true,
@@ -1087,8 +1290,8 @@
             await startSession();
             setStatus(el.skuStatus,
                 state.session?.status === 'active'
-                    ? `Sesi QC aktif (${state.session.code}). Silakan scan SKU.`
-                    : 'Gagal memuat sesi.',
+                    ? 'Scan QC hari ini aktif. Silakan scan SKU.'
+                    : 'Gagal memuat scan QC hari ini.',
                 state.session?.status === 'active' ? 'ok' : 'err');
             focusSku();
         });
@@ -1102,6 +1305,26 @@
             if (!btn) return;
             await ensureAudio();
             resumePendingResi(btn.getAttribute('data-id'));
+        });
+
+        el.btnRefreshHistory?.addEventListener('click', async () => {
+            await refreshSession();
+            setStatus(el.resiStatus, 'Riwayat scan resi diperbarui.', 'ok');
+            focusResi();
+        });
+
+        let historySearchTimer = null;
+        el.resiHistorySearch?.addEventListener('input', () => {
+            clearTimeout(historySearchTimer);
+            historySearchTimer = setTimeout(() => {
+                renderResiHistory(state.session?.resis || []);
+            }, 150);
+        });
+
+        el.resiHistoryBody?.addEventListener('click', (e) => {
+            const btn = e.target.closest('.btn-qc-resi-history-detail');
+            if (!btn) return;
+            showResiHistoryDetail(btn.getAttribute('data-id'));
         });
     });
 </script>

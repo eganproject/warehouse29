@@ -213,6 +213,12 @@
     const returnExceptionUrl = '{{ route('admin.inventory.picking-list.exception-return') }}';
     const todayStr = '{{ $today ?? '' }}';
     const csrfToken = '{{ csrf_token() }}';
+    const makeRequestId = () => {
+        if (window.crypto?.randomUUID) {
+            return window.crypto.randomUUID();
+        }
+        return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    };
 
     document.addEventListener('DOMContentLoaded', () => {
         const tableEl = $('#picking_list_table');
@@ -536,6 +542,7 @@
             e.preventDefault();
             clearReturnErrors();
             const formData = new FormData(returnForm);
+            formData.append('request_id', makeRequestId());
             try {
                 const res = await fetch(returnExceptionUrl, {
                     method: 'POST',

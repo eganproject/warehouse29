@@ -134,14 +134,32 @@ class StockOpnameController extends Controller
 
     public function approve(int $id)
     {
-        $opname = StockOpname::findOrFail($id);
-        if (($opname->status ?? 'open') === 'completed') {
-            return response()->json(['message' => 'Stock opname sudah disetujui']);
+        DB::beginTransaction();
+        try {
+            $opname = StockOpname::where('id', $id)->lockForUpdate()->firstOrFail();
+            if (($opname->status ?? 'open') === 'completed') {
+                DB::commit();
+                return response()->json(['message' => 'Stock opname sudah disetujui']);
+            }
+
+            $this->postStockMovements($opname);
+
+            $opname->status = 'completed';
+            $opname->completed_at = now();
+            $opname->completed_by = auth()->id();
+            $opname->save();
+
+            DB::commit();
+        } catch (ValidationException $e) {
+            DB::rollBack();
+            throw $e;
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Gagal menyetujui stock opname',
+                'error' => $e->getMessage(),
+            ], 500);
         }
-        $opname->status = 'completed';
-        $opname->completed_at = now();
-        $opname->completed_by = auth()->id();
-        $opname->save();
 
         return response()->json(['message' => 'Stock opname berhasil disetujui']);
     }
@@ -223,20 +241,6 @@ class StockOpnameController extends Controller
                     'created_by' => auth()->id(),
                 ]);
 
-                if ($adjustment !== 0) {
-                    StockService::mutate([
-                        'item_id' => $row['item_id'],
-                        'direction' => $adjustment > 0 ? 'in' : 'out',
-                        'qty' => abs($adjustment),
-                        'source_type' => 'opname',
-                        'source_subtype' => null,
-                        'source_id' => $opname->id,
-                        'source_code' => $opname->code,
-                        'note' => $row['note'] ?? null,
-                        'occurred_at' => $transactedAt,
-                        'created_by' => auth()->id(),
-                    ]);
-                }
             }
 
             DB::commit();
@@ -292,6 +296,31 @@ class StockOpnameController extends Controller
         }
 
         return $validated;
+    }
+
+    private function postStockMovements(StockOpname $opname): void
+    {
+        $opname->loadMissing('items');
+        foreach ($opname->items as $row) {
+            $adjustment = (int) $row->adjustment;
+            if ($adjustment === 0) {
+                continue;
+            }
+
+            StockService::mutate([
+                'item_id' => $row->item_id,
+                'direction' => $adjustment > 0 ? 'in' : 'out',
+                'qty' => abs($adjustment),
+                'source_type' => 'opname',
+                'source_subtype' => null,
+                'source_id' => $opname->id,
+                'source_code' => $opname->code,
+                'note' => $row->note ?? null,
+                'occurred_at' => $opname->transacted_at ?? now(),
+                'created_by' => auth()->id(),
+                'idempotency_key' => StockService::idempotencyKey(['stock', 'opname', $opname->id, $row->item_id]),
+            ]);
+        }
     }
 
     private function generateCode(string $prefix): string

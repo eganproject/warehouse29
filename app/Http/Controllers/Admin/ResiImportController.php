@@ -193,7 +193,15 @@ class ResiImportController extends Controller
             $defaultKurirId = $this->resolveDefaultKurirId();
 
             foreach ($groups as $group) {
-                $existing = Resi::where('id_pesanan', $group['id_pesanan'])->first();
+                $existing = Resi::where('id_pesanan', $group['id_pesanan'])
+                    ->lockForUpdate()
+                    ->first();
+                if ($existing && ($existing->status ?? 'active') === 'canceled') {
+                    throw ValidationException::withMessages([
+                        'file' => 'ID Pesanan '.$group['id_pesanan'].' sudah dibatalkan. Aktifkan kembali resi tersebut sebelum import ulang.',
+                    ]);
+                }
+
                 $oldTanggalUpload = $existing?->tanggal_upload?->format('Y-m-d');
                 $oldDetails = $existing
                     ? ResiDetail::where('resi_id', $existing->id)->get(['sku', 'qty'])

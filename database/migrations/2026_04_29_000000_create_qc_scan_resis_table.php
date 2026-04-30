@@ -7,23 +7,8 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration {
     public function up(): void
     {
-        Schema::create('qc_scan_sessions', function (Blueprint $table) {
-            $table->id();
-            $table->string('code', 50)->unique();
-            $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
-            $table->string('status', 20)->default('active');
-            $table->timestamp('started_at')->useCurrent();
-            $table->timestamp('last_scan_at')->nullable();
-            $table->text('note')->nullable();
-            $table->timestamps();
-
-            $table->index(['user_id', 'status']);
-            $table->index('started_at');
-        });
-
         Schema::create('qc_scan_resis', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('qc_scan_session_id')->constrained('qc_scan_sessions')->cascadeOnDelete();
             $table->foreignId('resi_id')->constrained('resis')->cascadeOnDelete();
             $table->string('status', 20)->default('in_progress');
             $table->timestamp('scanned_at')->useCurrent();
@@ -32,8 +17,9 @@ return new class extends Migration {
             $table->foreignId('completed_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
 
-            $table->unique(['qc_scan_session_id', 'resi_id']);
+            $table->unique('resi_id');
             $table->index(['resi_id', 'status']);
+            $table->index(['scanned_by', 'scanned_at']);
         });
 
         Schema::create('qc_scan_resi_items', function (Blueprint $table) {
@@ -68,6 +54,5 @@ return new class extends Migration {
         Schema::dropIfExists('qc_transit_items');
         Schema::dropIfExists('qc_scan_resi_items');
         Schema::dropIfExists('qc_scan_resis');
-        Schema::dropIfExists('qc_scan_sessions');
     }
 };
