@@ -18,10 +18,12 @@ class ActivityLog extends Model
         'ip_address',
         'user_agent',
         'payload',
+        'context',
     ];
 
     protected $casts = [
         'payload' => 'array',
+        'context' => 'array',
     ];
 
     public function user()

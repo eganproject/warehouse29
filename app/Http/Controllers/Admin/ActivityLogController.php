@@ -98,6 +98,7 @@ class ActivityLogController extends Controller
             'ip' => $log->ip_address ?? '-',
             'user_agent' => $log->user_agent ?? '-',
             'payload' => $log->payload ?? [],
+            'context' => $log->context ?? null,
         ]);
     }
 

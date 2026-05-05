@@ -159,7 +159,103 @@ class ActivityLogMessage
         return $action.' '.$target.($count > 0 ? ' sebanyak '.$count.' item' : '');
     }
 
-    private function resourceConfig(string $routeName): ?array
+    public function buildContext(Request $request, array $payload, array $snapshot): ?array
+    {
+        $items = $this->resolveItemsFromPayload($payload);
+
+        if (empty($items) && !empty($snapshot['id'])) {
+            $routeName = (string) ($request->route()?->getName() ?? '');
+            $items = $this->resolveItemsFromDb($routeName, (int) $snapshot['id']);
+        }
+
+        return !empty($items) ? ['items' => $items] : null;
+    }
+
+    private function resolveItemsFromPayload(array $payload): array
+    {
+        if (empty($payload['items']) || !is_array($payload['items'])) {
+            return [];
+        }
+
+        $itemIds = collect($payload['items'])
+            ->pluck('item_id')->filter()->map('intval')->unique()->values()->all();
+
+        if (empty($itemIds)) {
+            return [];
+        }
+
+        $details = DB::table('items')
+            ->whereIn('id', $itemIds)
+            ->select('id', 'sku', 'name')
+            ->get()
+            ->keyBy('id');
+
+        $items = [];
+        foreach ($payload['items'] as $row) {
+            $id = (int) ($row['item_id'] ?? 0);
+            if ($id && $details->has($id)) {
+                $d = $details->get($id);
+                $items[] = [
+                    'sku'  => $d->sku,
+                    'name' => $d->name,
+                    'qty'  => (int) ($row['qty'] ?? $row['counted_qty'] ?? 1),
+                ];
+            }
+        }
+
+        return $items;
+    }
+
+    private function resolveItemsFromDb(string $routeName, int $resourceId): array
+    {
+        $config = $this->resourceConfig($routeName);
+
+        if (
+            empty($config['item_table']) ||
+            empty($config['item_fk']) ||
+            !Schema::hasTable($config['item_table'])
+        ) {
+            return [];
+        }
+
+        $qtyCol = $config['qty_column'] ?? 'qty';
+
+        $rows = DB::table($config['item_table'])
+            ->where($config['item_fk'], $resourceId)
+            ->get(['item_id', $qtyCol]);
+
+        if ($rows->isEmpty()) {
+            return [];
+        }
+
+        $itemIds = $rows->pluck('item_id')->filter()->map('intval')->unique()->values()->all();
+        if (empty($itemIds)) {
+            return [];
+        }
+
+        $details = DB::table('items')
+            ->whereIn('id', $itemIds)
+            ->select('id', 'sku', 'name')
+            ->get()
+            ->keyBy('id');
+
+        $items = [];
+        foreach ($rows as $row) {
+            $id = (int) ($row->item_id ?? 0);
+            if ($id && $details->has($id)) {
+                $d = $details->get($id);
+                $items[] = [
+                    'sku'  => $d->sku,
+                    'name' => $d->name,
+                    'qty'  => (int) ($row->{$qtyCol} ?? 1),
+                ];
+            }
+        }
+
+        return $items;
+    }
+
+    public function resourceConfig(string $routeName): ?array
     {
         $resources = [
             'admin.inbound.receipts' => ['label' => 'penerimaan barang', 'table' => 'inbound_transactions', 'type' => 'receipt', 'item_table' => 'inbound_items', 'item_fk' => 'inbound_transaction_id'],

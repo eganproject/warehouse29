@@ -46,6 +46,7 @@ class LogUserActivity
             'ip_address' => $request->ip(),
             'user_agent' => $request->userAgent(),
             'payload' => $payload,
+            'context' => $message->buildContext($request, $payload, $snapshot),
         ]);
 
         return $response;

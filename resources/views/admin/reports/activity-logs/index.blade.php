@@ -123,6 +123,23 @@
                         <div id="activity_action">-</div>
                     </div>
                 </div>
+                <div class="row mb-6" id="activity_context_section" style="display:none">
+                    <div class="col-md-12">
+                        <div class="fw-bold text-gray-600 mb-2">Rincian Item</div>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered align-middle fs-7 mb-0">
+                                <thead>
+                                    <tr class="text-start text-gray-400 fw-bold text-uppercase gs-0 bg-light">
+                                        <th class="ps-3">SKU</th>
+                                        <th>Nama</th>
+                                        <th class="text-end pe-3">Qty</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="activity_context_tbody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
                 <div class="row mb-6">
                     <div class="col-md-12">
                         <div class="fw-bold text-gray-600">User Agent</div>
@@ -257,6 +274,30 @@
                 document.getElementById('activity_agent').textContent = data.user_agent ?? '-';
                 const payload = data.payload ? JSON.stringify(data.payload, null, 2) : '-';
                 document.getElementById('activity_payload').textContent = payload;
+
+                const contextSection = document.getElementById('activity_context_section');
+                const contextTbody = document.getElementById('activity_context_tbody');
+                const contextItems = data.context?.items;
+                if (contextItems && contextItems.length > 0) {
+                    contextTbody.innerHTML = '';
+                    contextItems.forEach(item => {
+                        const tr = document.createElement('tr');
+                        const tdSku = document.createElement('td');
+                        tdSku.className = 'ps-3 fw-bold';
+                        tdSku.textContent = item.sku ?? '-';
+                        const tdName = document.createElement('td');
+                        tdName.textContent = item.name ?? '-';
+                        const tdQty = document.createElement('td');
+                        tdQty.className = 'text-end pe-3';
+                        tdQty.textContent = item.qty ?? 0;
+                        tr.append(tdSku, tdName, tdQty);
+                        contextTbody.appendChild(tr);
+                    });
+                    contextSection.style.display = '';
+                } else {
+                    contextSection.style.display = 'none';
+                    contextTbody.innerHTML = '';
+                }
 
                 const modalEl = document.getElementById('modal_activity_detail');
                 if (modalEl) {
