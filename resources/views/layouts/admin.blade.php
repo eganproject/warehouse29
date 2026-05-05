@@ -231,15 +231,11 @@
                 jQuery.fn.select2 = function (...args) {
                     if (args.length === 0 || (args[0] && typeof args[0] === 'object' && !Array.isArray(args[0]))) {
                         const incoming = args[0] || {};
-                        this.each(function () {
-                            const modalEl = isInsideModal(this);
-                            if (modalEl && !incoming.dropdownParent) {
-                                jQuery(this).data('select2-modal-parent', modalEl);
-                            }
-                        });
-                        const firstModal = this.first().data('select2-modal-parent');
-                        if (firstModal && !incoming.dropdownParent) {
-                            args[0] = { ...incoming, dropdownParent: jQuery(firstModal) };
+                        // Gunakan document.body agar posisi dropdown dihitung dari viewport,
+                        // tidak terpengaruh oleh scroll pada elemen .modal itu sendiri.
+                        const insideModal = this.toArray().some(el => isInsideModal(el));
+                        if (insideModal && !incoming.dropdownParent) {
+                            args[0] = { ...incoming, dropdownParent: jQuery(document.body) };
                         }
                     }
 
@@ -289,10 +285,11 @@
 
                     const shouldPatch = elements.some((el) => isInsideModal(el));
                     if (shouldPatch && config && typeof config === 'object') {
-                        const modalEl = isInsideModal(elements[0]);
                         config = {
                             ...config,
-                            ...(!config.appendTo && modalEl ? { appendTo: modalEl } : {}),
+                            // Gunakan document.body agar kalender diposisikan dari viewport,
+                            // tidak terpengaruh oleh scroll pada elemen .modal itu sendiri.
+                            ...(!config.appendTo ? { appendTo: document.body } : {}),
                             onReady: [
                                 ...asFlatpickrHooks(config.onReady),
                                 (_selectedDates, _dateStr, instance) => {
@@ -339,10 +336,14 @@
             const bindModalResponsiveEvents = (modalEl) => {
                 if (!modalEl || modalEl.__responsiveEventsBound) return;
                 const modalBody = activeScrollableModalBody(modalEl);
-                modalBody?.addEventListener('scroll', () => {
+                const onScroll = () => {
                     repositionOpenFlatpickrs(modalEl);
                     window.jQuery?.('.select2-hidden-accessible').select2?.('close');
-                }, { passive: true });
+                };
+                // Tangani scroll di modal-body (form punya scrollbar sendiri)
+                modalBody?.addEventListener('scroll', onScroll, { passive: true });
+                // Tangani scroll di .modal itu sendiri (terjadi saat dialog lebih tinggi dari viewport)
+                modalEl.addEventListener('scroll', onScroll, { passive: true });
                 modalEl.addEventListener('shown.bs.modal', () => {
                     repositionOpenFlatpickrs(modalEl);
                 });

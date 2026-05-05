@@ -12,6 +12,7 @@ class DamagedItemStock extends Model
     protected $fillable = [
         'item_id',
         'stock',
+        'reserved_stock',
     ];
 
     public function item()

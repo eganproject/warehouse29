@@ -5,8 +5,6 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\DamagedAllocation;
 use App\Models\DamagedAllocationItem;
-use App\Models\DamagedItemStock;
-use App\Models\DamagedStockMutation;
 use App\Models\Item;
 use App\Support\DamagedStockService;
 use Illuminate\Http\Request;
@@ -22,13 +20,13 @@ class DamagedAllocationController extends Controller
     {
         $items = Item::query()
             ->leftJoin('damaged_item_stocks', 'damaged_item_stocks.item_id', '=', 'items.id')
-            ->whereRaw('COALESCE(damaged_item_stocks.stock, 0) > 0')
+            ->whereRaw('COALESCE(damaged_item_stocks.stock, 0) - COALESCE(damaged_item_stocks.reserved_stock, 0) > 0')
             ->orderBy('items.name')
             ->get([
                 'items.id',
                 'items.sku',
                 'items.name',
-                DB::raw('COALESCE(damaged_item_stocks.stock, 0) as damaged_stock'),
+                DB::raw('GREATEST(0, COALESCE(damaged_item_stocks.stock, 0) - COALESCE(damaged_item_stocks.reserved_stock, 0)) as damaged_stock'),
             ]);
 
         return view('admin.inventory.damaged-allocations.index', [
@@ -112,13 +110,17 @@ class DamagedAllocationController extends Controller
             ]);
 
             foreach ($validated['items'] as $row) {
-                $this->assertDamagedStockAvailable($row['item_id'], $row['qty']);
                 DamagedAllocationItem::create([
                     'damaged_allocation_id' => $allocation->id,
                     'item_id' => $row['item_id'],
                     'qty' => $row['qty'],
                     'note' => $row['note'] ?? null,
                 ]);
+            }
+
+            // Reservasi stok secara FIFO — siapa duluan simpan, dia yang dapat jatah
+            foreach ($validated['items'] as $row) {
+                DamagedStockService::reserve($row['item_id'], $row['qty']);
             }
 
             DB::commit();
@@ -162,10 +164,15 @@ class DamagedAllocationController extends Controller
 
         DB::beginTransaction();
         try {
-            $allocation = DamagedAllocation::findOrFail($id);
+            $allocation = DamagedAllocation::with('items')->findOrFail($id);
             if (($allocation->status ?? 'pending') === 'approved') {
                 DB::rollBack();
                 return response()->json(['message' => 'Data sudah disetujui dan tidak bisa diubah'], 422);
+            }
+
+            // Lepas reservasi lama sebelum item diganti
+            foreach ($allocation->items as $row) {
+                DamagedStockService::releaseReservation($row->item_id, $row->qty);
             }
 
             DamagedAllocationItem::where('damaged_allocation_id', $allocation->id)->delete();
@@ -177,13 +184,17 @@ class DamagedAllocationController extends Controller
             ]);
 
             foreach ($validated['items'] as $row) {
-                $this->assertDamagedStockAvailable($row['item_id'], $row['qty']);
                 DamagedAllocationItem::create([
                     'damaged_allocation_id' => $allocation->id,
                     'item_id' => $row['item_id'],
                     'qty' => $row['qty'],
                     'note' => $row['note'] ?? null,
                 ]);
+            }
+
+            // Reservasi ulang dengan item baru
+            foreach ($validated['items'] as $row) {
+                DamagedStockService::reserve($row['item_id'], $row['qty']);
             }
 
             DB::commit();
@@ -205,16 +216,17 @@ class DamagedAllocationController extends Controller
     {
         DB::beginTransaction();
         try {
-            $allocation = DamagedAllocation::findOrFail($id);
+            $allocation = DamagedAllocation::with('items')->findOrFail($id);
             if (($allocation->status ?? 'pending') === 'approved') {
                 DB::rollBack();
                 return response()->json(['message' => 'Data sudah disetujui dan tidak bisa dihapus'], 422);
             }
 
-            DamagedStockService::rollbackBySource('damaged_allocation', $allocation->id);
-            DamagedStockMutation::where('source_type', 'damaged_allocation')
-                ->where('source_id', $allocation->id)
-                ->delete();
+            // Lepas reservasi stok untuk alokasi pending yang dihapus
+            foreach ($allocation->items as $row) {
+                DamagedStockService::releaseReservation($row->item_id, $row->qty);
+            }
+
             $allocation->delete();
 
             DB::commit();
@@ -309,16 +321,6 @@ class DamagedAllocationController extends Controller
         $validated['transacted_at'] = Carbon::parse($validated['transacted_at']);
 
         return $validated;
-    }
-
-    private function assertDamagedStockAvailable(int $itemId, int $qty): void
-    {
-        $stock = (int) DamagedItemStock::where('item_id', $itemId)->lockForUpdate()->value('stock');
-        if ($stock < $qty) {
-            throw ValidationException::withMessages([
-                'qty' => 'Qty alokasi melebihi stok barang rusak yang tersedia.',
-            ]);
-        }
     }
 
     private function allocationTypeLabels(): array

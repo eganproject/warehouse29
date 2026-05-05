@@ -27,6 +27,55 @@ class DamagedGoodsController extends Controller
             'items' => $items,
             'dataUrl' => route('admin.inventory.damaged-goods.data'),
             'storeUrl' => route('admin.inventory.damaged-goods.store'),
+            'stockSummaryUrl' => route('admin.inventory.damaged-goods.stock-summary'),
+        ]);
+    }
+
+    public function stockSummary(Request $request)
+    {
+        $query = Item::query()
+            ->join('damaged_item_stocks', 'damaged_item_stocks.item_id', '=', 'items.id')
+            ->where('damaged_item_stocks.stock', '>', 0)
+            ->orderBy('items.name');
+
+        $search = trim((string) $request->input('q', ''));
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('items.sku', 'like', "%{$search}%")
+                    ->orWhere('items.name', 'like', "%{$search}%");
+            });
+        }
+
+        $recordsTotal = Item::join('damaged_item_stocks', 'damaged_item_stocks.item_id', '=', 'items.id')
+            ->where('damaged_item_stocks.stock', '>', 0)->count();
+        $recordsFiltered = (clone $query)->count();
+
+        $start = (int) $request->input('start', 0);
+        $length = (int) $request->input('length', 10);
+        if ($length > 0) {
+            $query->skip($start)->take($length);
+        }
+
+        $data = $query->get([
+            'items.id',
+            'items.sku',
+            'items.name',
+            DB::raw('damaged_item_stocks.stock as stock'),
+            DB::raw('COALESCE(damaged_item_stocks.reserved_stock, 0) as reserved_stock'),
+            DB::raw('GREATEST(0, damaged_item_stocks.stock - COALESCE(damaged_item_stocks.reserved_stock, 0)) as available_stock'),
+        ])->map(fn ($row) => [
+            'sku'             => $row->sku,
+            'name'            => $row->name,
+            'stock'           => (int) $row->stock,
+            'reserved_stock'  => (int) $row->reserved_stock,
+            'available_stock' => (int) $row->available_stock,
+        ]);
+
+        return response()->json([
+            'draw'            => (int) $request->input('draw'),
+            'recordsTotal'    => $recordsTotal,
+            'recordsFiltered' => $recordsFiltered,
+            'data'            => $data,
         ]);
     }
 

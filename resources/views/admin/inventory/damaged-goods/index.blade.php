@@ -11,6 +11,38 @@
 @endphp
 
 @section('content')
+{{-- Card Saldo Stok Barang Rusak --}}
+<div class="card mb-6">
+    <div class="card-header border-0 pt-6">
+        <div class="card-title">
+            <h3 class="fw-bolder text-dark">Saldo Stok Barang Rusak</h3>
+        </div>
+        <div class="card-toolbar">
+            <div class="d-flex align-items-center position-relative my-1">
+                <i class="fa-solid fa-magnifying-glass position-absolute ms-5 text-gray-500"></i>
+                <input type="text" class="form-control form-control-solid w-250px ps-14" placeholder="Cari SKU / Nama" id="stock_summary_search" />
+            </div>
+        </div>
+    </div>
+    <div class="card-body py-4">
+        <div class="table-responsive">
+            <table class="table align-middle table-row-dashed fs-6 gy-4" id="stock_summary_table">
+                <thead>
+                    <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
+                        <th>SKU</th>
+                        <th>Nama Item</th>
+                        <th class="text-end">Total Rusak</th>
+                        <th class="text-end">Direservasi</th>
+                        <th class="text-end">Tersedia</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{{-- Card Transaksi Barang Rusak --}}
 <div class="card">
     <div class="card-header border-0 pt-6">
         <div class="card-title">
@@ -52,6 +84,7 @@
         </div>
     </div>
 </div>
+{{-- End Card Transaksi --}}
 
 <div class="modal fade" id="modal_damaged_goods" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered mw-900px">
@@ -121,6 +154,7 @@
 <script>
     const dataUrl = '{{ $dataUrl }}';
     const storeUrl = '{{ $storeUrl }}';
+    const stockSummaryUrl = '{{ $stockSummaryUrl }}';
     const showUrlTpl = '{{ route('admin.inventory.damaged-goods.show', ':id') }}';
     const updateUrlTpl = '{{ route('admin.inventory.damaged-goods.update', ':id') }}';
     const deleteUrlTpl = '{{ route('admin.inventory.damaged-goods.destroy', ':id') }}';
@@ -131,6 +165,46 @@
     const itemOptionsHtml = `@foreach($items as $item)<option value="{{ $item->id }}">{{ $item->sku }} - {{ $item->name }}</option>@endforeach`;
 
     document.addEventListener('DOMContentLoaded', () => {
+        // --- Stock Summary Table ---
+        const summarySearchInput = document.getElementById('stock_summary_search');
+        const summaryTable = $('#stock_summary_table').DataTable({
+            processing: true,
+            serverSide: true,
+            dom: 'rtip',
+            order: [[1, 'asc']],
+            ajax: {
+                url: stockSummaryUrl,
+                dataSrc: 'data',
+                data: params => { params.q = summarySearchInput?.value || ''; },
+            },
+            columns: [
+                { data: 'sku' },
+                { data: 'name' },
+                {
+                    data: 'stock',
+                    className: 'text-end',
+                    render: val => `<span class="fw-bold">${val}</span>`,
+                },
+                {
+                    data: 'reserved_stock',
+                    className: 'text-end',
+                    render: val => val > 0
+                        ? `<span class="badge badge-light-warning">${val}</span>`
+                        : `<span class="text-muted">0</span>`,
+                },
+                {
+                    data: 'available_stock',
+                    className: 'text-end',
+                    render: val => val > 0
+                        ? `<span class="badge badge-light-success fw-bold">${val}</span>`
+                        : `<span class="badge badge-light-danger fw-bold">0</span>`,
+                },
+            ],
+            language: { emptyTable: 'Tidak ada stok barang rusak' },
+        });
+        summarySearchInput?.addEventListener('keyup', () => summaryTable.ajax.reload());
+
+        // --- Transaction Table ---
         const tableEl = $('#damaged_goods_table');
         const searchInput = document.querySelector('[data-kt-filter="search"]');
         const form = document.getElementById('damaged_goods_form');
@@ -203,7 +277,6 @@
                     placeholder: 'Pilih item',
                     allowClear: true,
                     width: '100%',
-                    dropdownParent: modalEl,
                     minimumResultsForSearch: 0,
                 })
                     .on('select2:opening select2:closing select2:close', function(e){ e.stopPropagation(); });
@@ -362,7 +435,7 @@
         refreshMenus();
         dt.on('draw', refreshMenus);
 
-        const reloadTable = () => dt.ajax.reload();
+        const reloadTable = () => { dt.ajax.reload(); summaryTable.ajax.reload(); };
         searchInput?.addEventListener('keyup', reloadTable);
 
         tableEl.on('click', '.btn-edit', async function(e) {

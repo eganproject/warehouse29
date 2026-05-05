@@ -116,7 +116,7 @@
     const csrfToken = '{{ csrf_token() }}';
     const canUpdate = {{ $canUpdate ? 'true' : 'false' }};
     const canDelete = {{ $canDelete ? 'true' : 'false' }};
-    const itemOptionsHtml = `@foreach($items as $item)<option value="{{ $item->id }}" data-stock="{{ (int) $item->damaged_stock }}">{{ $item->sku }} - {{ $item->name }} (stok rusak: {{ (int) $item->damaged_stock }})</option>@endforeach`;
+    const itemOptionsHtml = `@foreach($items as $item)<option value="{{ $item->id }}" data-stock="{{ (int) $item->damaged_stock }}">{{ $item->sku }} - {{ $item->name }} (tersedia: {{ (int) $item->damaged_stock }})</option>@endforeach`;
 
     document.addEventListener('DOMContentLoaded', () => {
         const tableEl = $('#damaged_allocations_table');
@@ -146,7 +146,7 @@
         };
         const initSelect2 = el => {
             if (el && typeof $ !== 'undefined' && $.fn.select2) {
-                $(el).select2({ placeholder: 'Pilih item', allowClear: true, width: '100%', dropdownParent: modalEl });
+                $(el).select2({ placeholder: 'Pilih item', allowClear: true, width: '100%' });
             }
         };
         const renumberRows = () => {

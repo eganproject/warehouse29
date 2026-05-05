@@ -49,6 +49,12 @@ class DamagedStockService
                 $stock->stock = $direction === 'out'
                     ? ($stock->stock - $qty)
                     : ($stock->stock + $qty);
+
+                // Saat stok benar-benar terpotong (approve alokasi), lepas reservasi yang dipegang
+                if ($direction === 'out') {
+                    $stock->reserved_stock = max(0, ($stock->reserved_stock ?? 0) - $qty);
+                }
+
                 $stock->save();
 
                 $sourceType = $payload['source_type'] ?? null;
@@ -80,6 +86,54 @@ class DamagedStockService
 
             throw $e;
         }
+    }
+
+    /**
+     * Reservasi stok rusak saat alokasi dibuat (pending).
+     * FIFO: siapa duluan buat alokasi, dia yang dapat jatah stok tersedia.
+     */
+    public static function reserve(int $itemId, int $qty): void
+    {
+        DB::transaction(function () use ($itemId, $qty) {
+            if ($itemId <= 0 || $qty <= 0) {
+                throw ValidationException::withMessages(['qty' => 'Qty reservasi tidak valid']);
+            }
+
+            $stock = DamagedItemStock::where('item_id', $itemId)->lockForUpdate()->first();
+            if (!$stock) {
+                $stock = DamagedItemStock::create(['item_id' => $itemId, 'stock' => 0, 'reserved_stock' => 0]);
+            }
+
+            $available = $stock->stock - ($stock->reserved_stock ?? 0);
+            if ($available < $qty) {
+                throw ValidationException::withMessages([
+                    'qty' => 'Stok barang rusak tidak mencukupi untuk alokasi ini',
+                ]);
+            }
+
+            $stock->reserved_stock = ($stock->reserved_stock ?? 0) + $qty;
+            $stock->save();
+        });
+    }
+
+    /**
+     * Lepas reservasi stok rusak saat alokasi pending dihapus atau diperbarui.
+     */
+    public static function releaseReservation(int $itemId, int $qty): void
+    {
+        DB::transaction(function () use ($itemId, $qty) {
+            if ($itemId <= 0 || $qty <= 0) {
+                return;
+            }
+
+            $stock = DamagedItemStock::where('item_id', $itemId)->lockForUpdate()->first();
+            if (!$stock) {
+                return;
+            }
+
+            $stock->reserved_stock = max(0, ($stock->reserved_stock ?? 0) - $qty);
+            $stock->save();
+        });
     }
 
     public static function rollbackBySource(string $sourceType, int $sourceId): void

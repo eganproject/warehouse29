@@ -253,7 +253,6 @@
                     placeholder: 'Pilih item',
                     allowClear: true,
                     width: '100%',
-                    dropdownParent: modalEl,
                     minimumResultsForSearch: 0,
                 })
                     .on('select2:opening select2:closing select2:close', function(e){ e.stopPropagation(); });
