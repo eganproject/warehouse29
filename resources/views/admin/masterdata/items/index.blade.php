@@ -79,6 +79,7 @@
                         <th>No</th>
                         <th>SKU</th>
                         <th>Nama</th>
+                        <th>Tipe</th>
                         <th>Kategori</th>
                         <th>Alamat</th>
                         <th>Deskripsi</th>
@@ -92,9 +93,9 @@
     </div>
 </div>
 
-<!--begin::Modal-->
+<!--begin::Modal Item Form-->
 <div class="modal fade" id="modal_item_form" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered mw-650px">
+    <div class="modal-dialog modal-dialog-centered mw-750px">
         <div class="modal-content">
             <div class="modal-header">
                 <h2 class="fw-bolder" id="modal_item_title">Add Item</h2>
@@ -146,6 +147,28 @@
                         <input type="number" min="0" class="form-control form-control-solid" name="safety_stock" id="item_safety_stock" value="0" />
                         <div class="invalid-feedback" id="error_safety_stock"></div>
                     </div>
+
+                    {{-- Bundle toggle --}}
+                    <div class="fv-row mb-5">
+                        <div class="form-check form-switch form-check-custom form-check-solid">
+                            <input class="form-check-input" type="checkbox" id="item_is_bundle" name="is_bundle" value="1" />
+                            <label class="form-check-label fw-bold" for="item_is_bundle">Ini adalah item Bundle</label>
+                        </div>
+                        <div class="text-muted fs-7 mt-1">Bundle tidak memiliki stok fisik sendiri. Stoknya dihitung dari stok terendah komponen.</div>
+                        <div class="invalid-feedback d-block" id="error_is_bundle"></div>
+                    </div>
+
+                    {{-- Bundle components section --}}
+                    <div id="bundle_components_section" class="d-none">
+                        <div class="separator mb-5"></div>
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="fw-bold mb-0">Komponen Bundle</h6>
+                            <button type="button" class="btn btn-sm btn-light-primary" id="btn_add_component">+ Tambah Komponen</button>
+                        </div>
+                        <div class="invalid-feedback d-block mb-2" id="error_components"></div>
+                        <div id="bundle_components_container"></div>
+                    </div>
+
                     <div class="text-end pt-3">
                         <button type="button" class="btn btn-light me-3" data-bs-dismiss="modal">Batal</button>
                         <button type="submit" class="btn btn-primary">
@@ -159,7 +182,7 @@
         </div>
     </div>
 </div>
-<!--end::Modal-->
+<!--end::Modal Item Form-->
 
 <!--begin::Import Modal-->
 <div class="modal fade" id="modal_import_items" tabindex="-1" aria-hidden="true">
@@ -211,90 +234,127 @@
 
 @push('scripts')
 <script>
-    const csrfToken = '{{ csrf_token() }}';
-    const dataUrl   = '{{ route('admin.masterdata.items.data') }}';
-    const storeUrl  = '{{ route('admin.masterdata.items.store') }}';
-    const updateTpl = '{{ route('admin.masterdata.items.update', ':id') }}';
-    const deleteTpl = '{{ route('admin.masterdata.items.destroy', ':id') }}';
-    const importUrl = '{{ route('admin.masterdata.items.import') }}';
-    const canUpdate = {{ $canUpdate ? 'true' : 'false' }};
-    const canDelete = {{ $canDelete ? 'true' : 'false' }};
-
-    const ensureOption = (selectEl, id, name) => {
-        if (!selectEl) return;
-        const exists = Array.from(selectEl.options).some(opt => opt.value == id);
-        if (!exists) {
-            const opt = document.createElement('option');
-            opt.value = id;
-            opt.textContent = name;
-            selectEl.appendChild(opt);
-        } else {
-            Array.from(selectEl.options).forEach(opt => {
-                if (opt.value == id) opt.textContent = name;
-            });
-        }
-    };
+    const csrfToken  = '{{ csrf_token() }}';
+    const dataUrl    = '{{ route('admin.masterdata.items.data') }}';
+    const storeUrl   = '{{ route('admin.masterdata.items.store') }}';
+    const updateTpl  = '{{ route('admin.masterdata.items.update', ':id') }}';
+    const deleteTpl  = '{{ route('admin.masterdata.items.destroy', ':id') }}';
+    const showTpl    = '{{ route('admin.masterdata.items.show', ':id') }}';
+    const importUrl  = '{{ route('admin.masterdata.items.import') }}';
+    const itemSearchUrl = '{{ route('admin.masterdata.items.data') }}';
+    const canUpdate  = {{ $canUpdate ? 'true' : 'false' }};
+    const canDelete  = {{ $canDelete ? 'true' : 'false' }};
 
     document.addEventListener('DOMContentLoaded', () => {
-        const tableEl = $('#items_table');
-        const searchInput = document.querySelector('[data-kt-filter="search"]');
-        const applyBtn = document.getElementById('filter_items_apply');
-        const resetBtn = document.getElementById('filter_items_reset');
-        const limitSelect = document.getElementById('filter_items_limit');
+        const tableEl        = $('#items_table');
+        const searchInput    = document.querySelector('[data-kt-filter="search"]');
+        const applyBtn       = document.getElementById('filter_items_apply');
+        const resetBtn       = document.getElementById('filter_items_reset');
+        const limitSelect    = document.getElementById('filter_items_limit');
         const categoryFilter = document.getElementById('filter_item_category');
-        const form = document.getElementById('item_form');
-        const modalEl = document.getElementById('modal_item_form');
-        const modal = modalEl ? new bootstrap.Modal(modalEl) : null;
-        const formSku = document.getElementById('item_sku');
-        const formName = document.getElementById('item_name');
-        const formCategory = document.getElementById('item_category_id');
-        const formId = document.getElementById('item_id');
-        const formAddress = document.getElementById('item_address');
+        const form           = document.getElementById('item_form');
+        const modalEl        = document.getElementById('modal_item_form');
+        const modal          = modalEl ? new bootstrap.Modal(modalEl) : null;
+        const formSku        = document.getElementById('item_sku');
+        const formName       = document.getElementById('item_name');
+        const formCategory   = document.getElementById('item_category_id');
+        const formId         = document.getElementById('item_id');
+        const formAddress    = document.getElementById('item_address');
         const formDescription = document.getElementById('item_description');
         const formSafetyStock = document.getElementById('item_safety_stock');
-        const titleEl = document.getElementById('modal_item_title');
-        const importBtn = document.getElementById('btn_import_items');
-        const importModalEl = document.getElementById('modal_import_items');
-        const importModal = importModalEl ? new bootstrap.Modal(importModalEl) : null;
-        const importInput = document.getElementById('import_items_file');
-        const importError = document.getElementById('error_import_file');
-        const importSubmit = document.getElementById('btn_import_items_submit');
-        const confirmAction = async () => {
-            if (typeof Swal === 'undefined') {
-                return true;
+        const formIsBundle   = document.getElementById('item_is_bundle');
+        const bundleSection  = document.getElementById('bundle_components_section');
+        const bundleContainer = document.getElementById('bundle_components_container');
+        const titleEl        = document.getElementById('modal_item_title');
+        const importModalEl  = document.getElementById('modal_import_items');
+        const importModal    = importModalEl ? new bootstrap.Modal(importModalEl) : null;
+        const importInput    = document.getElementById('import_items_file');
+        const importError    = document.getElementById('error_import_file');
+        const importSubmit   = document.getElementById('btn_import_items_submit');
+
+        // ── Bundle component rows ──────────────────────────────────────────────
+
+        const createComponentRow = (data = {}) => {
+            const idx = bundleContainer.querySelectorAll('.component-row').length;
+            const row = document.createElement('div');
+            row.className = 'row g-2 align-items-end mb-3 component-row';
+            row.innerHTML = `
+                <div class="col-md-8">
+                    <label class="required fs-7 fw-bold form-label mb-1">Item Komponen</label>
+                    <select class="form-select form-select-solid component-item-select" data-name="component_item_id" required>
+                        <option value=""></option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="required fs-7 fw-bold form-label mb-1">Qty</label>
+                    <input type="number" min="1" value="${data.qty ?? 1}" class="form-control form-control-solid" data-name="qty" required />
+                </div>
+                <div class="col-md-2 text-end">
+                    <button type="button" class="btn btn-sm btn-light btn-remove-component">Hapus</button>
+                </div>`;
+            bundleContainer.appendChild(row);
+
+            const selectEl = row.querySelector('.component-item-select');
+            const qtyEl    = row.querySelector('[data-name="qty"]');
+
+            // Prefill with existing data if provided
+            if (data.component_item_id && data.sku) {
+                const opt = new Option(`${data.sku} - ${data.name || ''}`, data.component_item_id, true, true);
+                selectEl.appendChild(opt);
             }
-            const result = await Swal.fire({
-                title: 'Apakah Anda yakin?',
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#3085d6',
-                cancelButtonColor: '#d33',
-                confirmButtonText: 'Ya, lanjutkan',
-                cancelButtonText: 'Batal',
-                allowOutsideClick: false,
-                allowEscapeKey: false,
-                allowEnterKey: false,
-                focusConfirm: false,
-            });
-            if (!result.isConfirmed) {
-                return false;
+            if (data.qty) qtyEl.value = data.qty;
+
+            // Init select2 with AJAX search
+            if (typeof $ !== 'undefined' && $.fn.select2) {
+                $(selectEl).select2({
+                    placeholder: 'Cari SKU komponen...',
+                    allowClear: true,
+                    width: '100%',
+                    ajax: {
+                        url: itemSearchUrl,
+                        dataType: 'json',
+                        delay: 250,
+                        data: params => ({ q: params.term || '', length: 20, start: 0 }),
+                        processResults: resp => ({
+                            results: (resp.data || [])
+                                .filter(i => !i.is_bundle)
+                                .map(i => ({ id: i.id, text: `${i.sku} – ${i.name}` })),
+                        }),
+                        cache: true,
+                    },
+                    minimumInputLength: 0,
+                });
             }
-            Swal.fire({
-                title: 'Memproses...',
-                allowOutsideClick: false,
-                allowEscapeKey: false,
-                allowEnterKey: false,
-                didOpen: () => {
-                    Swal.showLoading();
-                },
-            });
-            return true;
+
+            renumberComponents();
         };
-        const closeSwal = () => {
-            if (typeof Swal !== 'undefined') {
-                Swal.close();
-            }
+
+        const renumberComponents = () => {
+            bundleContainer.querySelectorAll('.component-row').forEach((row, idx) => {
+                row.querySelectorAll('[data-name]').forEach(el => {
+                    el.name = `components[${idx}][${el.getAttribute('data-name')}]`;
+                });
+            });
         };
+
+        bundleContainer.addEventListener('click', e => {
+            if (!e.target.closest('.btn-remove-component')) return;
+            e.target.closest('.component-row')?.remove();
+            renumberComponents();
+        });
+
+        document.getElementById('btn_add_component')?.addEventListener('click', () => createComponentRow());
+
+        formIsBundle?.addEventListener('change', () => {
+            if (formIsBundle.checked) {
+                bundleSection.classList.remove('d-none');
+                if (!bundleContainer.querySelector('.component-row')) createComponentRow();
+            } else {
+                bundleSection.classList.add('d-none');
+            }
+        });
+
+        // ── Helpers ────────────────────────────────────────────────────────────
 
         const setCategoryValue = (val) => {
             if (!formCategory) return;
@@ -305,29 +365,38 @@
             }
         };
 
-        if (!tableEl.length || !$.fn.DataTable) {
-            console.error('DataTables unavailable');
-            return;
-        }
+        const errorIds = ['error_sku','error_name','error_category_id','error_address','error_description','error_safety_stock','error_is_bundle','error_components'];
+        const clearErrors = () => {
+            errorIds.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.textContent = '';
+            });
+        };
+
+        const confirmAction = async () => {
+            if (typeof Swal === 'undefined') return true;
+            const result = await Swal.fire({
+                title: 'Apakah Anda yakin?', icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6', cancelButtonColor: '#d33',
+                confirmButtonText: 'Ya, lanjutkan', cancelButtonText: 'Batal',
+                allowOutsideClick: false, allowEscapeKey: false, focusConfirm: false,
+            });
+            if (!result.isConfirmed) return false;
+            Swal.fire({ title: 'Memproses...', allowOutsideClick: false, allowEscapeKey: false, didOpen: () => Swal.showLoading() });
+            return true;
+        };
+        const closeSwal = () => typeof Swal !== 'undefined' && Swal.close();
+
+        // ── DataTable ──────────────────────────────────────────────────────────
 
         if (typeof $ !== 'undefined' && $.fn.select2) {
-            $(categoryFilter).select2({
-                placeholder: 'Semua',
-                allowClear: true,
-                width: '100%'
-            }).on('select2:opening select2:closing select2:close', function(e){ e.stopPropagation(); });
-            $(formCategory).select2({
-                placeholder: 'Pilih kategori',
-                allowClear: true,
-                width: '100%'
-            });
+            $(categoryFilter).select2({ placeholder: 'Semua', allowClear: true, width: '100%' })
+                .on('select2:opening select2:closing select2:close', e => e.stopPropagation());
+            $(formCategory).select2({ placeholder: 'Pilih kategori', allowClear: true, width: '100%' });
         }
 
-        const refreshMenus = () => {
-            if (window.KTMenu) {
-                KTMenu.createInstances();
-            }
-        };
+        const refreshMenus = () => window.KTMenu?.createInstances();
 
         const dt = tableEl.DataTable({
             processing: true,
@@ -338,41 +407,42 @@
             ajax: {
                 url: dataUrl,
                 dataSrc: 'data',
-                data: function(params) {
+                data: params => {
                     params.q = searchInput?.value || '';
                     params.category_id = categoryFilter?.value || '';
-                }
+                },
             },
             columns: [
-                { data: null, orderable: false, searchable: false, render: (data, type, row, meta) => meta.row + meta.settings._iDisplayStart + 1 },
+                { data: null, orderable: false, searchable: false, render: (d, t, r, m) => m.row + m.settings._iDisplayStart + 1 },
                 { data: 'sku' },
                 { data: 'name' },
+                { data: 'is_bundle', render: v => v
+                    ? '<span class="badge badge-light-primary">Bundle</span>'
+                    : '<span class="badge badge-light-secondary">Regular</span>' },
                 { data: 'category' },
                 { data: 'address' },
                 { data: 'description' },
-                { data: 'safety_stock', className:'text-end', render: (data)=> data ?? 0 },
-                { data: 'id', orderable:false, searchable:false, className:'text-end', render: (data, type, row)=>{
-                    const editItem = canUpdate ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 btn-edit" data-id="${data}" data-sku="${row.sku}" data-name="${row.name}" data-category="${row.category_id}" data-address="${row.address ?? ''}" data-description="${row.description}" data-safety-stock="${row.safety_stock ?? 0}">Edit</a></div>` : '';
-                    const delItem = canDelete ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 text-danger btn-delete" data-id="${data}">Hapus</a></div>` : '';
+                { data: 'safety_stock', className: 'text-end', render: d => d ?? 0 },
+                { data: 'id', orderable: false, searchable: false, className: 'text-end', render: (id, t, row) => {
+                    const editItem = canUpdate ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 btn-edit" data-id="${id}">Edit</a></div>` : '';
+                    const delItem  = canDelete ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 text-danger btn-delete" data-id="${id}">Hapus</a></div>` : '';
                     const actions = `${editItem}${delItem}`;
                     if (!actions) return '';
-                    return `
-                        <div class="text-end">
-                            <a href="#" class="btn btn-sm btn-light btn-active-light-primary" data-kt-menu-trigger="click" data-kt-menu-placement="bottom-end">
-                                Actions
-                                <span class="svg-icon svg-icon-5 m-0">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
-                                        <path d="M11.4343 12.7344L7.25 8.55005C6.83579 8.13583 6.16421 8.13584 5.75 8.55005C5.33579 8.96426 5.33579 9.63583 5.75 10.05L11.2929 15.5929C11.6834 15.9835 12.3166 15.9835 12.7071 15.5929L18.25 10.05C18.6642 9.63584 18.6642 8.96426 18.25 8.55005C17.8358 8.13584 17.1642 8.13584 16.75 8.55005L12.5657 12.7344C12.2533 13.0468 11.7467 13.0468 11.4343 12.7344Z" fill="black"></path>
-                                    </svg>
-                                </span>
-                            </a>
-                            <div class="menu menu-sub menu-sub-dropdown menu-column menu-rounded menu-gray-600 menu-state-bg-light-primary fw-bold fs-7 w-175px py-3" data-kt-menu="true">
-                                ${actions}
-                            </div>
+                    return `<div class="text-end">
+                        <a href="#" class="btn btn-sm btn-light btn-active-light-primary" data-kt-menu-trigger="click" data-kt-menu-placement="bottom-end">
+                            Actions
+                            <span class="svg-icon svg-icon-5 m-0">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                    <path d="M11.4343 12.7344L7.25 8.55005C6.83579 8.13583 6.16421 8.13584 5.75 8.55005C5.33579 8.96426 5.33579 9.63583 5.75 10.05L11.2929 15.5929C11.6834 15.9835 12.3166 15.9835 12.7071 15.5929L18.25 10.05C18.6642 9.63584 18.6642 8.96426 18.25 8.55005C17.8358 8.13584 17.1642 8.13584 16.75 8.55005L12.5657 12.7344C12.2533 13.0468 11.7467 13.0468 11.4343 12.7344Z" fill="black"></path>
+                                </svg>
+                            </span>
+                        </a>
+                        <div class="menu menu-sub menu-sub-dropdown menu-column menu-rounded menu-gray-600 menu-state-bg-light-primary fw-bold fs-7 w-175px py-3" data-kt-menu="true">
+                            ${actions}
                         </div>
-                    `;
-                }}
-            ]
+                    </div>`;
+                }},
+            ],
         });
         refreshMenus();
         dt.on('draw', refreshMenus);
@@ -383,84 +453,172 @@
         applyBtn?.addEventListener('click', reloadTable);
         categoryFilter?.addEventListener('change', reloadTable);
         limitSelect?.addEventListener('change', () => {
-            const val = Number(limitSelect.value || 10);
-            dt.page.len(val).draw();
+            dt.page.len(Number(limitSelect.value || 10)).draw();
         });
         resetBtn?.addEventListener('click', () => {
             if (categoryFilter) {
                 categoryFilter.value = '';
-                if (typeof $ !== 'undefined' && $(categoryFilter).data('select2')) {
-                    $(categoryFilter).val('').trigger('change.select2');
-                }
+                typeof $ !== 'undefined' && $(categoryFilter).data('select2') && $(categoryFilter).val('').trigger('change.select2');
             }
-            if (limitSelect) {
-                limitSelect.value = '10';
-                dt.page.len(10).draw();
-            }
+            if (limitSelect) { limitSelect.value = '10'; dt.page.len(10).draw(); }
             reloadTable();
         });
 
-        const clearErrors = () => {
-            ['error_sku','error_name','error_category_id','error_address','error_description','error_safety_stock'].forEach(id => {
-                const el = document.getElementById(id);
-                if (el) el.textContent = '';
-            });
-        };
+        // ── Create item ────────────────────────────────────────────────────────
 
         document.getElementById('btn_open_create_item')?.addEventListener('click', () => {
             if (!form) return;
             form.reset();
             formId.value = '';
-            if (formSku) formSku.value = '';
-            if (formSafetyStock) formSafetyStock.value = 0;
+            formSafetyStock && (formSafetyStock.value = 0);
+            formIsBundle.checked = false;
+            bundleSection.classList.add('d-none');
+            bundleContainer.innerHTML = '';
             setCategoryValue('0');
             clearErrors();
             if (titleEl) titleEl.textContent = 'Add Item';
         });
 
-        importBtn?.addEventListener('click', () => {
+        // ── Edit item ──────────────────────────────────────────────────────────
+
+        tableEl.on('click', '.btn-edit', async function(e) {
+            e.preventDefault();
+            const id = this.getAttribute('data-id');
+            try {
+                const res  = await fetch(showTpl.replace(':id', id), { headers: { Accept: 'application/json' } });
+                const json = await res.json();
+                if (!res.ok) { Swal?.fire('Error', json.message || 'Gagal memuat data', 'error'); return; }
+
+                form.reset();
+                formId.value = id;
+                formSku && (formSku.value = json.sku || '');
+                formName && (formName.value = json.name || '');
+                formAddress && (formAddress.value = json.address || '');
+                formDescription && (formDescription.value = json.description || '');
+                formSafetyStock && (formSafetyStock.value = json.safety_stock ?? 0);
+                setCategoryValue(json.category_id || '0');
+
+                // Bundle state
+                const isBundle = !!json.is_bundle;
+                formIsBundle.checked = isBundle;
+                bundleContainer.innerHTML = '';
+                if (isBundle) {
+                    bundleSection.classList.remove('d-none');
+                    (json.components || []).forEach(c => createComponentRow(c));
+                    if (!(json.components || []).length) createComponentRow();
+                } else {
+                    bundleSection.classList.add('d-none');
+                }
+
+                clearErrors();
+                if (titleEl) titleEl.textContent = 'Edit Item';
+                modal?.show();
+            } catch (err) {
+                console.error(err);
+                Swal?.fire('Error', 'Gagal memuat data item', 'error');
+            }
+        });
+
+        // ── Delete item ────────────────────────────────────────────────────────
+
+        tableEl.on('click', '.btn-delete', async function(e) {
+            e.preventDefault();
+            const id = this.getAttribute('data-id');
+            let confirmed = true;
+            if (typeof Swal !== 'undefined') {
+                const res = await Swal.fire({
+                    title: 'Apakah Anda yakin?', text: 'Item akan dihapus', icon: 'warning',
+                    showCancelButton: true, confirmButtonText: 'Hapus', cancelButtonText: 'Batal',
+                    buttonsStyling: false,
+                    customClass: { confirmButton: 'btn btn-danger', cancelButton: 'btn btn-light' },
+                });
+                confirmed = res.isConfirmed;
+            }
+            if (!confirmed) return;
+            try {
+                const res  = await fetch(deleteTpl.replace(':id', id), {
+                    method: 'POST',
+                    headers: { 'X-CSRF-TOKEN': csrfToken, 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
+                    body: new URLSearchParams({ _method: 'DELETE' }),
+                });
+                const json = await res.json().catch(() => ({}));
+                if (!res.ok) { Swal?.fire('Error', json.message || 'Gagal menghapus item', 'error'); return; }
+                Swal?.fire('Berhasil', json.message || 'Berhasil', 'success');
+                reloadTable();
+            } catch (err) {
+                console.error(err);
+                Swal?.fire('Error', 'Gagal menghapus item', 'error');
+            }
+        });
+
+        // ── Form submit ────────────────────────────────────────────────────────
+
+        form?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            clearErrors();
+            const id  = formId.value;
+            const url = id ? updateTpl.replace(':id', id) : storeUrl;
+            const fd  = new FormData(form);
+            if (id) fd.append('_method', 'PUT');
+
+            // Explicitly send is_bundle as 0/1 (checkbox not submitted when unchecked)
+            fd.set('is_bundle', formIsBundle.checked ? '1' : '0');
+
+            try {
+                const res  = await fetch(id ? url : url, {
+                    method: 'POST',
+                    headers: { 'X-CSRF-TOKEN': csrfToken, Accept: 'application/json' },
+                    body: fd,
+                });
+                const json = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    if (json?.errors) {
+                        Object.entries(json.errors).forEach(([key, msgs]) => {
+                            const errEl = document.getElementById(`error_${key}`);
+                            if (errEl) errEl.textContent = msgs.join(', ');
+                        });
+                    } else {
+                        Swal?.fire('Error', json.message || 'Gagal menyimpan item', 'error');
+                    }
+                    return;
+                }
+                Swal?.fire('Berhasil', json.message || 'Berhasil', 'success');
+                modal?.hide();
+                reloadTable(true);
+            } catch (err) {
+                console.error(err);
+                Swal?.fire('Error', 'Gagal menyimpan item', 'error');
+            }
+        });
+
+        // ── Import ─────────────────────────────────────────────────────────────
+
+        document.getElementById('btn_import_items')?.addEventListener('click', () => {
             if (importInput) importInput.value = '';
             if (importError) importError.textContent = '';
         });
 
-        importSubmit?.addEventListener('click', async ()=> {
+        importSubmit?.addEventListener('click', async () => {
             if (importError) importError.textContent = '';
             const file = importInput?.files?.[0];
-                if (!file) {
-                    if (importError) importError.textContent = 'Pilih file Excel terlebih dahulu.';
-                    return;
-                }
+            if (!file) { if (importError) importError.textContent = 'Pilih file Excel terlebih dahulu.'; return; }
             const confirmed = await confirmAction();
-            if (!confirmed) {
-                return;
-            }
-            const formData = new FormData();
-            formData.append('file', file);
+            if (!confirmed) return;
+            const fd = new FormData();
+            fd.append('file', file);
             try {
-                const res = await fetch(importUrl, {
+                const res  = await fetch(importUrl, {
                     method: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': csrfToken,
-                        'Accept': 'application/json',
-                    },
-                    body: formData,
+                    headers: { 'X-CSRF-TOKEN': csrfToken, Accept: 'application/json' },
+                    body: fd,
                 });
                 const text = await res.text();
                 let json;
-                try { json = JSON.parse(text); } catch (e) {
-                    console.error('Invalid JSON', text);
-                    closeSwal();
-                    if (typeof Swal !== 'undefined') Swal.fire('Error', 'Respons server tidak valid', 'error');
-                    return;
-                }
+                try { json = JSON.parse(text); } catch { closeSwal(); Swal?.fire('Error', 'Respons server tidak valid', 'error'); return; }
                 closeSwal();
                 if (!res.ok) {
-                    if (json?.errors) {
-                        const msg = Object.values(json.errors).flat().join(', ');
-                        Swal?.fire('Error', msg || 'Gagal import', 'error');
-                    } else {
-                        Swal?.fire('Error', json.message || 'Gagal import', 'error');
-                    }
+                    if (json?.errors) { Swal?.fire('Error', Object.values(json.errors).flat().join(', ') || 'Gagal import', 'error'); }
+                    else { Swal?.fire('Error', json.message || 'Gagal import', 'error'); }
                     return;
                 }
                 Swal?.fire('Berhasil', `${json.message || 'Import selesai'} (created: ${json.created}, updated: ${json.updated})`, 'success');
@@ -471,128 +629,6 @@
                 console.error(err);
                 closeSwal();
                 Swal?.fire('Error', 'Gagal import', 'error');
-            }
-        });
-
-        form?.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            clearErrors();
-            const id = formId.value;
-            const url = id ? updateTpl.replace(':id', id) : storeUrl;
-            const method = id ? 'PUT' : 'POST';
-            const formData = new FormData(form);
-            if (id) formData.append('_method', 'PUT');
-            try {
-                const res = await fetch(url, {
-                    method: method === 'PUT' ? 'POST' : method,
-                    headers: {
-                        'X-CSRF-TOKEN': csrfToken,
-                        'Accept': 'application/json',
-                    },
-                    body: formData,
-                });
-                const text = await res.text();
-                let json;
-                try { json = JSON.parse(text); } catch (parseErr) {
-                    console.error('Invalid JSON', text);
-                    if (typeof Swal !== 'undefined') Swal.fire('Error', 'Respons server tidak valid', 'error');
-                    return;
-                }
-                if (!res.ok) {
-                    if (json?.errors) {
-                        Object.entries(json.errors).forEach(([key, msgs])=>{
-                            const errEl = document.getElementById(`error_${key}`);
-                            if (errEl) errEl.textContent = msgs.join(', ');
-                        });
-                    } else if (typeof Swal !== 'undefined') {
-                        Swal.fire('Error', json.message || 'Gagal menyimpan item', 'error');
-                    }
-                    return;
-                }
-                if (typeof Swal !== 'undefined') Swal.fire('Berhasil', json.message || 'Berhasil', 'success');
-                modal?.hide();
-                reloadTable(true);
-            } catch (err) {
-                console.error(err);
-                if (typeof Swal !== 'undefined') Swal.fire('Error', 'Gagal menyimpan item', 'error');
-            }
-        });
-
-        tableEl.on('click', '.btn-edit', function(e) {
-            e.preventDefault();
-            const id = this.getAttribute('data-id');
-            const sku = this.getAttribute('data-sku');
-            const name = this.getAttribute('data-name');
-            const categoryId = this.getAttribute('data-category');
-            const address = this.getAttribute('data-address') || '';
-            const description = this.getAttribute('data-description') || '';
-            const safetyStock = this.getAttribute('data-safety-stock');
-            if (!form) return;
-            formId.value = id;
-            if (formSku) formSku.value = sku || '';
-            formName.value = name;
-            if (formAddress) formAddress.value = address;
-            formDescription.value = description;
-            if (formSafetyStock) formSafetyStock.value = safetyStock ?? 0;
-            setCategoryValue(categoryId || '0');
-            clearErrors();
-            if (titleEl) titleEl.textContent = 'Edit Item';
-            modal?.show();
-        });
-
-        tableEl.on('click', '.btn-delete', async function(e) {
-            e.preventDefault();
-            const id = this.getAttribute('data-id');
-            let confirmed = true;
-            if (typeof Swal !== 'undefined') {
-                const res = await Swal.fire({
-                    title: 'Apakah Anda yakin?',
-                    text: 'Item akan dihapus',
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonText: 'Hapus',
-                    cancelButtonText: 'Batal',
-                    buttonsStyling: false,
-                    customClass: {
-                        confirmButton: 'btn btn-danger',
-                        cancelButton: 'btn btn-light'
-                    }
-                });
-                confirmed = res.isConfirmed;
-            }
-            if (!confirmed) return;
-            try {
-                const res = await fetch(deleteTpl.replace(':id', id), {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': csrfToken,
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                        'Accept': 'application/json',
-                    },
-                    body: new URLSearchParams({ _method: 'DELETE' }),
-                });
-                const text = await res.text();
-                let json;
-                try { json = JSON.parse(text); } catch (parseErr) {
-                    console.error('Invalid JSON', text);
-                    if (typeof Swal !== 'undefined') Swal.fire('Error', 'Respons server tidak valid', 'error');
-                    return;
-                }
-                if (!res.ok) {
-                    if (typeof Swal !== 'undefined') Swal.fire('Error', json.message || 'Gagal menghapus item', 'error');
-                    return;
-                }
-                if (typeof Swal !== 'undefined') Swal.fire('Berhasil', json.message || 'Berhasil', 'success');
-                reloadTable();
-            } catch (err) {
-                console.error(err);
-                if (typeof Swal !== 'undefined') Swal.fire('Error', 'Gagal menghapus item', 'error');
-            }
-        });
-
-        document.getElementById('btn_export_items')?.addEventListener('click', () => {
-            if (typeof Swal !== 'undefined') {
-                Swal.fire('Info', 'Fitur export belum diimplementasikan.', 'info');
             }
         });
     });

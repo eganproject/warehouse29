@@ -246,6 +246,21 @@
                     jQuery.fn.select2[key] = originalSelect2[key];
                 });
                 jQuery.fn.select2.__modalResponsivePatched = true;
+
+                // Bootstrap 5 modal mempunyai focus-trap: ketika fokus berpindah ke elemen
+                // di luar modal (termasuk dropdown select2 yang di-render di document.body),
+                // Bootstrap memanggil element.focus() kembali ke modal sehingga dropdown tertutup.
+                // Fix: intercept focusin di capture phase (sebelum Bootstrap handler berjalan)
+                // dan hentikan propagasi jika targetnya adalah bagian dari select2 dropdown.
+                if (!window.__select2FocusTrapFixApplied) {
+                    document.addEventListener('focusin', function (e) {
+                        if (e.target && e.target.closest &&
+                            e.target.closest('.select2-container, .select2-dropdown, .select2-search, .select2-results')) {
+                            e.stopImmediatePropagation();
+                        }
+                    }, { capture: true });
+                    window.__select2FocusTrapFixApplied = true;
+                }
             };
 
             const patchFlatpickrForModals = () => {

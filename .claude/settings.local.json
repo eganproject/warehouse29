@@ -1,7 +1,15 @@
 {
   "permissions": {
     "allow": [
-      "Bash(php artisan *)"
+      "Bash(php artisan *)",
+      "Bash(Get-ChildItem -Path \"c:\\\\laragon\\\\www\\\\warehouse29\" -Directory)",
+      "Bash(Select-Object Name)",
+      "Bash(php -l app/Models/Item.php)",
+      "Bash(php -l app/Models/ItemBundle.php)",
+      "Bash(php -l app/Support/BundleService.php)",
+      "Bash(php -l app/Http/Controllers/Admin/ItemController.php)",
+      "Bash(php -l app/Http/Controllers/Qc/QcScanController.php)",
+      "Bash(Get-ChildItem -Path \"C:\\\\laragon\\\\www\\\\warehouse29\" -Directory)"
     ]
   }
 }

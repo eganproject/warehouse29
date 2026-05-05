@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\ItemBundle;
 use App\Models\OutboundItem;
 use App\Models\OutboundTransaction;
 use App\Models\Item;
 use App\Models\StockMutation;
 use App\Imports\OutboundReturnsImport;
+use App\Support\BundleService;
 use App\Support\StockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -644,19 +646,58 @@ class OutboundController extends Controller
     private function postStockMovements(OutboundTransaction $tx, string $type): void
     {
         $tx->loadMissing('items');
+
+        $itemIds = $tx->items->pluck('item_id')->unique()->all();
+        $items = Item::whereIn('id', $itemIds)->get()->keyBy('id');
+
         foreach ($tx->items as $row) {
+            $item = $items->get($row->item_id);
+            $baseKey = StockService::idempotencyKey(['stock', 'outbound', $type, $tx->id, $row->item_id]);
+
+            if ($item && $item->is_bundle) {
+                $this->deductBundleComponentsForOutbound($item, $row->qty, $tx, $type, $baseKey);
+            } else {
+                StockService::mutate([
+                    'item_id' => $row->item_id,
+                    'direction' => 'out',
+                    'qty' => $row->qty,
+                    'source_type' => 'outbound',
+                    'source_subtype' => $type,
+                    'source_id' => $tx->id,
+                    'source_code' => $tx->code,
+                    'note' => $row->note ?? null,
+                    'occurred_at' => $tx->transacted_at ?? now(),
+                    'created_by' => auth()->id(),
+                    'idempotency_key' => $baseKey,
+                ]);
+            }
+        }
+    }
+
+    private function deductBundleComponentsForOutbound(Item $item, int $bundleQty, OutboundTransaction $tx, string $type, string $baseKey): void
+    {
+        $components = ItemBundle::where('bundle_item_id', $item->id)->lockForUpdate()->get();
+
+        BundleService::assertVirtualStockSufficient($item->id, $bundleQty);
+
+        foreach ($components as $index => $component) {
+            $componentQty = $bundleQty * (int) $component->qty;
+            $idempotencyKey = $index === 0
+                ? $baseKey
+                : StockService::idempotencyKey([$baseKey, 'comp', $component->component_item_id]);
+
             StockService::mutate([
-                'item_id' => $row->item_id,
+                'item_id' => $component->component_item_id,
                 'direction' => 'out',
-                'qty' => $row->qty,
+                'qty' => $componentQty,
                 'source_type' => 'outbound',
                 'source_subtype' => $type,
                 'source_id' => $tx->id,
                 'source_code' => $tx->code,
-                'note' => $row->note ?? null,
+                'note' => null,
                 'occurred_at' => $tx->transacted_at ?? now(),
                 'created_by' => auth()->id(),
-                'idempotency_key' => StockService::idempotencyKey(['stock', 'outbound', $type, $tx->id, $row->item_id]),
+                'idempotency_key' => $idempotencyKey,
             ]);
         }
     }

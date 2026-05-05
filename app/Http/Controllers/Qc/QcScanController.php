@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Qc;
 
 use App\Http\Controllers\Controller;
 use App\Models\Item;
+use App\Models\ItemBundle;
 use App\Models\PickingList;
 use App\Models\PickingListException;
 use App\Models\QcScanResi;
@@ -11,6 +12,7 @@ use App\Models\QcScanResiItem;
 use App\Models\QcTransitItem;
 use App\Models\Resi;
 use App\Models\StockMutation;
+use App\Support\BundleService;
 use App\Support\StockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -143,6 +145,8 @@ class QcScanController extends Controller
 
         try {
             $summary = DB::transaction(function () use ($validated, $code, $qty, $idempotencyKey) {
+                // Idempotency check: if any mutation with this key (or derived key) exists, skip.
+                // For bundle scans the first component uses $idempotencyKey directly.
                 if ($idempotencyKey && StockMutation::where('idempotency_key', $idempotencyKey)->lockForUpdate()->exists()) {
                     return $this->serializeDailyScanSummary();
                 }
@@ -189,6 +193,8 @@ class QcScanController extends Controller
                 $ledger->item_id = $item->id;
                 $ledger->save();
 
+                // Transit is always recorded against the scanned item's item_id
+                // (for bundles this is the bundle's item_id, which scan-out will look up by SKU)
                 $transit = QcTransitItem::where('item_id', $item->id)
                     ->where('transit_date', $date)
                     ->lockForUpdate()
@@ -209,19 +215,23 @@ class QcScanController extends Controller
                     ]);
                 }
 
-                StockService::mutate([
-                    'item_id' => $item->id,
-                    'direction' => 'out',
-                    'qty' => $qty,
-                    'source_type' => 'qc_resi',
-                    'source_subtype' => 'scan',
-                    'source_id' => $qcResi->id,
-                    'source_code' => $resi->no_resi ?: $resi->id_pesanan,
-                    'note' => 'QC scan resi',
-                    'occurred_at' => $scanAt,
-                    'created_by' => auth()->id(),
-                    'idempotency_key' => $idempotencyKey,
-                ]);
+                if ($item->is_bundle) {
+                    $this->deductBundleComponents($item, $qty, $qcResi, $resi, $scanAt, $idempotencyKey);
+                } else {
+                    StockService::mutate([
+                        'item_id' => $item->id,
+                        'direction' => 'out',
+                        'qty' => $qty,
+                        'source_type' => 'qc_resi',
+                        'source_subtype' => 'scan',
+                        'source_id' => $qcResi->id,
+                        'source_code' => $resi->no_resi ?: $resi->id_pesanan,
+                        'note' => 'QC scan resi',
+                        'occurred_at' => $scanAt,
+                        'created_by' => auth()->id(),
+                        'idempotency_key' => $idempotencyKey,
+                    ]);
+                }
 
                 $this->adjustPickingRemaining($date, $item->sku, $qty);
                 $this->markCompletedIfReady($qcResi);
@@ -244,6 +254,62 @@ class QcScanController extends Controller
             'message' => 'Item berhasil discan.',
             'session' => $summary,
         ]);
+    }
+
+    /**
+     * Deduct stock from each bundle component.
+     * The first component uses $baseIdempotencyKey so the top-level idempotency check
+     * can detect a completed bundle scan on retry. Subsequent components use derived keys.
+     * Transit was already recorded against the bundle item_id — this only handles stock deduction.
+     */
+    private function deductBundleComponents(
+        Item $item,
+        int $bundleQty,
+        QcScanResi $qcResi,
+        Resi $resi,
+        \DateTimeInterface $scanAt,
+        ?string $baseIdempotencyKey
+    ): void {
+        $components = ItemBundle::where('bundle_item_id', $item->id)
+            ->lockForUpdate()
+            ->get();
+
+        if ($components->isEmpty()) {
+            throw ValidationException::withMessages([
+                'code' => "Bundle {$item->sku} tidak memiliki komponen. Hubungi administrator.",
+            ]);
+        }
+
+        // Pre-check virtual stock before acquiring individual component locks
+        BundleService::assertVirtualStockSufficient($item->id, $bundleQty);
+
+        $sourceCode = $resi->no_resi ?: $resi->id_pesanan;
+
+        foreach ($components as $index => $component) {
+            $componentQty = $bundleQty * (int) $component->qty;
+
+            // First component uses the base key so the outer idempotency check catches retries.
+            // Subsequent components use a derived key so each mutation is independently idempotent.
+            $compKey = $index === 0
+                ? $baseIdempotencyKey
+                : ($baseIdempotencyKey
+                    ? StockService::idempotencyKey([$baseIdempotencyKey, 'comp', $component->component_item_id])
+                    : null);
+
+            StockService::mutate([
+                'item_id' => $component->component_item_id,
+                'direction' => 'out',
+                'qty' => $componentQty,
+                'source_type' => 'qc_resi',
+                'source_subtype' => 'scan_bundle',
+                'source_id' => $qcResi->id,
+                'source_code' => $sourceCode,
+                'note' => "QC scan bundle {$item->sku}",
+                'occurred_at' => $scanAt,
+                'created_by' => auth()->id(),
+                'idempotency_key' => $compKey,
+            ]);
+        }
     }
 
     private function requestIdempotencyKey(string $action, ?string $requestId): ?string

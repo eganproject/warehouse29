@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Exports\ItemStocksExport;
 use App\Models\Item;
+use App\Support\BundleService;
 use Illuminate\Http\Request;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -38,12 +39,23 @@ class ItemStockController extends Controller
             $query->skip($start)->take($length);
         }
 
-        $data = $query->get()->map(function ($i) {
+        $items = $query->get();
+
+        $bundleItemIds = $items->where('is_bundle', true)->pluck('id')->all();
+        $virtualStocks = BundleService::getVirtualStockBatch($bundleItemIds);
+
+        $data = $items->map(function ($i) use ($virtualStocks) {
+            $isBundle = (bool) $i->is_bundle;
+            $stock = $isBundle
+                ? ($virtualStocks[$i->id] ?? 0)
+                : ($i->stock?->stock ?? 0);
+
             return [
                 'id' => $i->id,
                 'sku' => $i->sku,
                 'name' => $i->name,
-                'stock' => $i->stock?->stock ?? 0,
+                'stock' => $stock,
+                'is_bundle' => $isBundle,
             ];
         });
 

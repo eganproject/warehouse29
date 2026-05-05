@@ -7,6 +7,7 @@ use App\Models\Category;
 use App\Models\InboundItem;
 use App\Models\InboundTransaction;
 use App\Models\Item;
+use App\Models\ItemBundle;
 use App\Models\ItemStock;
 use App\Imports\ItemsImport;
 use App\Support\StockService;
@@ -21,10 +22,32 @@ use Illuminate\Validation\ValidationException;
 class ItemController extends Controller
 {
     protected ?int $defaultCategoryId = null;
+
     public function index()
     {
         $categories = Category::orderBy('name')->get(['id', 'name']);
         return view('admin.masterdata.items.index', compact('categories'));
+    }
+
+    public function show(Item $item)
+    {
+        $item->load('bundleComponents.componentItem');
+        return response()->json([
+            'id' => $item->id,
+            'sku' => $item->sku,
+            'name' => $item->name,
+            'category_id' => $item->category_id,
+            'address' => $item->address ?? '',
+            'description' => $item->description ?? '',
+            'safety_stock' => (int) ($item->safety_stock ?? 0),
+            'is_bundle' => (bool) $item->is_bundle,
+            'components' => $item->bundleComponents->map(fn ($bc) => [
+                'component_item_id' => $bc->component_item_id,
+                'sku' => $bc->componentItem?->sku ?? '',
+                'name' => $bc->componentItem?->name ?? '',
+                'qty' => (int) $bc->qty,
+            ])->values(),
+        ]);
     }
 
     public function data(Request $request)
@@ -69,6 +92,7 @@ class ItemController extends Controller
                 'address' => $i->address ?? '',
                 'description' => $i->description ?? '',
                 'safety_stock' => (int) ($i->safety_stock ?? 0),
+                'is_bundle' => (bool) $i->is_bundle,
             ];
         });
 
@@ -94,18 +118,39 @@ class ItemController extends Controller
             'address' => ['nullable', 'string'],
             'description' => ['nullable', 'string'],
             'safety_stock' => ['nullable', 'integer', 'min:0'],
+            'is_bundle' => ['nullable', 'boolean'],
+            'components' => ['nullable', 'array'],
+            'components.*.component_item_id' => ['required_with:components', 'integer', 'exists:items,id'],
+            'components.*.qty' => ['required_with:components', 'integer', 'min:1'],
         ]);
+
+        $isBundle = filter_var($request->input('is_bundle', false), FILTER_VALIDATE_BOOLEAN);
+        $components = $isBundle ? ($validated['components'] ?? []) : [];
+
+        if ($isBundle && empty($components)) {
+            throw ValidationException::withMessages([
+                'components' => 'Bundle harus memiliki minimal satu komponen.',
+            ]);
+        }
 
         $catId = $request->input('category_id');
         $validated['category_id'] = ($catId === null || (int)$catId === 0) ? 0 : $catId;
         if (array_key_exists('safety_stock', $validated)) {
             $validated['safety_stock'] = max(0, (int) $validated['safety_stock']);
         }
+        $validated['is_bundle'] = $isBundle;
+        unset($validated['components']);
 
         DB::beginTransaction();
         try {
             $item = Item::create($validated);
-            ItemStock::firstOrCreate(['item_id' => $item->id], ['stock' => 0]);
+
+            if ($isBundle) {
+                $this->syncBundleComponents($item, $components);
+            } else {
+                ItemStock::firstOrCreate(['item_id' => $item->id], ['stock' => 0]);
+            }
+
             DB::commit();
 
             return response()->json([
@@ -115,8 +160,12 @@ class ItemController extends Controller
                     'sku' => $item->sku,
                     'name' => $item->name,
                     'category_id' => $item->category_id,
+                    'is_bundle' => $item->is_bundle,
                 ]
             ]);
+        } catch (ValidationException $e) {
+            DB::rollBack();
+            throw $e;
         } catch (\Throwable $e) {
             DB::rollBack();
             return response()->json([
@@ -140,17 +189,48 @@ class ItemController extends Controller
             'address' => ['nullable', 'string'],
             'description' => ['nullable', 'string'],
             'safety_stock' => ['nullable', 'integer', 'min:0'],
+            'is_bundle' => ['nullable', 'boolean'],
+            'components' => ['nullable', 'array'],
+            'components.*.component_item_id' => ['required_with:components', 'integer', 'exists:items,id'],
+            'components.*.qty' => ['required_with:components', 'integer', 'min:1'],
         ]);
+
+        $isBundle = filter_var($request->input('is_bundle', false), FILTER_VALIDATE_BOOLEAN);
+        $components = $isBundle ? ($validated['components'] ?? []) : [];
+
+        if ($isBundle && empty($components)) {
+            throw ValidationException::withMessages([
+                'components' => 'Bundle harus memiliki minimal satu komponen.',
+            ]);
+        }
+
+        // Prevent toggling is_bundle once item has stock-related activity
+        if ((bool)$item->is_bundle !== $isBundle) {
+            $this->assertBundleToggleSafe($item, $isBundle);
+        }
 
         $catId = $request->input('category_id');
         $validated['category_id'] = ($catId === null || (int)$catId === 0) ? 0 : $catId;
         if (array_key_exists('safety_stock', $validated)) {
             $validated['safety_stock'] = max(0, (int) $validated['safety_stock']);
         }
+        $validated['is_bundle'] = $isBundle;
+        unset($validated['components']);
 
         DB::beginTransaction();
         try {
             $item->update($validated);
+
+            if ($isBundle) {
+                $this->syncBundleComponents($item, $components);
+                // Remove item_stocks row if switching to bundle (stock should be 0 since no activity allowed)
+                ItemStock::where('item_id', $item->id)->where('stock', 0)->delete();
+            } else {
+                // Switching from bundle to regular: ensure item_stocks row exists, clear components
+                ItemBundle::where('bundle_item_id', $item->id)->delete();
+                ItemStock::firstOrCreate(['item_id' => $item->id], ['stock' => 0]);
+            }
+
             DB::commit();
 
             return response()->json([
@@ -160,8 +240,12 @@ class ItemController extends Controller
                     'sku' => $item->sku,
                     'name' => $item->name,
                     'category_id' => $item->category_id,
+                    'is_bundle' => $item->is_bundle,
                 ]
             ]);
+        } catch (ValidationException $e) {
+            DB::rollBack();
+            throw $e;
         } catch (\Throwable $e) {
             DB::rollBack();
             return response()->json([
@@ -269,6 +353,74 @@ class ItemController extends Controller
         ]);
     }
 
+    /**
+     * Sync bundle components: delete old entries then insert new ones.
+     * Validates that components are not bundles themselves.
+     */
+    private function syncBundleComponents(Item $item, array $components): void
+    {
+        $componentItemIds = array_column($components, 'component_item_id');
+
+        // A bundle's component cannot itself be a bundle
+        $bundleComponentCount = Item::whereIn('id', $componentItemIds)
+            ->where('is_bundle', true)
+            ->count();
+        if ($bundleComponentCount > 0) {
+            throw ValidationException::withMessages([
+                'components' => 'Komponen bundle tidak boleh berupa item bundle lain.',
+            ]);
+        }
+
+        // A bundle cannot reference itself
+        if (in_array($item->id, $componentItemIds, true)) {
+            throw ValidationException::withMessages([
+                'components' => 'Bundle tidak bisa menjadi komponen dirinya sendiri.',
+            ]);
+        }
+
+        // Duplicate component check
+        if (count($componentItemIds) !== count(array_unique($componentItemIds))) {
+            throw ValidationException::withMessages([
+                'components' => 'Terdapat duplikat komponen dalam bundle.',
+            ]);
+        }
+
+        ItemBundle::where('bundle_item_id', $item->id)->delete();
+
+        foreach ($components as $comp) {
+            ItemBundle::create([
+                'bundle_item_id' => $item->id,
+                'component_item_id' => (int) $comp['component_item_id'],
+                'qty' => max(1, (int) $comp['qty']),
+            ]);
+        }
+    }
+
+    /**
+     * Prevent toggling is_bundle if the item already has stock-related history.
+     */
+    private function assertBundleToggleSafe(Item $item, bool $toBundle): void
+    {
+        if ($toBundle) {
+            // Regular → Bundle: block if item has stock mutations or non-zero stock
+            $hasMutations = DB::table('stock_mutations')->where('item_id', $item->id)->exists();
+            $hasStock = (int) DB::table('item_stocks')->where('item_id', $item->id)->value('stock') > 0;
+            if ($hasMutations || $hasStock) {
+                throw ValidationException::withMessages([
+                    'is_bundle' => 'Item tidak bisa diubah menjadi bundle karena sudah memiliki riwayat mutasi stok.',
+                ]);
+            }
+        } else {
+            // Bundle → Regular: block if bundle has been QC-scanned (transit exists)
+            $hasTransit = DB::table('qc_transit_items')->where('item_id', $item->id)->exists();
+            if ($hasTransit) {
+                throw ValidationException::withMessages([
+                    'is_bundle' => 'Item bundle tidak bisa diubah menjadi item biasa karena sudah memiliki riwayat transit QC.',
+                ]);
+            }
+        }
+    }
+
     protected function findOrCreateCategory(string $name, int $parentId = 0): ?Category
     {
         $trimmed = trim($name);
@@ -293,6 +445,16 @@ class ItemController extends Controller
     private function assertItemCanBeDeleted(Item $item): void
     {
         $references = [];
+
+        // Block if this item is used as a bundle definition
+        if (Schema::hasTable('item_bundles')) {
+            if (DB::table('item_bundles')->where('bundle_item_id', $item->id)->exists()) {
+                $references[] = 'definisi bundle';
+            }
+            if (DB::table('item_bundles')->where('component_item_id', $item->id)->exists()) {
+                $references[] = 'komponen bundle';
+            }
+        }
 
         $itemTables = [
             'inbound_items' => 'penerimaan barang',

@@ -142,6 +142,7 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
 
         // Items
         Route::get('/items/data', [\App\Http\Controllers\Admin\ItemController::class, 'data'])->name('items.data');
+        Route::get('/items/{item}', [\App\Http\Controllers\Admin\ItemController::class, 'show'])->name('items.show');
         Route::resource('items', \App\Http\Controllers\Admin\ItemController::class)->except(['create','show','edit'])->names('items');
         Route::post('/items/import', [\App\Http\Controllers\Admin\ItemController::class, 'import'])->name('items.import');
 

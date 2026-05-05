@@ -29,7 +29,8 @@
                         <th>ID</th>
                         <th>SKU</th>
                         <th>Nama</th>
-                        <th>Stok</th>
+                        <th>Tipe</th>
+                        <th class="text-end">Stok</th>
                     </tr>
                 </thead>
                 <tbody></tbody>
@@ -70,7 +71,12 @@
                 { data: 'id' },
                 { data: 'sku' },
                 { data: 'name' },
-                { data: 'stock' },
+                { data: 'is_bundle', render: v => v
+                    ? '<span class="badge badge-light-primary">Bundle</span>'
+                    : '<span class="badge badge-light-secondary">Regular</span>' },
+                { data: 'stock', className: 'text-end', render: (v, t, row) => row.is_bundle
+                    ? `<span class="fw-bold">${v}</span> <span class="text-muted fs-8">virtual</span>`
+                    : `<span class="fw-bold">${v}</span>` },
             ]
         });
 
