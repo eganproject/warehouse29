@@ -8,8 +8,11 @@ use App\Models\OutboundItem;
 use App\Models\OutboundTransaction;
 use App\Models\Item;
 use App\Models\StockMutation;
+use App\Models\SuratJalan;
 use App\Imports\OutboundReturnsImport;
+use App\Models\DamagedStockMutation;
 use App\Support\BundleService;
+use App\Support\DamagedStockService;
 use App\Support\StockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -133,6 +136,59 @@ class OutboundController extends Controller
     public function manualsApprove(int $id)
     {
         return $this->approve('manual', $id);
+    }
+
+    public function manualsGenerateSuratJalan(int $id)
+    {
+        $tx = OutboundTransaction::with(['items.item', 'creator', 'suratJalan'])
+            ->where('type', 'manual')
+            ->findOrFail($id);
+
+        if (($tx->status ?? 'pending') !== 'approved') {
+            return response()->json(['message' => 'Outbound harus disetujui terlebih dahulu sebelum membuat surat jalan'], 422);
+        }
+
+        if ($tx->suratJalan) {
+            return response()->json([
+                'message' => 'Surat jalan sudah dibuat',
+                'code' => $tx->suratJalan->code,
+                'url' => route('admin.outbound.manuals.surat-jalan', $id),
+            ]);
+        }
+
+        $code = $this->generateSuratJalanCode();
+        $sj = SuratJalan::create([
+            'code' => $code,
+            'outbound_transaction_id' => $tx->id,
+            'note' => null,
+            'created_by' => auth()->id(),
+        ]);
+
+        return response()->json([
+            'message' => 'Surat jalan berhasil dibuat',
+            'code' => $sj->code,
+            'url' => route('admin.outbound.manuals.surat-jalan', $id),
+        ]);
+    }
+
+    public function manualsViewSuratJalan(int $id)
+    {
+        $tx = OutboundTransaction::with(['items.item', 'creator', 'approver', 'suratJalan.creator'])
+            ->where('type', 'manual')
+            ->findOrFail($id);
+
+        if (!$tx->suratJalan) {
+            abort(404, 'Surat jalan belum dibuat');
+        }
+
+        $totalQty = $tx->items->sum('qty');
+
+        return view('admin.stock-flow.surat-jalan', [
+            'transaction' => $tx,
+            'suratJalan' => $tx->suratJalan,
+            'totalQty' => $totalQty,
+            'backUrl' => route('admin.outbound.manuals.detail', $id),
+        ]);
     }
 
     public function returnsApprove(int $id)
@@ -451,6 +507,7 @@ class OutboundController extends Controller
                 return [
                     'item_id' => $item->item_id,
                     'qty' => $item->qty,
+                    'stock_source' => $item->stock_source ?? 'regular',
                     'note' => $item->note ?? '',
                 ];
             })->values(),
@@ -459,7 +516,7 @@ class OutboundController extends Controller
 
     private function detail(string $type, string $pageTitle, string $routeBase, int $id)
     {
-        $tx = OutboundTransaction::with(['items.item'])
+        $tx = OutboundTransaction::with(['items.item', 'creator', 'approver', 'suratJalan.creator'])
             ->where('type', $type)
             ->findOrFail($id);
 
@@ -502,6 +559,7 @@ class OutboundController extends Controller
                 OutboundItem::create([
                     'outbound_transaction_id' => $tx->id,
                     'item_id' => $row['item_id'],
+                    'stock_source' => $row['stock_source'] ?? 'regular',
                     'qty' => $row['qty'],
                     'note' => $row['note'] ?? null,
                 ]);
@@ -539,6 +597,8 @@ class OutboundController extends Controller
 
             StockService::rollbackBySource('outbound', $tx->id);
             StockMutation::where('source_type', 'outbound')->where('source_id', $tx->id)->delete();
+            DamagedStockService::rollbackBySource('outbound', $tx->id);
+            DamagedStockMutation::where('source_type', 'outbound')->where('source_id', $tx->id)->delete();
             OutboundItem::where('outbound_transaction_id', $tx->id)->delete();
 
             $tx->update([
@@ -551,6 +611,7 @@ class OutboundController extends Controller
                 OutboundItem::create([
                     'outbound_transaction_id' => $tx->id,
                     'item_id' => $row['item_id'],
+                    'stock_source' => $row['stock_source'] ?? 'regular',
                     'qty' => $row['qty'],
                     'note' => $row['note'] ?? null,
                 ]);
@@ -586,6 +647,8 @@ class OutboundController extends Controller
 
             StockService::rollbackBySource('outbound', $tx->id);
             StockMutation::where('source_type', 'outbound')->where('source_id', $tx->id)->delete();
+            DamagedStockService::rollbackBySource('outbound', $tx->id);
+            DamagedStockMutation::where('source_type', 'outbound')->where('source_id', $tx->id)->delete();
             $tx->delete();
 
             DB::commit();
@@ -652,7 +715,25 @@ class OutboundController extends Controller
 
         foreach ($tx->items as $row) {
             $item = $items->get($row->item_id);
-            $baseKey = StockService::idempotencyKey(['stock', 'outbound', $type, $tx->id, $row->item_id]);
+            $stockSource = $row->stock_source ?? 'regular';
+            $baseKey = StockService::idempotencyKey(['stock', 'outbound', $type, $stockSource, $tx->id, $row->item_id]);
+
+            if ($stockSource === 'damaged') {
+                DamagedStockService::mutate([
+                    'item_id' => $row->item_id,
+                    'direction' => 'out',
+                    'qty' => $row->qty,
+                    'source_type' => 'outbound',
+                    'source_subtype' => $type,
+                    'source_id' => $tx->id,
+                    'source_code' => $tx->code,
+                    'note' => $row->note ?? null,
+                    'occurred_at' => $tx->transacted_at ?? now(),
+                    'created_by' => auth()->id(),
+                    'idempotency_key' => $baseKey,
+                ]);
+                continue;
+            }
 
             if ($item && $item->is_bundle) {
                 $this->deductBundleComponentsForOutbound($item, $row->qty, $tx, $type, $baseKey);
@@ -708,6 +789,7 @@ class OutboundController extends Controller
             'items' => ['required', 'array', 'min:1'],
             'items.*.item_id' => ['required', 'integer', 'exists:items,id'],
             'items.*.qty' => ['required', 'integer', 'min:1'],
+            'items.*.stock_source' => ['nullable', 'in:regular,damaged'],
             'items.*.note' => ['nullable', 'string'],
             'ref_no' => ['nullable', 'string', 'max:100'],
             'note' => ['nullable', 'string'],
@@ -720,6 +802,7 @@ class OutboundController extends Controller
                 return [
                     'item_id' => (int) $row['item_id'],
                     'qty' => (int) $row['qty'],
+                    'stock_source' => in_array($row['stock_source'] ?? null, ['regular', 'damaged'], true) ? $row['stock_source'] : 'regular',
                     'note' => $row['note'] ?? null,
                 ];
             })->values();
@@ -730,22 +813,26 @@ class OutboundController extends Controller
             ]);
         }
 
-        $duplicates = $items->groupBy('item_id')->filter(fn ($rows) => $rows->count() > 1);
+        $duplicates = $items->groupBy(fn ($row) => $row['item_id'].'|'.$row['stock_source'])
+            ->filter(fn ($rows) => $rows->count() > 1);
         if ($duplicates->isNotEmpty()) {
             throw ValidationException::withMessages([
-                'items' => 'Item tidak boleh duplikat pada outbound',
+                'items' => 'Item dengan sumber stok yang sama tidak boleh duplikat pada outbound',
             ]);
         }
 
-        $normalized = $items->groupBy('item_id')->map(function ($rows, $itemId) {
-            $qty = $rows->sum('qty');
-            $note = $rows->pluck('note')->first(fn ($n) => $n !== null && $n !== '') ?? null;
-            return [
-                'item_id' => (int) $itemId,
-                'qty' => $qty,
-                'note' => $note,
-            ];
-        })->values()->all();
+        $normalized = $items->groupBy(fn ($row) => $row['item_id'].'|'.$row['stock_source'])
+            ->map(function ($rows) {
+                $first = $rows->first();
+                $qty = $rows->sum('qty');
+                $note = $rows->pluck('note')->first(fn ($n) => $n !== null && $n !== '') ?? null;
+                return [
+                    'item_id' => (int) $first['item_id'],
+                    'qty' => $qty,
+                    'stock_source' => $first['stock_source'],
+                    'note' => $note,
+                ];
+            })->values()->all();
 
         $validated['items'] = $normalized;
         if (!empty($validated['transacted_at'])) {
@@ -788,5 +875,22 @@ class OutboundController extends Controller
     private function generateCode(string $prefix): string
     {
         return $prefix.'-'.now()->format('YmdHis').'-'.Str::upper(Str::random(4));
+    }
+
+    private function generateSuratJalanCode(): string
+    {
+        $prefix = 'SJ-'.now()->format('Ymd');
+        $last = SuratJalan::where('code', 'like', $prefix.'-%')
+            ->orderByDesc('id')
+            ->lockForUpdate()
+            ->first();
+
+        $seq = 1;
+        if ($last) {
+            $parts = explode('-', $last->code);
+            $seq = ((int) end($parts)) + 1;
+        }
+
+        return $prefix.'-'.str_pad($seq, 4, '0', STR_PAD_LEFT);
     }
 }

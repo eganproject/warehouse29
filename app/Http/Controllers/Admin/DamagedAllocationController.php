@@ -328,7 +328,7 @@ class DamagedAllocationController extends Controller
         return [
             'dispose' => 'Dimusnahkan',
             'repair' => 'Diperbaiki',
-            'return_vendor' => 'Dikembalikan ke Vendor',
+            'return_vendor' => 'Dikembalikan ke Gudang Besar',
             'other' => 'Lainnya',
         ];
     }

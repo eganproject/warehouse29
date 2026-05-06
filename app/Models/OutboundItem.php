@@ -12,6 +12,7 @@ class OutboundItem extends Model
     protected $fillable = [
         'outbound_transaction_id',
         'item_id',
+        'stock_source',
         'qty',
         'note',
     ];

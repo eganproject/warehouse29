@@ -209,6 +209,7 @@
     const permMap = @json($permMap ?? []);
     const canCreateDefault = {{ $canCreateDefault ? 'true' : 'false' }};
     const isInboundReturnFlow = defaultTypeFilter === 'return' && !!routeMap?.receipt;
+    const isOutboundReturnFlow = defaultTypeFilter === 'return' && !!routeMap?.picker;
 
     document.addEventListener('DOMContentLoaded', () => {
         const tableEl = $('#stock_flow_table');
@@ -268,25 +269,28 @@
         const validateUniqueItems = () => {
             if (!itemsContainer) return true;
             const rows = Array.from(itemsContainer.querySelectorAll('.flow-item-row'));
+            const rowKey = (row) => {
+                const item = row.querySelector('.flow-item-select')?.value || '';
+                if (!item) return '';
+                const src = row.querySelector('select[data-name="stock_source"]')?.value || 'regular';
+                return `${item}|${src}`;
+            };
             const counts = {};
             rows.forEach((row) => {
-                const selectEl = row.querySelector('.flow-item-select');
-                const val = selectEl?.value;
-                if (val) {
-                    counts[val] = (counts[val] || 0) + 1;
-                }
+                const key = rowKey(row);
+                if (key) counts[key] = (counts[key] || 0) + 1;
             });
             let hasDuplicate = false;
             rows.forEach((row) => {
                 const selectEl = row.querySelector('.flow-item-select');
-                const val = selectEl?.value;
+                const key = rowKey(row);
                 const errEl = row.querySelector('[data-error-for="item_id"]');
-                if (selectEl && val && counts[val] > 1) {
+                if (selectEl && key && counts[key] > 1) {
                     hasDuplicate = true;
-                    if (errEl) errEl.textContent = 'Item tidak boleh duplikat';
+                    if (errEl) errEl.textContent = 'Item dengan sumber yang sama tidak boleh duplikat';
                     selectEl.classList.add('is-invalid');
                 } else {
-                    if (errEl && errEl.textContent === 'Item tidak boleh duplikat') {
+                    if (errEl && (errEl.textContent === 'Item tidak boleh duplikat' || errEl.textContent === 'Item dengan sumber yang sama tidak boleh duplikat')) {
                         errEl.textContent = '';
                     }
                     selectEl?.classList.remove('is-invalid');
@@ -363,6 +367,35 @@
                 <div class="col-md-1 text-end">
                     <button type="button" class="btn btn-light btn-sm btn-remove-item">Hapus</button>
                 </div>
+            ` : (isOutboundReturnFlow ? `
+                <div class="col-md-4">
+                    <label class="required fs-6 fw-bold form-label mb-2">Item</label>
+                    <select class="form-select form-select-solid flow-item-select" data-name="item_id" required>
+                        <option value=""></option>
+                        ${itemOptionsHtml}
+                    </select>
+                    <div class="invalid-feedback" data-error-for="item_id"></div>
+                </div>
+                <div class="col-md-2">
+                    <label class="required fs-6 fw-bold form-label mb-2">Sumber</label>
+                    <select class="form-select form-select-solid" data-name="stock_source">
+                        <option value="regular">Gudang Reguler</option>
+                        <option value="damaged">Gudang Rusak</option>
+                    </select>
+                    <div class="invalid-feedback" data-error-for="stock_source"></div>
+                </div>
+                <div class="col-md-2">
+                    <label class="required fs-6 fw-bold form-label mb-2">Qty</label>
+                    <input type="number" min="1" class="form-control form-control-solid" data-name="qty" required />
+                    <div class="invalid-feedback" data-error-for="qty"></div>
+                </div>
+                <div class="col-md-3">
+                    <label class="fs-6 fw-bold form-label mb-2">Catatan Item</label>
+                    <input type="text" class="form-control form-control-solid" data-name="note" />
+                </div>
+                <div class="col-md-1 text-end">
+                    <button type="button" class="btn btn-light btn-sm btn-remove-item">Hapus</button>
+                </div>
             ` : `
                 <div class="col-md-6">
                     <label class="required fs-6 fw-bold form-label mb-2">Item</label>
@@ -384,7 +417,7 @@
                 <div class="col-md-1 text-end">
                     <button type="button" class="btn btn-light btn-sm btn-remove-item">Hapus</button>
                 </div>
-            `;
+            `);
             itemsContainer.appendChild(row);
 
             const selectEl = row.querySelector('.flow-item-select');
@@ -401,6 +434,8 @@
             if (qtyDamagedEl) qtyDamagedEl.value = data.qty_damaged ?? data.qty ?? 0;
             const noteEl = row.querySelector('input[data-name="note"]');
             if (noteEl) noteEl.value = data.note ?? '';
+            const stockSourceEl = row.querySelector('select[data-name="stock_source"]');
+            if (stockSourceEl) stockSourceEl.value = data.stock_source ?? 'regular';
 
             initSelect2(selectEl);
             renumberRows();
@@ -432,7 +467,7 @@
         }
 
         itemsContainer?.addEventListener('change', (e) => {
-            if (e.target.matches('.flow-item-select')) {
+            if (e.target.matches('.flow-item-select') || e.target.matches('select[data-name="stock_source"]')) {
                 validateUniqueItems();
             }
         });

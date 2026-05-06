@@ -161,6 +161,7 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         Route::get('/item-stocks', [ItemStockController::class, 'index'])->name('item-stocks.index');
         Route::get('/item-stocks/data', [ItemStockController::class, 'data'])->name('item-stocks.data');
         Route::get('/item-stocks/export', [ItemStockController::class, 'export'])->name('item-stocks.export');
+        Route::get('/item-stocks/{id}', [ItemStockController::class, 'show'])->name('item-stocks.show');
 
         // Stock Mutations
         Route::get('/stock-mutations', [StockMutationController::class, 'index'])->name('stock-mutations.index');
@@ -273,6 +274,8 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         Route::delete('/manuals/{id}', [OutboundController::class, 'manualsDestroy'])->name('manuals.destroy');
         Route::get('/manuals/{id}/detail', [OutboundController::class, 'manualsDetail'])->name('manuals.detail');
         Route::post('/manuals/{id}/approve', [OutboundController::class, 'manualsApprove'])->name('manuals.approve');
+        Route::post('/manuals/{id}/surat-jalan', [OutboundController::class, 'manualsGenerateSuratJalan'])->name('manuals.surat-jalan.generate');
+        Route::get('/manuals/{id}/surat-jalan', [OutboundController::class, 'manualsViewSuratJalan'])->name('manuals.surat-jalan');
 
         Route::get('/returns', [OutboundController::class, 'returns'])->name('returns.index');
         Route::get('/returns/data', [OutboundController::class, 'returnsData'])->name('returns.data');

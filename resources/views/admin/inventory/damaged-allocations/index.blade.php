@@ -67,7 +67,7 @@
                                 <option value="">Pilih alokasi</option>
                                 <option value="dispose">Dimusnahkan</option>
                                 <option value="repair">Diperbaiki</option>
-                                <option value="return_vendor">Dikembalikan ke Vendor</option>
+                                <option value="return_vendor">Dikembalikan ke Gudang Besar</option>
                                 <option value="other">Lainnya</option>
                             </select>
                             <div class="invalid-feedback" id="error_allocation_type"></div>

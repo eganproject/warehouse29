@@ -40,4 +40,9 @@ class OutboundTransaction extends Model
     {
         return $this->belongsTo(User::class, 'approved_by');
     }
+
+    public function suratJalan()
+    {
+        return $this->hasOne(SuratJalan::class, 'outbound_transaction_id');
+    }
 }

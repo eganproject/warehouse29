@@ -31,6 +31,7 @@
                         <th>Nama</th>
                         <th>Tipe</th>
                         <th class="text-end">Stok</th>
+                        <th class="text-end">Aksi</th>
                     </tr>
                 </thead>
                 <tbody></tbody>
@@ -44,6 +45,7 @@
 <script>
     const dataUrl = '{{ route('admin.inventory.item-stocks.data') }}';
     const exportUrl = '{{ route('admin.inventory.item-stocks.export') }}';
+    const showUrlTpl = '{{ route('admin.inventory.item-stocks.show', ':id') }}';
 
     document.addEventListener('DOMContentLoaded', () => {
         const tableEl = $('#item_stocks_table');
@@ -77,6 +79,10 @@
                 { data: 'stock', className: 'text-end', render: (v, t, row) => row.is_bundle
                     ? `<span class="fw-bold">${v}</span> <span class="text-muted fs-8">virtual</span>`
                     : `<span class="fw-bold">${v}</span>` },
+                { data: 'id', orderable: false, searchable: false, className: 'text-end', render: (data) => {
+                    const url = showUrlTpl.replace(':id', data);
+                    return `<a href="${url}" class="btn btn-sm btn-light btn-active-light-primary">Detail</a>`;
+                }},
             ]
         });
 
