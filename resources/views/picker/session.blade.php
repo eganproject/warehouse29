@@ -3,6 +3,14 @@
 @section('title', 'QC Scan')
 
 @section('content')
+    @include('picker.qc-scan-resi-mobile')
+@endsection
+
+{{-- Legacy draft-session QC mobile view disabled; active flow is included above.
+
+@section('title', 'QC Scan')
+
+@section('content')
 <style>
     .address-line {
         display: flex;
@@ -1023,3 +1031,4 @@
     renderSession();
 </script>
 @endsection
+--}}

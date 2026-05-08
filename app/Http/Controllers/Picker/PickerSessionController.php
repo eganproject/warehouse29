@@ -36,6 +36,11 @@ class PickerSessionController extends Controller
                 'searchItems' => route('picker.items.search'),
                 'scanItem' => route('picker.scan-item'),
                 'logout' => route('logout'),
+                'qcCurrent' => route('qc.current'),
+                'qcStart' => route('qc.start'),
+                'qcScanItem' => route('qc.scan-item'),
+                'qcResiLookup' => route('qc.resi-lookup'),
+                'qcResiRecord' => route('qc.resi-record'),
             ],
         ]);
     }
