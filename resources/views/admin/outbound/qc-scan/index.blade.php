@@ -37,6 +37,34 @@
     .qc-status.warn { background: #fffbeb; border-color: #fde68a; }
     .qc-status.warn .dot { background: #f59e0b; }
 
+    .qc-live-status {
+        min-height: 72px;
+        padding: 14px 18px;
+        border-width: 2px;
+    }
+    .qc-live-status .dot {
+        width: 13px;
+        height: 13px;
+    }
+    .qc-live-status .msg {
+        font-size: 16px;
+        font-weight: 700;
+    }
+
+    .qc-scan-workspace {
+        max-width: 1680px;
+        margin: 0 auto;
+    }
+
+    .qc-scan-card {
+        border: 2px solid #dbeafe;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+    }
+
+    .qc-scan-card .card-header {
+        min-height: auto;
+    }
+
     /* ── Step badge ── */
     .step-badge {
         display: inline-flex;
@@ -84,6 +112,9 @@
         list-style: none;
         padding: 0;
         margin: 0;
+        max-height: 360px;
+        overflow: auto;
+        padding-right: 4px;
     }
     .qc-checklist-item {
         display: flex;
@@ -97,6 +128,7 @@
     .qc-checklist-item.pending { background: #fff; border: 1px solid #e5e7eb; margin-bottom: 4px; }
     .qc-checklist-item.scanned { background: #f0fdf4; border: 1px solid #bbf7d0; margin-bottom: 4px; opacity: 0.85; }
     .qc-checklist-item.active  { background: #eff6ff; border: 1.5px solid #93c5fd; margin-bottom: 4px; }
+    .qc-checklist-item.next { background: #ecfeff; border: 1.5px solid #67e8f9; margin-bottom: 4px; }
     .qc-check-icon { font-size: 16px; flex: 0 0 auto; }
     .qc-sku-label { font-weight: 700; font-size: 13px; min-width: 90px; }
     .qc-sku-name  { font-size: 12px; color: #64748b; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -115,9 +147,9 @@
 
     /* ── Input large ── */
     .qc-input-lg {
-        font-size: 18px;
+        font-size: 22px;
         letter-spacing: 0.5px;
-        height: 54px;
+        height: 62px;
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
     }
     .qc-input-md { height: 50px; font-size: 16px; }
@@ -151,18 +183,124 @@
         text-align: center;
     }
 
+    .qc-next-box {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        background: #0f172a;
+        color: #fff;
+        border-radius: 12px;
+        padding: 14px 16px;
+        margin-bottom: 16px;
+    }
+
+    .qc-next-box .label {
+        color: #94a3b8;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+    }
+
+    .qc-next-box .sku {
+        font-size: 20px;
+        font-weight: 800;
+        line-height: 1.1;
+    }
+
+    .qc-next-box .name {
+        color: #cbd5e1;
+        font-size: 12px;
+        margin-top: 3px;
+        max-width: 420px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .qc-next-box .qty {
+        text-align: right;
+        font-size: 24px;
+        font-weight: 800;
+        white-space: nowrap;
+    }
+
+    .qc-operator-hint {
+        background: #f8fafc;
+        border: 1px dashed #cbd5e1;
+        border-radius: 12px;
+        padding: 10px 12px;
+        color: #64748b;
+        font-size: 12px;
+    }
+
+    .swal2-popup.qc-scan-toast {
+        width: 420px !important;
+        padding: 14px 16px !important;
+        border-radius: 12px !important;
+        box-shadow: 0 14px 36px rgba(15, 23, 42, 0.18) !important;
+    }
+
+    .swal2-popup.qc-scan-toast .swal2-title {
+        font-size: 15px !important;
+        line-height: 1.35 !important;
+        text-align: left !important;
+    }
+
+    .swal2-popup.qc-scan-toast .swal2-html-container {
+        margin: 6px 0 0 !important;
+        color: #475569 !important;
+        font-size: 12px !important;
+        line-height: 1.45 !important;
+        text-align: left !important;
+    }
+
+    .qc-toast-code {
+        display: inline-block;
+        margin-bottom: 4px;
+        padding: 2px 6px;
+        border-radius: 6px;
+        background: #f1f5f9;
+        color: #0f172a;
+        font-weight: 800;
+    }
+
+    .qc-toast-action {
+        display: block;
+        margin-top: 4px;
+        color: #0f172a;
+        font-weight: 700;
+    }
+
+    @media (min-width: 1400px) {
+        .qc-left-col { width: 42%; }
+        .qc-right-col { width: 58%; }
+    }
+
+    @media (max-width: 991.98px) {
+        .qc-next-box {
+            align-items: flex-start;
+            flex-direction: column;
+        }
+
+        .qc-next-box .qty {
+            text-align: left;
+            font-size: 20px;
+        }
+    }
+
     /* ── Phase visibility ── */
     #phase-scan-resi { display: block; }
     #phase-scan-sku  { display: none; }
 </style>
 
-<div class="row g-6">
+<div class="row g-6 qc-scan-workspace">
     {{-- ═══════════════ LEFT COLUMN ═══════════════ --}}
-    <div class="col-xl-5">
+    <div class="col-xl-5 qc-left-col">
 
         {{-- ─── PHASE 1: Scan Resi ─── --}}
         <div id="phase-scan-resi">
-            <div class="card">
+            <div class="card qc-scan-card">
                 <div class="card-header border-0 pt-6 pb-0">
                     <div class="card-title">
                         <div class="d-flex align-items-center gap-3">
@@ -205,14 +343,14 @@
                             autocomplete="off"
                             placeholder="Arahkan scanner ke barcode resi, lalu Enter"
                         />
-                        <div class="form-text">Pastikan cursor aktif di kolom ini saat mulai scan.</div>
+                        <div class="form-text">Scanner biasanya mengirim Enter otomatis. Halaman akan menjaga fokus ke kolom aktif.</div>
                     </div>
 
                     <button type="button" class="btn btn-primary w-100 fs-6 py-3 mb-4" id="resi_scan_btn">
                         <i class="fa-solid fa-barcode me-2"></i>Cari &amp; Muat Resi
                     </button>
 
-                    <div class="qc-status" id="resi_scan_status">
+                    <div class="qc-status qc-live-status" id="resi_scan_status">
                         <span class="dot"></span>
                         <div class="msg">Siap scan resi.</div>
                     </div>
@@ -282,6 +420,15 @@
             {{-- Progress --}}
             <div class="card mb-4">
                 <div class="card-body py-5 px-6">
+                    <div class="qc-next-box" id="qc_next_box">
+                        <div class="min-w-0">
+                            <div class="label">SKU Berikutnya</div>
+                            <div class="sku qc-mono" id="qc_next_sku">-</div>
+                            <div class="name" id="qc_next_name">Scan SKU yang masih belum lengkap.</div>
+                        </div>
+                        <div class="qty" id="qc_next_qty">0 / 0</div>
+                    </div>
+
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <div class="fw-bold fs-7" id="progress_text">0 / 0 SKU selesai</div>
                         <div class="fw-bold fs-7 text-primary" id="progress_pct">0%</div>
@@ -292,9 +439,9 @@
 
                     {{-- All-done banner (hidden by default) --}}
                     <div class="qc-alldone-banner d-none" id="alldone_banner">
-                        <div class="fs-3 mb-1">✅</div>
+                        <div class="fs-3 mb-1"><i class="fa-solid fa-circle-check text-success"></i></div>
                         <div class="fw-bold text-success fs-6">Semua SKU pada resi ini sudah selesai di-scan!</div>
-                        <div class="text-muted fs-8 mt-1">Kamu bisa langsung scan resi berikutnya.</div>
+                        <div class="text-muted fs-8 mt-1">Halaman akan kembali ke scan resi berikutnya otomatis.</div>
                     </div>
 
                     {{-- Checklist --}}
@@ -306,7 +453,7 @@
             </div>
 
             {{-- SKU Scan Form --}}
-            <div class="card" id="sku_scan_card">
+            <div class="card qc-scan-card" id="sku_scan_card">
                 <div class="card-header border-0 pt-5 pb-0">
                     <div class="card-title">
                         <div class="d-flex align-items-center gap-3">
@@ -351,12 +498,15 @@
                         </div>
                     </div>
 
-                    <div class="qc-status mb-5" id="sku_scan_status">
+                    <div class="qc-status qc-live-status mb-4" id="sku_scan_status">
                         <span class="dot"></span>
                         <div class="msg">Siap scan SKU.</div>
                     </div>
 
-                    <div class="separator my-5"></div>
+                    <div class="qc-operator-hint mb-4">
+                        <i class="fa-solid fa-keyboard me-1"></i>
+                        Tips cepat: scan resi, scan SKU satu per satu, lalu langsung lanjut ke resi berikutnya saat indikator selesai.
+                    </div>
 
                     <div class="d-flex flex-wrap gap-2">
                         <button type="button" class="btn btn-light" id="qc_btn_focus" title="Fokus ke input scanner">
@@ -376,7 +526,7 @@
     </div>
 
     {{-- ═══════════════ RIGHT COLUMN ═══════════════ --}}
-    <div class="col-xl-7">
+    <div class="col-xl-7 qc-right-col">
         <div class="card h-100">
             <div class="card-header border-0 pt-6">
                 <div class="card-title">
@@ -505,6 +655,7 @@
         resi: null,           // {id, id_pesanan, no_resi, tanggal_pesanan, kurir_name}
         checklist: [],        // [{sku, qty, scanned_qty}]
         itemNames: {},        // sku → name (fetched from session items)
+        completionTimer: null,
     };
 
     /* ─────────────── ELEMENT REFS ─────────────── */
@@ -533,6 +684,10 @@
         alldoneBanner: document.getElementById('alldone_banner'),
         checklistWrap: document.getElementById('checklist_wrap'),
         skuChecklist:  document.getElementById('sku_checklist'),
+        nextBox:       document.getElementById('qc_next_box'),
+        nextSku:       document.getElementById('qc_next_sku'),
+        nextName:      document.getElementById('qc_next_name'),
+        nextQty:       document.getElementById('qc_next_qty'),
 
         // Step 2
         skuCode:    document.getElementById('sku_code'),
@@ -623,6 +778,20 @@
         if (el.resiCode) { el.resiCode.focus(); el.resiCode.select?.(); }
     }
 
+    function activeScanInput() {
+        return state.phase === 'scan-sku' ? el.skuCode : el.resiCode;
+    }
+
+    function refocusActiveScanner() {
+        if (state.busy) return;
+        const input = activeScanInput();
+        if (!input) return;
+        const active = document.activeElement;
+        if (active !== input && !active?.closest?.('.modal')) {
+            input.focus();
+        }
+    }
+
     function makeRequestId() {
         if (window.crypto?.randomUUID) {
             return window.crypto.randomUUID();
@@ -652,14 +821,21 @@
 
     /* ─────────────── PHASE SWITCHING ─────────────── */
     function goToPhase(phase) {
+        if (state.completionTimer) {
+            clearTimeout(state.completionTimer);
+            state.completionTimer = null;
+        }
         state.phase = phase;
         el.phaseScanResi.style.display = phase === 'scan-resi' ? 'block' : 'none';
         el.phaseScanSku.style.display  = phase === 'scan-sku'  ? 'block' : 'none';
         if (phase === 'scan-resi') {
             setStatus(el.resiStatus, 'Siap scan resi.');
             if (el.resiCode) el.resiCode.value = '';
+            if (el.skuCode) el.skuCode.value = '';
+            if (el.skuQty) el.skuQty.value = '1';
             setTimeout(focusResi, 50);
         } else {
+            if (el.skuHint) el.skuHint.textContent = 'Scan 1 item fisik per kali scan. Qty default: 1.';
             setTimeout(focusSku, 50);
         }
     }
@@ -672,6 +848,29 @@
         return { total, done, pct };
     }
 
+    function nextChecklistItem() {
+        return state.checklist.find(i => Number(i.scanned_qty || 0) < Number(i.qty || 0)) || null;
+    }
+
+    function updateNextBox() {
+        const next = nextChecklistItem();
+        if (!el.nextBox) return;
+
+        if (!next) {
+            el.nextSku.textContent = 'SELESAI';
+            el.nextName.textContent = 'Semua SKU pada resi ini sudah lengkap.';
+            el.nextQty.textContent = '';
+            return;
+        }
+
+        const scanned = Number(next.scanned_qty || 0);
+        const required = Number(next.qty || 0);
+        const remaining = Math.max(0, required - scanned);
+        el.nextSku.textContent = next.sku || '-';
+        el.nextName.textContent = state.itemNames[next.sku?.toLowerCase?.() || ''] || 'Scan SKU ini atau SKU lain yang ada dalam daftar.';
+        el.nextQty.textContent = `${scanned} / ${required} | sisa ${remaining}`;
+    }
+
     function renderChecklist() {
         if (!el.skuChecklist) return;
         const items = state.checklist;
@@ -680,8 +879,9 @@
         el.skuChecklist.innerHTML = items.map(item => {
             const isDone    = item.scanned_qty >= item.qty;
             const isPartial = item.scanned_qty > 0 && !isDone;
-            const cls       = isDone ? 'scanned' : 'pending';
-            const icon      = isDone ? '✅' : '⬜';
+            const next      = nextChecklistItem();
+            const cls       = isDone ? 'scanned' : (next && next.sku === item.sku ? 'next' : 'pending');
+            const icon      = isDone ? '<i class="fa-solid fa-circle-check text-success"></i>' : (next && next.sku === item.sku ? '<i class="fa-solid fa-location-dot text-info"></i>' : '<i class="fa-regular fa-circle text-gray-400"></i>');
             const badgeCls  = isDone ? 'done' : 'pending';
             const qtyLabel  = isDone
                 ? `${item.qty} / ${item.qty}`
@@ -708,6 +908,7 @@
         const allDone = total > 0 && done === total;
         if (el.alldoneBanner) el.alldoneBanner.classList.toggle('d-none', !allDone);
         if (el.checklistWrap) el.checklistWrap.classList.toggle('d-none', allDone);
+        updateNextBox();
         renderChecklist();
     }
 
@@ -934,8 +1135,13 @@
             renderSession();
             return !!(state.session?.status === 'active');
         } catch (e) {
-            setStatus(el.skuStatus, e.message || 'Gagal memuat scan QC hari ini.', 'err');
-            window.AppSwal?.error?.(e.message);
+            notifyScanIssue({
+                target: el.skuStatus,
+                title: 'Gagal Memuat QC',
+                detail: e.message || 'Gagal memuat scan QC hari ini.',
+                action: 'Coba muat ulang, lalu scan lagi.',
+                timer: 4500,
+            });
             return false;
         } finally {
             setBusy(false);
@@ -949,7 +1155,14 @@
         const code = (el.resiCode?.value || '').trim();
 
         if (!code) {
-            setStatus(el.resiStatus, 'Kode resi tidak boleh kosong.', 'warn');
+            notifyScanIssue({
+                target: el.resiStatus,
+                icon: 'warning',
+                title: 'Resi Kosong',
+                detail: 'Scanner belum mengirim kode resi atau ID pesanan.',
+                action: 'Arahkan scanner ke barcode resi, lalu scan ulang.',
+                timer: 3000,
+            });
             focusResi();
             return;
         }
@@ -985,23 +1198,19 @@
             // Handle resi yang sudah pernah di-scan
             if (json.already_scanned) {
                 if (json.is_complete) {
-                    // Resi SELESAI - tolak, tidak bisa scan ulang
                     beep('err');
-                    if (window.Swal) {
-                        await window.Swal.fire({
-                            icon: 'error',
-                            title: 'Resi Sudah Selesai Di-QC',
-                            html: `Resi <strong class="font-monospace">${esc(state.resi.no_resi || code)}</strong> sudah selesai di-QC.<br><br>
-                                <span class="text-muted fs-7">Semua SKU telah terverifikasi secara fisik. Tidak perlu scan ulang.</span>`,
-                            confirmButtonText: 'OK',
-                            buttonsStyling: false,
-                            customClass: { confirmButton: 'btn btn-danger' },
-                        });
-                    }
                     state.resi      = null;
                     state.checklist = [];
                     if (el.resiCode) el.resiCode.value = '';
-                    setStatus(el.resiStatus, 'Resi sudah selesai di-scan. Silakan scan resi lain.', 'warn');
+                    notifyScanIssue({
+                        target: el.resiStatus,
+                        icon: 'warning',
+                        title: 'Resi Sudah Selesai',
+                        code: state.resi?.no_resi || code,
+                        detail: 'Semua SKU pada resi ini sudah lengkap.',
+                        action: 'Tidak perlu scan ulang. Lanjut scan resi lain.',
+                        timer: 4200,
+                    });
                     focusResi();
                     return;
                 }
@@ -1030,9 +1239,15 @@
                     : 'Resi dimuat. Scan SKU sesuai daftar di atas.',
                 'ok');
         } catch (e) {
-            setStatus(el.resiStatus, e.message || 'Resi tidak ditemukan.', 'err');
             beep('err');
-            window.AppSwal?.error?.(e.message || 'Resi tidak ditemukan.');
+            notifyScanIssue({
+                target: el.resiStatus,
+                title: 'Resi Gagal Dimuat',
+                code,
+                detail: e.message || 'Resi tidak ditemukan.',
+                action: 'Periksa barcode atau ganti tipe scan, lalu scan ulang.',
+                timer: 4800,
+            });
             focusResi();
         } finally {
             setBusy(false);
@@ -1051,6 +1266,33 @@
             timer,
             timerProgressBar: true,
             showConfirmButton: false,
+            returnFocus: false,
+        });
+    }
+
+    function notifyScanIssue({ target, icon = 'error', title, code = '', detail, action, timer = 3800 }) {
+        const statusType = icon === 'warning' ? 'warn' : 'err';
+        const shortCode = code ? ` [${code}]` : '';
+        setStatus(target, `${title}${shortCode}: ${detail}`, statusType);
+
+        if (!window.Swal) return;
+        window.Swal.fire({
+            icon,
+            title,
+            html: `
+                ${code ? `<span class="qc-toast-code qc-mono">${esc(code)}</span><br>` : ''}
+                <span>${esc(detail)}</span>
+                ${action ? `<span class="qc-toast-action">${esc(action)}</span>` : ''}
+            `,
+            toast: true,
+            position: 'top-end',
+            timer,
+            timerProgressBar: true,
+            showConfirmButton: false,
+            returnFocus: false,
+            customClass: { popup: 'qc-scan-toast' },
+            didOpen: () => setTimeout(refocusActiveScanner, 20),
+            didClose: () => setTimeout(refocusActiveScanner, 20),
         });
     }
 
@@ -1061,7 +1303,14 @@
         let qty    = Math.max(1, parseInt(el.skuQty?.value || '1', 10) || 1);
 
         if (!code) {
-            setStatus(el.skuStatus, 'Kode SKU kosong. Scan ulang.', 'warn');
+            notifyScanIssue({
+                target: el.skuStatus,
+                icon: 'warning',
+                title: 'SKU Kosong',
+                detail: 'Scanner belum mengirim kode SKU.',
+                action: 'Scan ulang item fisik yang sedang dipegang.',
+                timer: 2600,
+            });
             focusSku();
             return;
         }
@@ -1069,32 +1318,33 @@
         // ── Validasi 1: SKU harus ada di checklist resi ──
         const checkItem = state.checklist.find(i => i.sku.toLowerCase() === code.toLowerCase());
         if (!checkItem) {
-            const msg = `SKU "${code}" tidak ada dalam resi ini. Pastikan barang sesuai dengan resi yang di-scan.`;
-            setStatus(el.skuStatus, msg, 'err');
             beep('err');
-            if (window.Swal) {
-                window.Swal.fire({
-                    icon: 'error',
-                    title: 'SKU Tidak Sesuai Resi',
-                    html: `SKU <strong class="font-monospace">${esc(code)}</strong> tidak ada dalam resi <strong>${esc(state.resi?.no_resi || '-')}</strong>.<br><br>
-                        <span class="text-muted fs-7">Pastikan barang yang di-scan sesuai dengan resi yang dimuat.</span>`,
-                    confirmButtonText: 'Mengerti',
-                    buttonsStyling: false,
-                    customClass: { confirmButton: 'btn btn-danger' },
-                });
-            }
             if (el.skuCode) el.skuCode.value = '';
+            notifyScanIssue({
+                target: el.skuStatus,
+                title: 'SKU Tidak Sesuai Resi',
+                code,
+                detail: `SKU ini tidak ada dalam resi ${state.resi?.no_resi || '-'}.`,
+                action: 'Pisahkan barang ini, lalu scan SKU yang sesuai daftar.',
+                timer: 5200,
+            });
             focusSku();
             return;
         }
 
         // ── Validasi 2: SKU sudah selesai di-scan ──
         if (checkItem.scanned_qty >= checkItem.qty) {
-            const msg = `SKU "${code}" sudah selesai di-scan (${checkItem.qty} dari ${checkItem.qty} qty).`;
-            setStatus(el.skuStatus, msg, 'warn');
             beep('err');
-            swalToast('warning', 'SKU Sudah Selesai', msg, 3000);
             if (el.skuCode) el.skuCode.value = '';
+            notifyScanIssue({
+                target: el.skuStatus,
+                icon: 'warning',
+                title: 'SKU Sudah Lengkap',
+                code,
+                detail: `Qty SKU ini sudah terpenuhi (${checkItem.qty}/${checkItem.qty}).`,
+                action: 'Jangan scan ulang. Lanjut ke SKU lain yang belum lengkap.',
+                timer: 4200,
+            });
             focusSku();
             return;
         }
@@ -1104,7 +1354,15 @@
         if (qty > remaining) {
             qty = remaining;
             if (el.skuQty) el.skuQty.value = String(qty);
-            setStatus(el.skuStatus, `Qty disesuaikan ke ${qty} — hanya ${remaining} lagi dibutuhkan untuk SKU ini.`, 'warn');
+            notifyScanIssue({
+                target: el.skuStatus,
+                icon: 'warning',
+                title: 'Qty Disesuaikan',
+                code,
+                detail: `Qty scan melebihi sisa. Sistem pakai qty ${qty} karena sisa SKU ini ${remaining}.`,
+                action: 'Lanjut scan. Tidak perlu input ulang.',
+                timer: 3600,
+            });
         }
 
         // ── Pastikan ringkasan scan hari ini termuat ──
@@ -1140,36 +1398,18 @@
             if (skuSelesai) {
                 // ── Notifikasi: SKU selesai ──
                 const doneMsg = `SKU "${code}" sudah selesai di-scan (${checkItem.qty} dari ${checkItem.qty} qty).`;
-                setStatus(el.skuStatus, `✅ ${doneMsg}`, 'ok');
+                setStatus(el.skuStatus, doneMsg, 'ok');
                 beep('ok');
-                swalToast('success', 'SKU Selesai ✅', doneMsg, 3000);
+                swalToast('success', 'SKU Selesai', doneMsg, 2000);
 
                 // ── Notifikasi: Semua SKU di resi selesai ──
                 const { total, done } = checklistProgress();
                 if (total > 0 && done === total) {
-                    // Beri jeda agar toast "SKU selesai" sempat tampil dulu
-                    setTimeout(() => {
-                        if (!window.Swal) return;
-                        window.Swal.fire({
-                            icon: 'success',
-                            title: '🎉 Semua SKU Selesai!',
-                            html: `<div style="text-align:left;font-size:14px">
-                                Resi <strong class="font-monospace">${esc(state.resi?.no_resi || '-')}</strong> sudah selesai di-scan.<br>
-                                Semua <strong>${total}</strong> SKU telah diverifikasi secara fisik.<br><br>
-                                <span class="text-muted">Scan resi berikutnya jika masih ada paket QC.</span>
-                            </div>`,
-                            confirmButtonText: '🔄 Scan Resi Lain',
-                            showCancelButton: true,
-                            cancelButtonText: 'Tetap di Sini',
-                            buttonsStyling: false,
-                            customClass: {
-                                confirmButton: 'btn btn-primary me-2',
-                                cancelButton: 'btn btn-light',
-                            },
-                        }).then(result => {
-                            if (result.isConfirmed) goToPhase('scan-resi');
-                        });
-                    }, 600);
+                    setStatus(el.skuStatus, `Resi ${state.resi?.no_resi || '-'} selesai. Siapkan resi berikutnya.`, 'ok');
+                    swalToast('success', 'Resi Selesai', 'Halaman kembali ke scan resi berikutnya.', 2200);
+                    state.completionTimer = setTimeout(() => {
+                        goToPhase('scan-resi');
+                    }, 900);
                 }
             } else {
                 const msg = `OK: ${code} +${qty} ✓  (sisa perlu: ${sisaSetelahScan})`;
@@ -1180,18 +1420,16 @@
             if (el.skuCode) el.skuCode.value = '';
             if (el.skuQty)  el.skuQty.value  = '1';
         } catch (e) {
-            setStatus(el.skuStatus, e.message || 'Gagal memproses scan.', 'err');
             beep('err');
-            if (window.Swal) {
-                window.Swal.fire({
-                    icon: 'error',
-                    title: 'Scan Gagal',
-                    text: e.message || 'Gagal memproses scan.',
-                    confirmButtonText: 'OK',
-                    buttonsStyling: false,
-                    customClass: { confirmButton: 'btn btn-danger' },
-                });
-            }
+            if (el.skuCode) el.skuCode.value = '';
+            notifyScanIssue({
+                target: el.skuStatus,
+                title: 'Scan Gagal',
+                code,
+                detail: e.message || 'Gagal memproses scan.',
+                action: 'Data belum tercatat. Perbaiki penyebabnya, lalu scan ulang.',
+                timer: 5200,
+            });
         } finally {
             setBusy(false);
             focusSku();
@@ -1325,6 +1563,24 @@
             const btn = e.target.closest('.btn-qc-resi-history-detail');
             if (!btn) return;
             showResiHistoryDetail(btn.getAttribute('data-id'));
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey || e.altKey || e.metaKey || e.key.length !== 1) return;
+            const target = e.target;
+            if (target?.closest?.('input, textarea, select, button, a, [contenteditable="true"], .modal')) return;
+
+            const input = activeScanInput();
+            if (!input || state.busy) return;
+            input.focus();
+            input.value += e.key;
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            e.preventDefault();
+        });
+
+        document.addEventListener('click', (e) => {
+            if (e.target?.closest?.('input, textarea, select, button, a, .modal')) return;
+            setTimeout(refocusActiveScanner, 20);
         });
     });
 </script>
