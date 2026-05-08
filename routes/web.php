@@ -20,6 +20,7 @@ use App\Http\Controllers\Admin\PackerScanExceptionController;
 use App\Http\Controllers\Admin\PackerPackingReportController;
 use App\Http\Controllers\Admin\PackerReportController;
 use App\Http\Controllers\Admin\PackerScanOutHistoryController;
+use App\Http\Controllers\Admin\PackerScanOutInputController;
 use App\Http\Controllers\Admin\PickerReportController;
 use App\Http\Controllers\Admin\LowStockReportController;
 use App\Http\Controllers\Admin\ActivityLogController;
@@ -292,6 +293,8 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         Route::delete('/picker-sessions/{id}', [PickerHistoryController::class, 'destroy'])->name('picker-sessions.destroy');
 
         Route::get('/qc-scan', [QcScanInputController::class, 'index'])->name('qc-scan.index');
+        Route::get('/scan-out', [PackerScanOutInputController::class, 'index'])->name('scan-out.index');
+        Route::post('/scan-out/scan', [PackerScanOutController::class, 'scan'])->name('scan-out.scan');
 
         Route::get('/packer-history', [PackerHistoryController::class, 'index'])->name('packer-history.index');
         Route::get('/packer-history/data', [PackerHistoryController::class, 'data'])->name('packer-history.data');

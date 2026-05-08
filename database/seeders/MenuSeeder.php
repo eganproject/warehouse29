@@ -40,6 +40,7 @@ class MenuSeeder extends Seeder
             ['name' => 'Manual', 'slug' => 'outbound-manual', 'route' => 'admin.outbound.manuals.index', 'icon' => 'fa-solid fa-pen-to-square', 'parent_slug' => 'outbound', 'sort_order' => 11],
             ['name' => 'Retur', 'slug' => 'outbound-return', 'route' => 'admin.outbound.returns.index', 'icon' => 'fa-solid fa-rotate-left', 'parent_slug' => 'outbound', 'sort_order' => 12],
             ['name' => 'QC Scan Input', 'slug' => 'outbound-qc-scan', 'route' => 'admin.outbound.qc-scan.index', 'icon' => 'fa-solid fa-barcode', 'parent_slug' => 'outbound', 'sort_order' => 12.5],
+            ['name' => 'Scan Out Input', 'slug' => 'outbound-scan-out', 'route' => 'admin.outbound.scan-out.index', 'icon' => 'fa-solid fa-truck-ramp-box', 'parent_slug' => 'outbound', 'sort_order' => 12.7],
             ['name' => 'History QC Scan', 'slug' => 'outbound-picker-history', 'route' => 'admin.outbound.picker-sessions.index', 'icon' => 'fa-solid fa-clipboard-list', 'parent_slug' => 'outbound', 'sort_order' => 13],
             ['name' => 'History Packing (Legacy)', 'slug' => 'outbound-packer-history', 'route' => 'admin.outbound.packer-history.index', 'icon' => 'fa-solid fa-box-archive', 'parent_slug' => 'outbound', 'sort_order' => 13.5, 'is_active' => false],
             ['name' => 'History Scan Out', 'slug' => 'outbound-packer-scan-outs', 'route' => 'admin.outbound.packer-scan-outs.index', 'icon' => 'fa-solid fa-truck-ramp-box', 'parent_slug' => 'outbound', 'sort_order' => 13.7],
@@ -114,6 +115,25 @@ class MenuSeeder extends Seeder
             if ($qcScanMenu) {
                 DB::table('permission_menu')->updateOrInsert(
                     ['role_id' => $pickerRole->id, 'menu_id' => $qcScanMenu->id],
+                    [
+                        'can_view' => true,
+                        'can_create' => false,
+                        'can_update' => false,
+                        'can_delete' => false,
+                        'updated_at' => now(),
+                        'created_at' => now(),
+                    ]
+                );
+            }
+        }
+
+        // Allow scan out role to access Scan Out Input (admin desktop page) by default.
+        $scanOutRole = DB::table('roles')->where('slug', 'admin-scan')->first();
+        if ($scanOutRole) {
+            $scanOutMenu = DB::table('menus')->where('slug', 'outbound-scan-out')->first();
+            if ($scanOutMenu) {
+                DB::table('permission_menu')->updateOrInsert(
+                    ['role_id' => $scanOutRole->id, 'menu_id' => $scanOutMenu->id],
                     [
                         'can_view' => true,
                         'can_create' => false,
