@@ -15,6 +15,7 @@ use App\Models\Resi;
 use App\Models\ResiDetail;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 
 class PackerScanOutController extends Controller
 {
@@ -99,11 +100,22 @@ class PackerScanOutController extends Controller
 
     public function scan(Request $request)
     {
-        $validated = $request->validate([
+        $validator = Validator::make($request->all(), [
             'type' => ['required', 'in:id_pesanan,no_resi'],
             'code' => ['required', 'string'],
         ]);
 
+        if ($validator->fails()) {
+            $errors = $validator->errors()->toArray();
+            $first = collect($errors)->flatten()->first() ?: 'Data scan tidak valid.';
+
+            return response()->json([
+                'message' => $first,
+                'errors' => $errors,
+            ], 422);
+        }
+
+        $validated = $validator->validated();
         $type = $validated['type'];
         $code = trim((string) $validated['code']);
         if ($code === '') {

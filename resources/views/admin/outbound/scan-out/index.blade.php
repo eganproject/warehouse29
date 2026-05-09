@@ -378,6 +378,7 @@
             credentials: 'same-origin',
             headers: {
                 Accept: 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
                 'X-CSRF-TOKEN': csrf,
                 ...(options.headers || {}),
             },
@@ -386,6 +387,11 @@
         const text = await response.text();
         let json = null;
         try { json = JSON.parse(text); } catch {}
+        if (response.redirected || (!json && response.ok)) {
+            const error = new Error('Request scan out dialihkan. Tetap di halaman scan out dan silakan scan ulang.');
+            error.status = response.status;
+            throw error;
+        }
         if (!response.ok) {
             let message = json?.message || 'Terjadi kesalahan.';
             if (json?.errors) {

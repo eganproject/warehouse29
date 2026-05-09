@@ -340,6 +340,7 @@
             credentials: 'same-origin',
             headers: {
                 'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
                 'X-CSRF-TOKEN': csrfToken,
                 ...(options.headers || {}),
             },
@@ -349,6 +350,11 @@
         const text = await res.text();
         let json = null;
         try { json = JSON.parse(text); } catch (err) { json = null; }
+        if (res.redirected || (!json && res.ok)) {
+            const error = new Error('Request scan out dialihkan. Tetap di halaman scan out dan silakan scan ulang.');
+            error.status = res.status;
+            throw error;
+        }
 
         if (!res.ok) {
             const error = new Error(buildErrorMessage(res, json));
