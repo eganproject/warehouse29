@@ -321,6 +321,7 @@
         busy: false,
         successCount: 0,
         failedCount: 0,
+        lastValidationErrorAt: 0,
     };
 
     const el = {
@@ -359,6 +360,18 @@
         state.busy = !!busy;
         if (el.scanBtn) el.scanBtn.disabled = state.busy;
         if (el.scanCode) el.scanCode.disabled = state.busy;
+    }
+
+    function isScanOutRedirectUrl(url) {
+        try {
+            const parsed = new URL(url, window.location.origin);
+            return parsed.pathname === '/dashboard'
+                || parsed.pathname === '/admin'
+                || parsed.pathname === '/admin/dashboard'
+                || parsed.pathname === '/mobile/dashboard';
+        } catch {
+            return false;
+        }
     }
 
     function focusScan() {
@@ -560,6 +573,7 @@
             renderIssues(error.message || 'Gagal memproses scan out.', error.details || []);
             setStatus(`${error.message || 'Gagal memproses scan out.'} [${code}]`, 'err');
             toast('error', 'Scan Out Gagal', error.message || 'Gagal memproses scan out.', code, 'Data belum tercatat. Perbaiki penyebabnya, lalu scan ulang.', 5200);
+            state.lastValidationErrorAt = Date.now();
             await beep('err');
             el.scanCode.value = '';
         } finally {
@@ -627,6 +641,21 @@
             if (event.target?.closest?.('input, textarea, select, button, a, .modal')) return;
             setTimeout(focusScan, 20);
         });
+
+        document.addEventListener('submit', event => {
+            if (event.target?.closest?.('.modal')) return;
+            event.preventDefault();
+            focusScan();
+        }, true);
+
+        document.addEventListener('click', event => {
+            const link = event.target?.closest?.('a[href]');
+            if (!link) return;
+            if (Date.now() - state.lastValidationErrorAt > 6000) return;
+            if (!isScanOutRedirectUrl(link.href)) return;
+            event.preventDefault();
+            focusScan();
+        }, true);
     });
 </script>
 @endpush

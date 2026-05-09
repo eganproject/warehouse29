@@ -70,6 +70,12 @@ class RestrictPickerAccess
             }
         }
 
+        if ($isAdminScanOutRoute || $isAdminScanOutHistoryDataRoute) {
+            return response()->json([
+                'message' => 'Akses scan out desktop tidak valid. Tetap di halaman scan out.',
+            ], 403);
+        }
+
         if ($request->expectsJson()) {
             return response()->json([
                 'message' => 'Akses dibatasi untuk role picker',
