@@ -144,7 +144,9 @@ class InboundController extends Controller
                     'note' => $group['note'] ?? null,
                     'transacted_at' => $transactedAt,
                     'created_by' => auth()->id(),
-                    'status' => 'pending',
+                    'status' => 'approved',
+                    'approved_at' => now(),
+                    'approved_by' => auth()->id(),
                 ]);
                 $createdTx++;
 
@@ -166,7 +168,7 @@ class InboundController extends Controller
             DB::commit();
 
             return response()->json([
-                'message' => 'Import retur inbound berhasil',
+                'message' => 'Import retur inbound berhasil masuk Gudang Retur',
                 'transactions' => $createdTx,
                 'items' => $createdItems,
             ]);
@@ -465,6 +467,9 @@ class InboundController extends Controller
 
         $code = $this->generateCode($prefix);
         $transactedAt = $validated['transacted_at'] ?? now();
+        $status = $type === 'return' ? 'approved' : 'pending';
+        $approvedAt = $type === 'return' ? now() : null;
+        $approvedBy = $type === 'return' ? auth()->id() : null;
 
         DB::beginTransaction();
         try {
@@ -475,7 +480,9 @@ class InboundController extends Controller
                 'note' => $validated['note'] ?? null,
                 'transacted_at' => $transactedAt,
                 'created_by' => auth()->id(),
-                'status' => 'pending',
+                'status' => $status,
+                'approved_at' => $approvedAt,
+                'approved_by' => $approvedBy,
             ]);
 
             foreach ($validated['items'] as $row) {
@@ -504,7 +511,9 @@ class InboundController extends Controller
         }
 
         return response()->json([
-            'message' => 'Inbound berhasil disimpan',
+            'message' => $type === 'return'
+                ? 'Retur berhasil masuk Gudang Retur. Lakukan finalisasi untuk distribusi stok.'
+                : 'Inbound berhasil disimpan',
         ]);
     }
 

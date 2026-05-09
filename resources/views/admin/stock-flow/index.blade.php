@@ -568,10 +568,10 @@
                     const isApproved = row?.status === 'approved';
                     const isFinalized = row?.status === 'finalized';
                     const canFinalizeReturn = isInboundReturnFlow && rowType === 'return' && isApproved && perms.update;
+                    const canApprove = !(isInboundReturnFlow && rowType === 'return') && !isApproved && !isFinalized && perms.update;
                     const detailItem = `<div class="menu-item px-3"><a href="${resolveRoute(rowType, 'detail').replace(':id', data)}" class="menu-link px-3">Detail</a></div>`;
-                    const approveLabel = isInboundReturnFlow && rowType === 'return' ? 'Masuk Gudang Retur' : 'Approve';
-                    const approveItem = (!isApproved && !isFinalized && perms.update)
-                        ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 text-success btn-approve" data-id="${data}" data-type="${rowType}">${approveLabel}</a></div>`
+                    const approveItem = canApprove
+                        ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 text-success btn-approve" data-id="${data}" data-type="${rowType}">Approve</a></div>`
                         : '';
                     const finalizeItem = canFinalizeReturn
                         ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 text-primary btn-finalize" data-id="${data}" data-type="${rowType}">Finalisasi</a></div>`

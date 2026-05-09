@@ -42,7 +42,7 @@ class InboundReturnFinalizationTest extends TestCase
             ->assertJsonValidationErrors(['items.0.qty_received']);
     }
 
-    public function test_inbound_return_approval_holds_stock_in_return_warehouse_until_finalized(): void
+    public function test_inbound_return_creation_holds_stock_in_return_warehouse_until_finalized(): void
     {
         $user = User::create([
             'name' => 'Admin',
@@ -66,17 +66,14 @@ class InboundReturnFinalizationTest extends TestCase
                     ],
                 ],
             ])
-            ->assertOk();
-
-        $tx = InboundTransaction::where('type', 'return')->firstOrFail();
-
-        $this->actingAs($user)
-            ->postJson(route('admin.inbound.returns.approve', $tx->id))
             ->assertOk()
             ->assertJsonPath('message', 'Retur berhasil masuk Gudang Retur. Lakukan finalisasi untuk distribusi stok.');
 
+        $tx = InboundTransaction::where('type', 'return')->firstOrFail();
+
         $tx->refresh();
         $this->assertSame('approved', $tx->status);
+        $this->assertNotNull($tx->approved_at);
         $this->assertNull($tx->finalized_at);
         $this->assertNull(ItemStock::where('item_id', $item->id)->value('stock'));
         $this->assertNull(DamagedItemStock::where('item_id', $item->id)->value('stock'));

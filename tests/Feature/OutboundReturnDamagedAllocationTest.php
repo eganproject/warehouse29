@@ -47,20 +47,16 @@ class OutboundReturnDamagedAllocationTest extends TestCase
 
         $this->actingAs($user)
             ->postJson(route('admin.inventory.damaged-allocations.approve', $allocation->id))
-            ->assertOk();
+            ->assertOk()
+            ->assertJsonPath('message', 'Alokasi barang rusak berhasil disetujui dan retur outbound berhasil dibuat serta disetujui');
 
         $allocation->refresh();
         $outbound = OutboundTransaction::with('items')->findOrFail($allocation->outbound_transaction_id);
         $this->assertSame('return', $outbound->type);
-        $this->assertSame('pending', $outbound->status);
+        $this->assertSame('approved', $outbound->status);
+        $this->assertNotNull($outbound->approved_at);
         $this->assertSame($allocation->code, $outbound->ref_no);
         $this->assertSame('damaged', $outbound->items->first()->stock_source);
-        $this->assertSame(5, DamagedItemStock::where('item_id', $item->id)->value('stock'));
-
-        $this->actingAs($user)
-            ->postJson(route('admin.outbound.returns.approve', $outbound->id))
-            ->assertOk();
-
         $this->assertSame(3, DamagedItemStock::where('item_id', $item->id)->value('stock'));
         $this->assertSame(0, DamagedItemStock::where('item_id', $item->id)->value('reserved_stock'));
     }

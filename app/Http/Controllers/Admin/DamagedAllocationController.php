@@ -294,7 +294,7 @@ class DamagedAllocationController extends Controller
 
         return response()->json([
             'message' => 'Alokasi barang rusak berhasil disetujui'
-                .($allocation->allocation_type === 'return_vendor' ? ' dan retur outbound berhasil dibuat' : ''),
+                .($allocation->allocation_type === 'return_vendor' ? ' dan retur outbound berhasil dibuat serta disetujui' : ''),
         ]);
     }
 
@@ -311,6 +311,7 @@ class DamagedAllocationController extends Controller
         if ($existing) {
             $allocation->outbound_transaction_id = $existing->id;
             $allocation->save();
+            $this->approveOutboundReturnForAllocation($existing);
             return $existing;
         }
 
@@ -337,7 +338,37 @@ class DamagedAllocationController extends Controller
         $allocation->outbound_transaction_id = $tx->id;
         $allocation->save();
 
+        $this->approveOutboundReturnForAllocation($tx);
+
         return $tx;
+    }
+
+    private function approveOutboundReturnForAllocation(OutboundTransaction $tx): void
+    {
+        $tx->loadMissing('items');
+
+        foreach ($tx->items as $row) {
+            DamagedStockService::mutate([
+                'item_id' => $row->item_id,
+                'direction' => 'out',
+                'qty' => $row->qty,
+                'source_type' => 'outbound',
+                'source_subtype' => 'return',
+                'source_id' => $tx->id,
+                'source_code' => $tx->code,
+                'note' => $row->note ?? null,
+                'occurred_at' => $tx->transacted_at ?? now(),
+                'created_by' => auth()->id(),
+                'idempotency_key' => DamagedStockService::idempotencyKey(['stock', 'outbound', 'return', 'damaged', $tx->id, $row->item_id]),
+            ]);
+        }
+
+        if (($tx->status ?? 'pending') !== 'approved') {
+            $tx->status = 'approved';
+            $tx->approved_at = now();
+            $tx->approved_by = auth()->id();
+            $tx->save();
+        }
     }
 
     private function validatePayload(Request $request): array
