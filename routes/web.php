@@ -294,6 +294,7 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
 
         Route::get('/qc-scan', [QcScanInputController::class, 'index'])->name('qc-scan.index');
         Route::get('/scan-out', [PackerScanOutInputController::class, 'index'])->name('scan-out.index');
+        Route::get('/scan-out/csrf-token', [PackerScanOutInputController::class, 'csrfToken'])->name('scan-out.csrf-token');
         Route::post('/scan-out/scan', [PackerScanOutController::class, 'scan'])->name('scan-out.scan');
 
         Route::get('/packer-history', [PackerHistoryController::class, 'index'])->name('packer-history.index');

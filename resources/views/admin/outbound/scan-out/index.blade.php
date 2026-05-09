@@ -314,7 +314,7 @@
 @push('scripts')
 <script>
     const routes = @json($routes);
-    const csrf = '{{ csrf_token() }}';
+    let csrf = '{{ csrf_token() }}';
     const todayStr = '{{ $today }}';
 
     const state = {
@@ -386,17 +386,54 @@
         el.kpiFailed.textContent = String(state.failedCount);
     }
 
-    async function fetchJson(url, options = {}) {
-        const response = await fetch(url, {
+    async function refreshCsrfToken() {
+        if (!routes.csrfToken) return false;
+
+        const response = await fetch(routes.csrfToken, {
             credentials: 'same-origin',
             redirect: 'manual',
             headers: {
                 Accept: 'application/json',
                 'X-Requested-With': 'XMLHttpRequest',
-                'X-CSRF-TOKEN': csrf,
-                ...(options.headers || {}),
             },
+        });
+        const text = await response.text();
+        let json = null;
+        try { json = JSON.parse(text); } catch {}
+        if (!response.ok || !json?.csrf_token) return false;
+
+        csrf = json.csrf_token;
+        return true;
+    }
+
+    function withCurrentCsrfBody(options = {}) {
+        const headers = {
+            Accept: 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-TOKEN': csrf,
+            ...(options.headers || {}),
+        };
+
+        let body = options.body;
+        const contentType = String(headers['Content-Type'] || headers['content-type'] || '');
+        if (body && contentType.includes('application/json')) {
+            try {
+                const payload = JSON.parse(body);
+                body = JSON.stringify({ ...payload, _token: csrf });
+            } catch {}
+        }
+
+        return { headers, body };
+    }
+
+    async function fetchJson(url, options = {}, retryOnCsrf = true) {
+        const csrfAware = withCurrentCsrfBody(options);
+        const response = await fetch(url, {
+            credentials: 'same-origin',
+            redirect: 'manual',
             ...options,
+            headers: csrfAware.headers,
+            body: csrfAware.body,
         });
         if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {
             const error = new Error('Request scan out dialihkan. Tetap di halaman scan out dan silakan scan ulang.');
@@ -406,6 +443,12 @@
         const text = await response.text();
         let json = null;
         try { json = JSON.parse(text); } catch {}
+        if (response.status === 419 && retryOnCsrf && String(options.method || 'GET').toUpperCase() !== 'GET') {
+            const refreshed = await refreshCsrfToken();
+            if (refreshed) {
+                return fetchJson(url, options, false);
+            }
+        }
         if (response.redirected || (!json && response.ok)) {
             const error = new Error('Request scan out dialihkan. Tetap di halaman scan out dan silakan scan ulang.');
             error.status = response.status;
