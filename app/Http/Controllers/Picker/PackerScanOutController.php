@@ -236,17 +236,19 @@ class PackerScanOutController extends Controller
                 ]);
             }
 
-            $qcResi = QcScanResi::where('resi_id', $resi->id)
-                ->where('status', 'completed')
-                ->latest('completed_at')
-                ->lockForUpdate()
-                ->first();
+            if (!empty($skuTotals)) {
+                $qcResi = QcScanResi::where('resi_id', $resi->id)
+                    ->where('status', 'completed')
+                    ->latest('completed_at')
+                    ->lockForUpdate()
+                    ->first();
 
-            if (!$qcResi) {
-                DB::rollBack();
-                return response()->json([
-                    'message' => 'Resi belum selesai QC scan resi.',
-                ], 422);
+                if (!$qcResi) {
+                    DB::rollBack();
+                    return response()->json([
+                        'message' => 'Resi belum selesai QC scan resi.',
+                    ], 422);
+                }
             }
 
             $items = collect();

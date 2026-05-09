@@ -182,10 +182,12 @@
                         <div class="text-muted fs-8">Scan resi atau ID pesanan untuk keluar dari QC transit.</div>
                     </div>
                 </div>
-                <div class="card-toolbar gap-2">
-                    <a href="{{ $routes['history'] }}" class="btn btn-sm btn-light">History</a>
-                    <a href="{{ $routes['qcTransit'] }}" class="btn btn-sm btn-light">QC Transit</a>
-                </div>
+                @if(empty($isAdminScanOnly))
+                    <div class="card-toolbar gap-2">
+                        <a href="{{ $routes['history'] }}" class="btn btn-sm btn-light">History</a>
+                        <a href="{{ $routes['qcTransit'] }}" class="btn btn-sm btn-light">QC Transit</a>
+                    </div>
+                @endif
             </div>
             <div class="card-body pt-5 pb-7">
                 <div class="alert alert-light-primary d-flex align-items-start gap-3 py-3 px-4 mb-6">

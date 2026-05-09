@@ -20,8 +20,8 @@ class PickerDashboardController extends Controller
             'routes' => [
                 'opname' => route('opname.index'),
                 'picker' => route('picker.index'),
-                'scanOut' => route('picker.scan-out.index'),
-                'scanOutV2' => route('picker.scan-out-v2.index'),
+                'scanOut' => $isAdminScanOnly ? route('admin.outbound.scan-out.index') : route('picker.scan-out.index'),
+                'scanOutV2' => $isAdminScanOnly ? route('admin.outbound.scan-out.index') : route('picker.scan-out-v2.index'),
                 'pickingList' => route('picker.picking-list.index'),
                 'logout' => route('logout'),
             ],

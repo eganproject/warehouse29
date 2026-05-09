@@ -45,6 +45,8 @@ class RestrictPickerAccess
         $isAdminQcScanRoute = $routeName === 'admin.outbound.qc-scan.index' || $path === 'admin/outbound/qc-scan';
         $isAdminScanOutRoute = str_starts_with($routeName, 'admin.outbound.scan-out')
             || str_starts_with($path, 'admin/outbound/scan-out');
+        $isAdminScanOutHistoryDataRoute = $routeName === 'admin.outbound.packer-scan-outs.data'
+            || $path === 'admin/outbound/packer-scan-outs/data';
 
         if ($hasPicker || $hasPacker) {
             if (
@@ -61,7 +63,7 @@ class RestrictPickerAccess
         }
 
         if ($hasAdminScan && !$hasPicker && !$hasPacker) {
-            if ($isScanOutRoute || $isAdminScanOutRoute || $isLogoutRoute || $isDashboardRoute) {
+            if ($isScanOutRoute || $isAdminScanOutRoute || $isAdminScanOutHistoryDataRoute || $isLogoutRoute) {
                 return $next($request);
             }
         }
@@ -70,6 +72,10 @@ class RestrictPickerAccess
             return response()->json([
                 'message' => 'Akses dibatasi untuk role picker',
             ], 403);
+        }
+
+        if ($hasAdminScan && !$hasPicker && !$hasPacker && !$hasOtherRoles) {
+            return redirect()->route('admin.outbound.scan-out.index');
         }
 
         return redirect()->route('picker.dashboard');

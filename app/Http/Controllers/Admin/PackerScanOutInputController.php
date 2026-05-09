@@ -8,8 +8,15 @@ class PackerScanOutInputController extends Controller
 {
     public function index()
     {
+        $roles = auth()->user()?->roles()->pluck('slug') ?? collect();
+        $isAdminScanOnly = $roles->contains('admin-scan')
+            && !$roles->contains('picker')
+            && !$roles->contains('packer')
+            && $roles->diff(['picker', 'packer', 'admin-scan'])->isEmpty();
+
         return view('admin.outbound.scan-out.index', [
             'today' => now()->toDateString(),
+            'isAdminScanOnly' => $isAdminScanOnly,
             'routes' => [
                 'dashboard' => route('admin.dashboard'),
                 'scan' => route('admin.outbound.scan-out.scan'),

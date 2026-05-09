@@ -7,6 +7,7 @@ use App\Models\Item;
 use App\Models\ItemBundle;
 use App\Models\PickingList;
 use App\Models\PickingListException;
+use App\Models\PackerScanException;
 use App\Models\QcScanResi;
 use App\Models\QcScanResiItem;
 use App\Models\QcTransitItem;
@@ -358,10 +359,15 @@ class QcScanController extends Controller
 
         $skuTotals = $this->buildResiSkuTotals($resi);
         if (empty($skuTotals)) {
-            throw ValidationException::withMessages(['resi' => 'Resi tidak memiliki detail SKU valid.']);
+            throw ValidationException::withMessages(['resi' => 'Resi tidak memiliki SKU yang perlu QC. Semua detail kosong atau masuk SKU exception.']);
         }
 
         $itemIdsBySku = Item::whereIn('sku', array_keys($skuTotals))->pluck('id', 'sku')->all();
+        QcScanResiItem::where('qc_scan_resi_id', $qcResi->id)
+            ->whereNotIn('sku', array_keys($skuTotals))
+            ->where('scanned_qty', 0)
+            ->delete();
+
         foreach ($skuTotals as $sku => $requiredQty) {
             QcScanResiItem::updateOrCreate(
                 ['qc_scan_resi_id' => $qcResi->id, 'sku' => $sku],
@@ -375,10 +381,14 @@ class QcScanController extends Controller
     private function buildResiSkuTotals(Resi $resi): array
     {
         $resi->loadMissing('details');
+        $exceptionLookup = $this->packerScanExceptionLookup();
         $totals = [];
         foreach ($resi->details as $detail) {
             $sku = trim((string) ($detail->sku ?? ''));
             $qty = (int) ($detail->qty ?? 0);
+            if ($sku !== '' && isset($exceptionLookup[strtolower($sku)])) {
+                continue;
+            }
             if ($sku !== '' && $qty > 0) {
                 $totals[$sku] = ($totals[$sku] ?? 0) + $qty;
             }
@@ -389,7 +399,11 @@ class QcScanController extends Controller
 
     private function markCompletedIfReady(QcScanResi $qcResi): void
     {
-        $items = QcScanResiItem::where('qc_scan_resi_id', $qcResi->id)->lockForUpdate()->get();
+        $exceptionLookup = $this->packerScanExceptionLookup();
+        $items = QcScanResiItem::where('qc_scan_resi_id', $qcResi->id)
+            ->lockForUpdate()
+            ->get()
+            ->reject(fn ($item) => isset($exceptionLookup[strtolower((string) $item->sku)]));
         $complete = $items->isNotEmpty()
             && $items->every(fn ($item) => (int) $item->scanned_qty >= (int) $item->required_qty);
 
@@ -411,6 +425,7 @@ class QcScanController extends Controller
 
     private function serializeDailyScanSummary(): array
     {
+        $exceptionLookup = $this->packerScanExceptionLookup();
         $resis = QcScanResi::with(['resi.kurir', 'items.item'])
             ->where('scanned_by', auth()->id())
             ->whereDate('scanned_at', now()->toDateString())
@@ -418,15 +433,19 @@ class QcScanController extends Controller
             ->orderByDesc('id')
             ->get();
 
-        $items = $resis->flatMap(fn ($resi) => $resi->items)->groupBy('sku')->map(function ($rows, $sku) {
-            $first = $rows->first();
-            return [
-                'sku' => $sku,
-                'name' => $first?->item?->name ?? '-',
-                'qty' => (int) $rows->sum('scanned_qty'),
-                'required_qty' => (int) $rows->sum('required_qty'),
-            ];
-        })->values();
+        $items = $resis
+            ->flatMap(fn ($resi) => $resi->items)
+            ->reject(fn ($item) => isset($exceptionLookup[strtolower((string) $item->sku)]))
+            ->groupBy('sku')
+            ->map(function ($rows, $sku) {
+                $first = $rows->first();
+                return [
+                    'sku' => $sku,
+                    'name' => $first?->item?->name ?? '-',
+                    'qty' => (int) $rows->sum('scanned_qty'),
+                    'required_qty' => (int) $rows->sum('required_qty'),
+                ];
+            })->values();
         $firstScanAt = $resis->min('scanned_at');
         $lastScanAt = $resis->max(function ($row) {
             return $row->completed_at ?: $row->updated_at ?: $row->scanned_at;
@@ -439,9 +458,10 @@ class QcScanController extends Controller
             'started_at' => $firstScanAt ? Carbon::parse($firstScanAt)->format('Y-m-d H:i') : null,
             'last_scan_at' => $lastScanAt ? Carbon::parse($lastScanAt)->format('Y-m-d H:i') : null,
             'items' => $items,
-            'resis' => $resis->map(function ($row) {
-                $requiredQty = (int) $row->items->sum('required_qty');
-                $scannedQty = (int) $row->items->sum('scanned_qty');
+            'resis' => $resis->map(function ($row) use ($exceptionLookup) {
+                $items = $row->items->reject(fn ($item) => isset($exceptionLookup[strtolower((string) $item->sku)]));
+                $requiredQty = (int) $items->sum('required_qty');
+                $scannedQty = (int) $items->sum('scanned_qty');
                 return [
                     'id' => $row->id,
                     'resi_id' => $row->resi_id,
@@ -455,7 +475,7 @@ class QcScanController extends Controller
                     'required_qty' => $requiredQty,
                     'scanned_qty' => $scannedQty,
                     'progress' => $requiredQty > 0 ? (int) floor(min(100, ($scannedQty / $requiredQty) * 100)) : 0,
-                    'items' => $row->items->map(fn ($item) => [
+                    'items' => $items->map(fn ($item) => [
                         'sku' => $item->sku,
                         'name' => $item->item?->name ?? '-',
                         'required_qty' => (int) $item->required_qty,
@@ -464,6 +484,16 @@ class QcScanController extends Controller
                 ];
             })->values(),
         ];
+    }
+
+    private function packerScanExceptionLookup(): array
+    {
+        return PackerScanException::query()
+            ->pluck('sku')
+            ->map(fn ($sku) => strtolower(trim((string) $sku)))
+            ->filter()
+            ->flip()
+            ->all();
     }
 
     private function ensurePickingListCapacity(string $date, string $sku, int $requiredQty): void
