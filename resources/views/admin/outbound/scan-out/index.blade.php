@@ -156,11 +156,14 @@
         color: #0f172a;
         font-weight: 800;
     }
+    .scanout-toast-detail {
+        font-weight: 800;
+    }
     .scanout-toast-action {
         display: block;
         margin-top: 4px;
         color: #0f172a;
-        font-weight: 700;
+        font-weight: 400;
     }
     @media (min-width: 1400px) {
         .scanout-left {
@@ -508,7 +511,7 @@
             title,
             html: `
                 ${code ? `<span class="scanout-toast-code scanout-mono">${esc(code)}</span><br>` : ''}
-                <span>${esc(detail)}</span>
+                <span class="scanout-toast-detail">${esc(detail)}</span>
                 ${action ? `<span class="scanout-toast-action">${esc(action)}</span>` : ''}
             `,
             toast: true,
