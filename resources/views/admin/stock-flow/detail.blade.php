@@ -8,6 +8,7 @@
 @php($isManualOutbound = ($transaction->type ?? '') === 'manual' && str_contains($backUrl ?? '', '/outbound/'))
 @php($isOutboundReturn = ($transaction->type ?? '') === 'return' && str_contains($backUrl ?? '', '/outbound/'))
 @php($isApproved = ($transaction->status ?? '') === 'approved')
+@php($isFinalized = ($transaction->status ?? '') === 'finalized')
 @php($suratJalan = $isManualOutbound ? ($transaction->suratJalan ?? null) : null)
 
 @if($isManualOutbound)
@@ -216,7 +217,11 @@
             <div class="col-md-3">
                 <div class="fw-bold text-gray-600">Status</div>
                 <div>
-                    @if($isApproved)
+                    @if($isFinalized)
+                        <span class="badge badge-light-success">Finalisasi</span>
+                    @elseif($isApproved && $isInboundReturn)
+                        <span class="badge badge-light-primary">Gudang Retur</span>
+                    @elseif($isApproved)
                         <span class="badge badge-light-success">Disetujui</span>
                     @else
                         <span class="badge badge-light-warning">Menunggu</span>
@@ -232,6 +237,29 @@
                 <div>{{ $totalQty }}</div>
             </div>
         </div>
+
+        @if($isInboundReturn && $isApproved)
+            <div class="alert alert-primary d-flex align-items-center p-5 mb-6">
+                <i class="fas fa-warehouse fs-2 me-4"></i>
+                <div>
+                    <div class="fw-bold">Stok Gudang Retur: {{ number_format($totalQty) }} qty</div>
+                    <div class="text-muted">Barang retur ini belum finalisasi, sehingga belum masuk stok reguler maupun stok barang rusak.</div>
+                </div>
+            </div>
+        @endif
+
+        @if($isInboundReturn && $isFinalized)
+            <div class="alert alert-success d-flex align-items-center p-5 mb-6">
+                <i class="fas fa-check-circle fs-2 me-4"></i>
+                <div>
+                    <div class="fw-bold">Retur sudah finalisasi</div>
+                    <div class="text-muted">
+                        Finalisasi: {{ $transaction->finalized_at?->format('Y-m-d H:i') ?? '-' }}
+                        oleh {{ $transaction->finalizer?->name ?? '-' }}.
+                    </div>
+                </div>
+            </div>
+        @endif
 
         <div class="table-responsive">
             <table class="table align-middle table-row-dashed fs-6 gy-5">

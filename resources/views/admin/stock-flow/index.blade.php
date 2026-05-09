@@ -252,7 +252,11 @@
             return { store: storeUrl, show: showUrlTpl, update: updateUrlTpl, delete: deleteUrlTpl, detail: detailUrlTpl, approve: approveUrlTpl }[key] || '';
         };
 
-        const statusLabel = (status) => {
+        const statusLabel = (status, row = {}) => {
+            if (status === 'finalized') return '<span class="badge badge-light-success">Finalisasi</span>';
+            if (status === 'approved' && row?.type === 'return' && isInboundReturnFlow) {
+                return '<span class="badge badge-light-primary">Gudang Retur</span>';
+            }
             if (status === 'approved') return '<span class="badge badge-light-success">Disetujui</span>';
             return '<span class="badge badge-light-warning">Menunggu</span>';
         };
@@ -510,27 +514,40 @@
                 { data: 'id' },
                 { data: 'code' },
                 { data: 'type', render: (data) => typeLabelMap?.[data] || data || '-' },
-                { data: 'status', orderable:false, searchable:false, render: (data) => statusLabel(data) },
+                { data: 'status', orderable:false, searchable:false, render: (data, type, row) => statusLabel(data, row) },
                 { data: 'transacted_at' },
                 { data: 'submit_by' },
                 { data: 'item' },
-                { data: 'qty' },
+                { data: 'qty', render: (data, type, row) => {
+                    const qty = Number(data || 0).toLocaleString('id-ID');
+                    const returnQty = Number(row?.return_warehouse_qty || 0);
+                    if (returnQty > 0) {
+                        return `${qty}<div class="text-primary fs-8 fw-bold">Gudang retur: ${returnQty.toLocaleString('id-ID')}</div>`;
+                    }
+                    return qty;
+                } },
                 { data: 'note' },
                 { data: 'id', orderable:false, searchable:false, className:'text-end', render: (data, type, row)=>{
                     const rowType = row?.type || defaultTypeFilter;
                     const perms = permMap?.[rowType] || {};
                     const isApproved = row?.status === 'approved';
+                    const isFinalized = row?.status === 'finalized';
+                    const canFinalizeReturn = isInboundReturnFlow && rowType === 'return' && isApproved && perms.update;
                     const detailItem = `<div class="menu-item px-3"><a href="${resolveRoute(rowType, 'detail').replace(':id', data)}" class="menu-link px-3">Detail</a></div>`;
-                    const approveItem = (!isApproved && perms.update)
-                        ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 text-success btn-approve" data-id="${data}" data-type="${rowType}">Approve</a></div>`
+                    const approveLabel = isInboundReturnFlow && rowType === 'return' ? 'Masuk Gudang Retur' : 'Approve';
+                    const approveItem = (!isApproved && !isFinalized && perms.update)
+                        ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 text-success btn-approve" data-id="${data}" data-type="${rowType}">${approveLabel}</a></div>`
                         : '';
-                    const editItem = (!isApproved && perms.update)
+                    const finalizeItem = canFinalizeReturn
+                        ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 text-primary btn-finalize" data-id="${data}" data-type="${rowType}">Finalisasi</a></div>`
+                        : '';
+                    const editItem = (!isApproved && !isFinalized && perms.update)
                         ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 btn-edit" data-id="${data}" data-type="${rowType}">Edit</a></div>`
                         : '';
-                    const delItem = (!isApproved && perms.delete)
+                    const delItem = (!isApproved && !isFinalized && perms.delete)
                         ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 text-danger btn-delete" data-id="${data}" data-type="${rowType}">Hapus</a></div>`
                         : '';
-                    const actions = `${detailItem}${approveItem}${editItem}${delItem}`;
+                    const actions = `${detailItem}${approveItem}${finalizeItem}${editItem}${delItem}`;
                     if (!actions) return '';
                     return `
                         <div class="text-end">
@@ -704,12 +721,15 @@
             if (!approveUrl) return;
             let confirmed = true;
             if (typeof Swal !== 'undefined') {
+                const isReturnApproval = isInboundReturnFlow && rowType === 'return';
                 const res = await Swal.fire({
-                    title: 'Setujui data ini?',
-                    text: 'Setelah disetujui, data tidak bisa diubah atau dihapus.',
+                    title: isReturnApproval ? 'Masukkan ke Gudang Retur?' : 'Setujui data ini?',
+                    text: isReturnApproval
+                        ? 'Barang akan tercatat sebagai stok Gudang Retur dan belum masuk stok reguler/barang rusak sampai finalisasi.'
+                        : 'Setelah disetujui, data tidak bisa diubah atau dihapus.',
                     icon: 'warning',
                     showCancelButton: true,
-                    confirmButtonText: 'Approve',
+                    confirmButtonText: isReturnApproval ? 'Masuk Gudang Retur' : 'Approve',
                     cancelButtonText: 'Batal',
                     buttonsStyling: false,
                     customClass: {
@@ -737,6 +757,51 @@
                 reloadTable();
             } catch (err) {
                 if (typeof Swal !== 'undefined') Swal.fire('Error', 'Gagal menyetujui', 'error');
+            }
+        });
+
+        tableEl.on('click', '.btn-finalize', async function(e) {
+            e.preventDefault();
+            const id = this.getAttribute('data-id');
+            const rowType = this.getAttribute('data-type') || defaultTypeFilter;
+            if (!id) return;
+            const finalizeUrl = resolveRoute(rowType, 'finalize')?.replace(':id', id);
+            if (!finalizeUrl) return;
+            let confirmed = true;
+            if (typeof Swal !== 'undefined') {
+                const res = await Swal.fire({
+                    title: 'Finalisasi retur ini?',
+                    text: 'Qty bagus akan masuk stok reguler dan qty rusak akan masuk stok barang rusak.',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Finalisasi',
+                    cancelButtonText: 'Batal',
+                    buttonsStyling: false,
+                    customClass: {
+                        confirmButton: 'btn btn-primary',
+                        cancelButton: 'btn btn-light'
+                    }
+                });
+                confirmed = res.isConfirmed;
+            }
+            if (!confirmed) return;
+            try {
+                const res = await fetch(finalizeUrl, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json',
+                    },
+                });
+                const json = await res.json();
+                if (!res.ok) {
+                    if (typeof Swal !== 'undefined') Swal.fire('Error', json.message || 'Gagal finalisasi', 'error');
+                    return;
+                }
+                if (typeof Swal !== 'undefined') Swal.fire('Berhasil', json.message || 'Berhasil', 'success');
+                reloadTable();
+            } catch (err) {
+                if (typeof Swal !== 'undefined') Swal.fire('Error', 'Gagal finalisasi', 'error');
             }
         });
 

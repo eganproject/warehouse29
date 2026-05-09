@@ -102,6 +102,11 @@ class InboundController extends Controller
         return $this->approve('return', $id);
     }
 
+    public function returnsFinalize(int $id)
+    {
+        return $this->finalizeReturn($id);
+    }
+
     public function returnsImport(Request $request)
     {
         $request->validate([
@@ -273,6 +278,7 @@ class InboundController extends Controller
                 'delete' => route('admin.inbound.returns.destroy', ':id'),
                 'detail' => route('admin.inbound.returns.detail', ':id'),
                 'approve' => route('admin.inbound.returns.approve', ':id'),
+                'finalize' => route('admin.inbound.returns.finalize', ':id'),
             ],
         ];
 
@@ -390,6 +396,9 @@ class InboundController extends Controller
                 'note' => $row->note ?? '',
                 'type' => $row->type,
                 'status' => $row->status ?? 'pending',
+                'return_warehouse_qty' => ($row->type ?? '') === 'return' && ($row->status ?? 'pending') === 'approved'
+                    ? (int) $items->sum(fn ($it) => (int) ($it->qty_received ?? $it->qty ?? 0))
+                    : 0,
             ];
         });
 
@@ -413,6 +422,7 @@ class InboundController extends Controller
             'ref_no' => $tx->ref_no,
             'note' => $tx->note,
             'status' => $tx->status ?? 'pending',
+            'finalized_at' => $tx->finalized_at?->format('Y-m-d H:i'),
             'transacted_at' => $tx->transacted_at?->format('Y-m-d\TH:i'),
             'items' => $tx->items->map(function ($item) {
                 return [
@@ -429,7 +439,7 @@ class InboundController extends Controller
 
     private function detail(string $type, string $pageTitle, string $routeBase, int $id)
     {
-        $tx = InboundTransaction::with(['items.item'])
+        $tx = InboundTransaction::with(['items.item', 'creator', 'approver', 'finalizer'])
             ->where('type', $type)
             ->findOrFail($id);
 
@@ -505,9 +515,9 @@ class InboundController extends Controller
         DB::beginTransaction();
         try {
             $tx = InboundTransaction::where('type', $type)->findOrFail($id);
-            if (($tx->status ?? 'pending') === 'approved') {
+            if (in_array(($tx->status ?? 'pending'), ['approved', 'finalized'], true)) {
                 DB::rollBack();
-                return response()->json(['message' => 'Data sudah disetujui dan tidak bisa diubah'], 422);
+                return response()->json(['message' => 'Data sudah diproses dan tidak bisa diubah'], 422);
             }
 
             StockService::rollbackBySource('inbound', $tx->id);
@@ -555,9 +565,9 @@ class InboundController extends Controller
         DB::beginTransaction();
         try {
             $tx = InboundTransaction::where('type', $type)->findOrFail($id);
-            if (($tx->status ?? 'pending') === 'approved') {
+            if (in_array(($tx->status ?? 'pending'), ['approved', 'finalized'], true)) {
                 DB::rollBack();
-                return response()->json(['message' => 'Data sudah disetujui dan tidak bisa dihapus'], 422);
+                return response()->json(['message' => 'Data sudah diproses dan tidak bisa dihapus'], 422);
             }
 
             StockService::rollbackBySource('inbound', $tx->id);
@@ -596,8 +606,16 @@ class InboundController extends Controller
                 DB::commit();
                 return response()->json(['message' => 'Data sudah disetujui']);
             }
+            if (($tx->status ?? 'pending') === 'finalized') {
+                DB::commit();
+                return response()->json(['message' => 'Data sudah finalisasi']);
+            }
 
-            $this->postStockMovements($tx, $type);
+            if ($type !== 'return') {
+                $this->postStockMovements($tx, $type);
+            } else {
+                $this->assertInboundReturnBalanced($tx);
+            }
 
             $tx->status = 'approved';
             $tx->approved_at = now();
@@ -616,7 +634,54 @@ class InboundController extends Controller
             ], 500);
         }
 
-        return response()->json(['message' => 'Inbound berhasil disetujui']);
+        return response()->json([
+            'message' => $type === 'return'
+                ? 'Retur berhasil masuk Gudang Retur. Lakukan finalisasi untuk distribusi stok.'
+                : 'Inbound berhasil disetujui',
+        ]);
+    }
+
+    private function finalizeReturn(int $id)
+    {
+        DB::beginTransaction();
+        try {
+            $tx = InboundTransaction::where('type', 'return')
+                ->lockForUpdate()
+                ->findOrFail($id);
+
+            if (($tx->status ?? 'pending') === 'finalized') {
+                DB::commit();
+                return response()->json(['message' => 'Retur sudah finalisasi']);
+            }
+
+            if (($tx->status ?? 'pending') !== 'approved') {
+                DB::rollBack();
+                return response()->json([
+                    'message' => 'Retur harus disetujui dan masuk Gudang Retur sebelum finalisasi.',
+                ], 422);
+            }
+
+            $this->assertInboundReturnBalanced($tx);
+            $this->postInboundReturnToDamagedStock($tx);
+
+            $tx->status = 'finalized';
+            $tx->finalized_at = now();
+            $tx->finalized_by = auth()->id();
+            $tx->save();
+
+            DB::commit();
+        } catch (ValidationException $e) {
+            DB::rollBack();
+            throw $e;
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Gagal finalisasi retur',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+
+        return response()->json(['message' => 'Retur berhasil difinalisasi']);
     }
 
     private function postStockMovements(InboundTransaction $tx, string $type): void
@@ -641,6 +706,22 @@ class InboundController extends Controller
                 'created_by' => auth()->id(),
                 'idempotency_key' => StockService::idempotencyKey(['stock', 'inbound', $type, $tx->id, $row->item_id]),
             ]);
+        }
+    }
+
+    private function assertInboundReturnBalanced(InboundTransaction $tx): void
+    {
+        $tx->loadMissing('items.item');
+        foreach ($tx->items as $row) {
+            $received = (int) ($row->qty_received ?? $row->qty ?? 0);
+            $good = (int) ($row->qty_good ?? 0);
+            $damaged = (int) ($row->qty_damaged ?? 0);
+            if ($received <= 0 || $good + $damaged !== $received) {
+                $sku = $row->item?->sku ?? 'item '.$row->item_id;
+                throw ValidationException::withMessages([
+                    'items' => "Qty OK + qty reject harus sama dengan qty diterima untuk {$sku}.",
+                ]);
+            }
         }
     }
 

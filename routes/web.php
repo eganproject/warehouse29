@@ -253,6 +253,7 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         Route::delete('/returns/{id}', [InboundController::class, 'returnsDestroy'])->name('returns.destroy');
         Route::get('/returns/{id}/detail', [InboundController::class, 'returnsDetail'])->name('returns.detail');
         Route::post('/returns/{id}/approve', [InboundController::class, 'returnsApprove'])->name('returns.approve');
+        Route::post('/returns/{id}/finalize', [InboundController::class, 'returnsFinalize'])->name('returns.finalize');
 
     });
 

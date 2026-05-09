@@ -17,13 +17,16 @@ class InboundTransaction extends Model
         'note',
         'status',
         'approved_at',
+        'finalized_at',
         'created_by',
         'approved_by',
+        'finalized_by',
     ];
 
     protected $casts = [
         'transacted_at' => 'datetime',
         'approved_at' => 'datetime',
+        'finalized_at' => 'datetime',
     ];
 
     public function items()
@@ -39,5 +42,10 @@ class InboundTransaction extends Model
     public function approver()
     {
         return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function finalizer()
+    {
+        return $this->belongsTo(User::class, 'finalized_by');
     }
 }

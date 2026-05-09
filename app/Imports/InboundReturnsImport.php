@@ -37,6 +37,11 @@ class InboundReturnsImport implements ToCollection, WithHeadingRow, SkipsEmptyRo
         }
         $goodKey = $this->detectFirstKey($headers, ['qty_bagus', 'qty_good', 'bagus', 'good']);
         $damagedKey = $this->detectFirstKey($headers, ['qty_rusak', 'qty_damaged', 'rusak', 'damaged']);
+        if ($goodKey === null || $damagedKey === null) {
+            throw ValidationException::withMessages([
+                'file' => 'Header qty_bagus dan qty_rusak wajib agar qty diterima bisa divalidasi balance.',
+            ]);
+        }
 
         $skus = $rows->map(fn ($row) => trim((string) ($row['sku'] ?? '')))
             ->filter()
@@ -60,8 +65,8 @@ class InboundReturnsImport implements ToCollection, WithHeadingRow, SkipsEmptyRo
                 continue;
             }
             $receivedQty = $this->parseQty($row, $receivedKey);
-            $goodQty = $goodKey ? $this->parseQty($row, $goodKey) : 0;
-            $damagedQty = $damagedKey ? $this->parseQty($row, $damagedKey) : max(0, $receivedQty - $goodQty);
+            $goodQty = $this->parseQty($row, $goodKey);
+            $damagedQty = $this->parseQty($row, $damagedKey);
 
             if ($receivedQty <= 0) {
                 $errors[] = "Baris {$rowIndex}: qty diterima tidak valid untuk SKU {$sku}";
