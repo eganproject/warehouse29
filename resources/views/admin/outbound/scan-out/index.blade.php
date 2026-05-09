@@ -376,6 +376,7 @@
     async function fetchJson(url, options = {}) {
         const response = await fetch(url, {
             credentials: 'same-origin',
+            redirect: 'manual',
             headers: {
                 Accept: 'application/json',
                 'X-Requested-With': 'XMLHttpRequest',
@@ -384,6 +385,11 @@
             },
             ...options,
         });
+        if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {
+            const error = new Error('Request scan out dialihkan. Tetap di halaman scan out dan silakan scan ulang.');
+            error.status = response.status;
+            throw error;
+        }
         const text = await response.text();
         let json = null;
         try { json = JSON.parse(text); } catch {}

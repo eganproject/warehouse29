@@ -51,6 +51,8 @@ class RestrictPickerAccess
         if ($hasPicker || $hasPacker) {
             if (
                 ($hasPicker && $isAdminQcScanRoute)
+                || $isAdminScanOutRoute
+                || $isAdminScanOutHistoryDataRoute
                 || $isPickerRoute
                 || $isScanOutRoute
                 || $isQcRoute
