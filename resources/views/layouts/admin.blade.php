@@ -210,6 +210,7 @@
             };
 
             const loginUrl = document.querySelector('meta[name="login-url"]')?.getAttribute('content') || '/login';
+            const isScanOutDesktopPage = () => window.location.pathname.startsWith('/admin/outbound/scan-out');
 
             const redirectToLogin = () => {
                 window.location.href = loginUrl;
@@ -404,6 +405,9 @@
                     window.fetch = async (...args) => {
                         const response = await originalFetch(...args);
                         if (response.status === 419) {
+                            if (isScanOutDesktopPage()) {
+                                return response;
+                            }
                             redirectToLogin();
                         }
                         return response;
@@ -413,6 +417,9 @@
                 if (window.jQuery) {
                     jQuery(document).ajaxError((_event, xhr) => {
                         if (xhr?.status === 419) {
+                            if (isScanOutDesktopPage()) {
+                                return;
+                            }
                             redirectToLogin();
                         }
                     });

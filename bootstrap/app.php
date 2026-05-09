@@ -34,6 +34,13 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->render(function (TokenMismatchException $e, Request $request) {
+            if ($request->is('admin/outbound/scan-out*')) {
+                return response()->json([
+                    'message' => 'Sesi halaman Scan Out berakhir. Refresh halaman Scan Out, lalu scan ulang.',
+                    'redirect' => null,
+                ], 419);
+            }
+
             if ($request->expectsJson()) {
                 return response()->json([
                     'message' => 'Sesi berakhir. Silakan login kembali.',
