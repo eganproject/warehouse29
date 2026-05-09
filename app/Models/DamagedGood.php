@@ -13,6 +13,7 @@ class DamagedGood extends Model
         'code',
         'source_type',
         'source_ref',
+        'inbound_transaction_id',
         'transacted_at',
         'note',
         'status',
@@ -39,5 +40,10 @@ class DamagedGood extends Model
     public function approver()
     {
         return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function inboundTransaction()
+    {
+        return $this->belongsTo(InboundTransaction::class, 'inbound_transaction_id');
     }
 }

@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\DamagedGood;
 use App\Models\DamagedGoodItem;
 use App\Models\DamagedStockMutation;
+use App\Models\InboundItem;
+use App\Models\InboundTransaction;
 use App\Models\Item;
 use App\Models\StockMutation;
 use App\Support\DamagedStockService;
@@ -312,7 +314,11 @@ class DamagedGoodsController extends Controller
                 return response()->json(['message' => 'Data sudah disetujui']);
             }
 
-            $this->postStockMovements($damage);
+            if (($damage->source_type ?? '') === 'inbound_return') {
+                $this->createFinalizedInboundReturnForDamage($damage);
+            } else {
+                $this->postStockMovements($damage);
+            }
 
             $damage->status = 'approved';
             $damage->approved_at = now();
@@ -331,7 +337,120 @@ class DamagedGoodsController extends Controller
             ], 500);
         }
 
-        return response()->json(['message' => 'Barang rusak berhasil disetujui']);
+        return response()->json([
+            'message' => 'Barang rusak berhasil disetujui'
+                .($damage->source_type === 'inbound_return' ? ' dan retur inbound berhasil dibuat' : ''),
+        ]);
+    }
+
+    private function createFinalizedInboundReturnForDamage(DamagedGood $damage): InboundTransaction
+    {
+        $damage->loadMissing('items');
+
+        if ($damage->inbound_transaction_id) {
+            return InboundTransaction::lockForUpdate()->findOrFail($damage->inbound_transaction_id);
+        }
+
+        $existing = null;
+        if (!empty($damage->source_ref)) {
+            $existing = InboundTransaction::where('type', 'return')
+                ->where('code', $damage->source_ref)
+                ->lockForUpdate()
+                ->first();
+        }
+
+        if (!$existing) {
+            $existing = InboundTransaction::where('type', 'return')
+                ->where('ref_no', $damage->code)
+                ->lockForUpdate()
+                ->first();
+        }
+
+        if ($existing) {
+            if (!$existing->items()->exists()) {
+                foreach ($damage->items as $row) {
+                    InboundItem::create([
+                        'inbound_transaction_id' => $existing->id,
+                        'item_id' => $row->item_id,
+                        'qty' => $row->qty,
+                        'qty_received' => $row->qty,
+                        'qty_good' => 0,
+                        'qty_damaged' => $row->qty,
+                        'note' => $row->note ?? null,
+                    ]);
+                }
+            }
+
+            $damage->inbound_transaction_id = $existing->id;
+            $damage->source_ref = $existing->code;
+            $damage->save();
+            $this->finalizeInboundReturnFromDamage($existing, $damage);
+            return $existing;
+        }
+
+        $tx = InboundTransaction::create([
+            'code' => $this->generateCode('INB-RET'),
+            'type' => 'return',
+            'ref_no' => $damage->code,
+            'note' => 'Otomatis dari barang rusak '.$damage->code,
+            'transacted_at' => $damage->transacted_at ?? now(),
+            'created_by' => auth()->id(),
+            'status' => 'finalized',
+            'approved_at' => now(),
+            'approved_by' => auth()->id(),
+            'finalized_at' => now(),
+            'finalized_by' => auth()->id(),
+        ]);
+
+        foreach ($damage->items as $row) {
+            InboundItem::create([
+                'inbound_transaction_id' => $tx->id,
+                'item_id' => $row->item_id,
+                'qty' => $row->qty,
+                'qty_received' => $row->qty,
+                'qty_good' => 0,
+                'qty_damaged' => $row->qty,
+                'note' => $row->note ?? null,
+            ]);
+
+        }
+
+        $damage->inbound_transaction_id = $tx->id;
+        $damage->source_ref = $tx->code;
+        $damage->save();
+        $this->finalizeInboundReturnFromDamage($tx, $damage);
+
+        return $tx;
+    }
+
+    private function finalizeInboundReturnFromDamage(InboundTransaction $tx, DamagedGood $damage): void
+    {
+        $damage->loadMissing('items');
+
+        foreach ($damage->items as $row) {
+            DamagedStockService::mutate([
+                'item_id' => $row->item_id,
+                'direction' => 'in',
+                'qty' => $row->qty,
+                'source_type' => 'inbound_return',
+                'source_subtype' => 'approval',
+                'source_id' => $tx->id,
+                'source_code' => $tx->code,
+                'note' => $row->note ?? 'Inbound retur masuk stok barang rusak',
+                'occurred_at' => $tx->transacted_at ?? now(),
+                'created_by' => auth()->id(),
+                'idempotency_key' => DamagedStockService::idempotencyKey(['damaged-stock', 'inbound-return', $tx->id, $row->item_id]),
+            ]);
+        }
+
+        if (($tx->status ?? 'pending') !== 'finalized') {
+            $tx->status = 'finalized';
+            $tx->approved_at = $tx->approved_at ?? now();
+            $tx->approved_by = $tx->approved_by ?? auth()->id();
+            $tx->finalized_at = now();
+            $tx->finalized_by = auth()->id();
+            $tx->save();
+        }
     }
 
     private function postStockMovements(DamagedGood $damage): void
