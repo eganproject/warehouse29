@@ -303,6 +303,34 @@
             return !hasDuplicate;
         };
 
+        const toQty = (value) => {
+            const qty = parseInt(value, 10);
+            return Number.isFinite(qty) && qty > 0 ? qty : 0;
+        };
+
+        const clampQty = (value, max) => Math.min(Math.max(toQty(value), 0), Math.max(toQty(max), 0));
+
+        const syncReturnQtyRow = (row, changedField) => {
+            if (!isInboundReturnFlow || !row) return;
+
+            const receivedEl = row.querySelector('input[data-name="qty_received"]');
+            const goodEl = row.querySelector('input[data-name="qty_good"]');
+            const damagedEl = row.querySelector('input[data-name="qty_damaged"]');
+            if (!receivedEl || !goodEl || !damagedEl) return;
+
+            const received = toQty(receivedEl.value);
+            if (changedField === 'qty_damaged') {
+                const damaged = clampQty(damagedEl.value, received);
+                damagedEl.value = damaged;
+                goodEl.value = Math.max(0, received - damaged);
+                return;
+            }
+
+            const good = clampQty(goodEl.value, received);
+            goodEl.value = good;
+            damagedEl.value = Math.max(0, received - good);
+        };
+
         const initSelect2 = (selectEl) => {
             if (selectEl && typeof $ !== 'undefined' && $.fn.select2) {
                 $(selectEl).select2({
@@ -474,6 +502,13 @@
             if (e.target.matches('.flow-item-select') || e.target.matches('select[data-name="stock_source"]')) {
                 validateUniqueItems();
             }
+        });
+
+        itemsContainer?.addEventListener('input', (e) => {
+            if (!e.target.matches('input[data-name="qty_received"], input[data-name="qty_good"], input[data-name="qty_damaged"]')) {
+                return;
+            }
+            syncReturnQtyRow(e.target.closest('.flow-item-row'), e.target.getAttribute('data-name'));
         });
 
         itemsContainer?.addEventListener('click', (e) => {
@@ -845,6 +880,10 @@
                                 const parts = key.split('.');
                                 const idx = parseInt(parts[1], 10);
                                 const field = parts[2];
+                                if (!Number.isInteger(idx) || field === undefined) {
+                                    unhandled.push(msgs.join(', '));
+                                    return;
+                                }
                                 const row = itemsContainer.querySelectorAll('.flow-item-row')[idx];
                                 const errEl = row ? row.querySelector(`[data-error-for="${field}"]`) : null;
                                 if (errEl) errEl.textContent = msgs.join(', ');
