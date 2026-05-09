@@ -316,6 +316,14 @@
         }
     };
 
+    const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;',
+    }[char]));
+
     const buildErrorMessage = (res, json) => {
         if (json?.message) {
             return json.message;
@@ -370,13 +378,13 @@
 
     const showError = (message, details = []) => {
         if (typeof Swal !== 'undefined') {
-            let html = `<div style="text-align:left; font-size:13px;">${message}</div>`;
+            let html = `<div style="text-align:left; font-size:13px;">${esc(message)}</div>`;
             if (Array.isArray(details) && details.length) {
                 const list = details.map((row) => {
-                    const sku = row.sku || '-';
-                    const required = row.required ?? '-';
-                    const available = row.available ?? '-';
-                    const reason = row.reason ? `<div style="color:#64748b; font-size:12px;">${row.reason}</div>` : '';
+                    const sku = esc(row.sku || '-');
+                    const required = esc(row.required ?? '-');
+                    const available = esc(row.available ?? '-');
+                    const reason = row.reason ? `<div style="color:#64748b; font-size:12px;">${esc(row.reason)}</div>` : '';
                     const stock = row.available !== undefined
                         ? `<div style="color:#64748b; font-size:12px;">Butuh ${required}, tersedia ${available}</div>`
                         : `<div style="color:#64748b; font-size:12px;">Butuh ${required}</div>`;

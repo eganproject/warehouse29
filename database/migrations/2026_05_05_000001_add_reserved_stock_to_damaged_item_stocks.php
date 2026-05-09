@@ -12,18 +12,20 @@ return new class extends Migration {
             $table->integer('reserved_stock')->default(0)->after('stock');
         });
 
-        // Backfill reserved_stock dari alokasi pending yang sudah ada
-        DB::statement("
-            UPDATE damaged_item_stocks dis
-            INNER JOIN (
-                SELECT dai.item_id, SUM(dai.qty) AS total
-                FROM damaged_allocation_items dai
-                INNER JOIN damaged_allocations da ON da.id = dai.damaged_allocation_id
-                WHERE da.status = 'pending'
-                GROUP BY dai.item_id
-            ) sub ON sub.item_id = dis.item_id
-            SET dis.reserved_stock = sub.total
-        ");
+        // Backfill reserved_stock dari alokasi pending yang sudah ada.
+        DB::table('damaged_allocation_items as dai')
+            ->join('damaged_allocations as da', 'da.id', '=', 'dai.damaged_allocation_id')
+            ->where('da.status', 'pending')
+            ->groupBy('dai.item_id')
+            ->select('dai.item_id', DB::raw('SUM(dai.qty) as total'))
+            ->orderBy('dai.item_id')
+            ->chunk(500, function ($rows) {
+                foreach ($rows as $row) {
+                    DB::table('damaged_item_stocks')
+                        ->where('item_id', $row->item_id)
+                        ->update(['reserved_stock' => (int) $row->total]);
+                }
+            });
     }
 
     public function down(): void

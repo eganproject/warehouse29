@@ -265,16 +265,22 @@ class PackerScanOutController extends Controller
 
             $items = collect();
             if (!empty($skuTotals)) {
-                $items = Item::whereIn('sku', array_keys($skuTotals))
+                $skuKeys = collect(array_keys($skuTotals))
+                    ->map(fn ($sku) => strtolower(trim((string) $sku)))
+                    ->filter()
+                    ->values()
+                    ->all();
+
+                $items = Item::whereIn(DB::raw('LOWER(sku)'), $skuKeys)
                     ->get(['id', 'sku', 'name'])
-                    ->keyBy('sku');
+                    ->keyBy(fn ($item) => strtolower(trim((string) $item->sku)));
             }
 
             $issues = [];
             $allocations = [];
 
             foreach ($skuTotals as $sku => $qty) {
-                $item = $items->get($sku);
+                $item = $items->get(strtolower(trim((string) $sku)));
                 if (!$item) {
                     $issues[] = [
                         'sku' => $sku,
@@ -285,7 +291,7 @@ class PackerScanOutController extends Controller
                 }
 
                 $transitRows = QcTransitItem::where('item_id', $item->id)
-                    ->where('transit_date', '<=', $scanDate)
+                    ->whereDate('transit_date', '<=', $scanDate)
                     ->where('remaining_qty', '>', 0)
                     ->orderBy('transit_date')
                     ->orderBy('id')
