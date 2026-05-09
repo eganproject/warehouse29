@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\Item;
+use App\Models\PackerResiScan;
+use App\Models\PackerScanException;
 use App\Models\PackerScanOut;
 use App\Models\QcScanResi;
 use App\Models\QcTransitItem;
@@ -110,5 +112,99 @@ class PackerScanOutTest extends TestCase
             ->assertJsonPath('message', 'Resi belum selesai QC scan resi.');
 
         $this->assertFalse(PackerScanOut::where('resi_id', $resi->id)->exists());
+    }
+
+    public function test_scan_out_rejects_legacy_packer_scan_when_qc_is_not_completed(): void
+    {
+        $user = User::create([
+            'name' => 'Scanner',
+            'email' => 'legacy-scanner@example.test',
+            'password' => 'password',
+        ]);
+
+        $resi = Resi::create([
+            'id_pesanan' => 'ORDER-LEGACY',
+            'tanggal_pesanan' => now()->toDateString(),
+            'tanggal_upload' => now()->toDateString(),
+            'no_resi' => 'TRACK-LEGACY',
+            'uploader_id' => $user->id,
+        ]);
+
+        ResiDetail::create([
+            'resi_id' => $resi->id,
+            'sku' => 'SKU-LEGACY',
+            'qty' => 1,
+        ]);
+
+        PackerResiScan::create([
+            'resi_id' => $resi->id,
+            'scan_type' => 'no_resi',
+            'scan_code' => 'TRACK-LEGACY',
+            'scan_date' => now()->toDateString(),
+            'scanned_at' => now(),
+            'scanned_by' => $user->id,
+        ]);
+
+        $this->actingAs($user)
+            ->postJson(route('picker.scan-out.scan'), [
+                'type' => 'no_resi',
+                'code' => 'TRACK-LEGACY',
+            ])
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'Resi belum selesai QC scan resi.');
+
+        $this->assertFalse(PackerScanOut::where('resi_id', $resi->id)->exists());
+    }
+
+    public function test_scan_out_exception_sku_still_requires_completed_qc_scan(): void
+    {
+        $user = User::create([
+            'name' => 'Scanner',
+            'email' => 'exception-scanner@example.test',
+            'password' => 'password',
+        ]);
+
+        PackerScanException::create([
+            'sku' => 'SKU-EXCEPTION',
+            'note' => 'No transit deduction',
+        ]);
+
+        $resi = Resi::create([
+            'id_pesanan' => 'ORDER-EXCEPTION',
+            'tanggal_pesanan' => now()->toDateString(),
+            'tanggal_upload' => now()->toDateString(),
+            'no_resi' => 'TRACK-EXCEPTION',
+            'uploader_id' => $user->id,
+        ]);
+
+        ResiDetail::create([
+            'resi_id' => $resi->id,
+            'sku' => 'SKU-EXCEPTION',
+            'qty' => 1,
+        ]);
+
+        $this->actingAs($user)
+            ->postJson(route('picker.scan-out.scan'), [
+                'type' => 'no_resi',
+                'code' => 'TRACK-EXCEPTION',
+            ])
+            ->assertStatus(422)
+            ->assertJsonPath('message', 'Resi belum selesai QC scan resi.');
+
+        QcScanResi::create([
+            'resi_id' => $resi->id,
+            'status' => 'completed',
+            'scanned_by' => $user->id,
+            'completed_at' => now(),
+            'completed_by' => $user->id,
+        ]);
+
+        $this->actingAs($user)
+            ->postJson(route('picker.scan-out.scan'), [
+                'type' => 'no_resi',
+                'code' => 'TRACK-EXCEPTION',
+            ])
+            ->assertOk()
+            ->assertJsonPath('message', 'Scan out berhasil.');
     }
 }

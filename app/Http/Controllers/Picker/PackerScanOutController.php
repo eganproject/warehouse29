@@ -5,10 +5,8 @@ namespace App\Http\Controllers\Picker;
 use App\Http\Controllers\Controller;
 use App\Models\Item;
 use App\Models\Kurir;
-use App\Models\PackerResiScan;
 use App\Models\PackerScanException;
 use App\Models\PackerScanOut;
-use App\Models\PackerTransitHistory;
 use App\Models\QcScanResi;
 use App\Models\QcTransitItem;
 use App\Models\Resi;
@@ -197,70 +195,17 @@ class PackerScanOutController extends Controller
                 ], 422);
             }
 
-            $hasLegacyPacking = PackerResiScan::where('resi_id', $resi->id)->exists();
-            if ($hasLegacyPacking) {
-                $transit = PackerTransitHistory::where('resi_id', $resi->id)
-                    ->lockForUpdate()
-                    ->first();
+            $qcResi = QcScanResi::where('resi_id', $resi->id)
+                ->where('status', 'completed')
+                ->latest('completed_at')
+                ->lockForUpdate()
+                ->first();
 
-                if ($transit && ($transit->status ?? '') === 'selesai') {
-                    DB::rollBack();
-                    return response()->json([
-                        'message' => 'Resi sudah selesai scan out.',
-                    ], 422);
-                }
-
-                $kurirId = $this->resolveKurirId($resi);
-
-                PackerScanOut::create([
-                    'resi_id' => $resi->id,
-                    'kurir_id' => $kurirId,
-                    'scan_type' => $type,
-                    'scan_code' => $code,
-                    'scan_date' => $scanDate,
-                    'scanned_at' => now(),
-                    'scanned_by' => auth()->id(),
-                ]);
-
-                if (!$transit) {
-                    DB::rollBack();
-                    return response()->json([
-                        'message' => 'Data transit picker untuk resi ini tidak ditemukan. Resi tidak bisa scan out sebelum data transitnya valid.',
-                    ], 422);
-                }
-
-                $transit->status = 'selesai';
-                if (empty($transit->no_resi) && !empty($resi->no_resi)) {
-                    $transit->no_resi = $resi->no_resi;
-                }
-                $transit->save();
-
-                DB::commit();
-
+            if (!$qcResi) {
+                DB::rollBack();
                 return response()->json([
-                    'message' => 'Scan out berhasil.',
-                    'resi' => [
-                        'id_pesanan' => $resi->id_pesanan,
-                        'no_resi' => $resi->no_resi,
-                        'tanggal_pesanan' => $resi->tanggal_pesanan?->format('Y-m-d'),
-                    ],
-                    'items' => $itemsPayload,
-                ]);
-            }
-
-            if (!empty($skuTotals)) {
-                $qcResi = QcScanResi::where('resi_id', $resi->id)
-                    ->where('status', 'completed')
-                    ->latest('completed_at')
-                    ->lockForUpdate()
-                    ->first();
-
-                if (!$qcResi) {
-                    DB::rollBack();
-                    return response()->json([
-                        'message' => 'Resi belum selesai QC scan resi.',
-                    ], 422);
-                }
+                    'message' => 'Resi belum selesai QC scan resi.',
+                ], 422);
             }
 
             $items = collect();
