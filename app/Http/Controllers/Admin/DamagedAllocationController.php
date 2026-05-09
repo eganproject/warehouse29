@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\DamagedAllocation;
 use App\Models\DamagedAllocationItem;
 use App\Models\Item;
+use App\Models\OutboundItem;
+use App\Models\OutboundTransaction;
 use App\Support\DamagedStockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -82,6 +84,7 @@ class DamagedAllocationController extends Controller
                 'qty' => (int) $items->sum('qty'),
                 'note' => $row->note ?? '',
                 'status' => $row->status ?? 'pending',
+                'outbound_transaction_id' => $row->outbound_transaction_id,
             ];
         });
 
@@ -252,20 +255,24 @@ class DamagedAllocationController extends Controller
             }
 
             $allocation->loadMissing('items');
-            foreach ($allocation->items as $row) {
-                DamagedStockService::mutate([
-                    'item_id' => $row->item_id,
-                    'direction' => 'out',
-                    'qty' => $row->qty,
-                    'source_type' => 'damaged_allocation',
-                    'source_subtype' => $allocation->allocation_type,
-                    'source_id' => $allocation->id,
-                    'source_code' => $allocation->code,
-                    'note' => $row->note ?? null,
-                    'occurred_at' => $allocation->transacted_at ?? now(),
-                    'created_by' => auth()->id(),
-                    'idempotency_key' => DamagedStockService::idempotencyKey(['damaged-stock', 'allocation', $allocation->id, $row->item_id]),
-                ]);
+            if (($allocation->allocation_type ?? '') === 'return_vendor') {
+                $this->createOutboundReturnForAllocation($allocation);
+            } else {
+                foreach ($allocation->items as $row) {
+                    DamagedStockService::mutate([
+                        'item_id' => $row->item_id,
+                        'direction' => 'out',
+                        'qty' => $row->qty,
+                        'source_type' => 'damaged_allocation',
+                        'source_subtype' => $allocation->allocation_type,
+                        'source_id' => $allocation->id,
+                        'source_code' => $allocation->code,
+                        'note' => $row->note ?? null,
+                        'occurred_at' => $allocation->transacted_at ?? now(),
+                        'created_by' => auth()->id(),
+                        'idempotency_key' => DamagedStockService::idempotencyKey(['damaged-stock', 'allocation', $allocation->id, $row->item_id]),
+                    ]);
+                }
             }
 
             $allocation->status = 'approved';
@@ -285,7 +292,52 @@ class DamagedAllocationController extends Controller
             ], 500);
         }
 
-        return response()->json(['message' => 'Alokasi barang rusak berhasil disetujui']);
+        return response()->json([
+            'message' => 'Alokasi barang rusak berhasil disetujui'
+                .($allocation->allocation_type === 'return_vendor' ? ' dan retur outbound berhasil dibuat' : ''),
+        ]);
+    }
+
+    private function createOutboundReturnForAllocation(DamagedAllocation $allocation): OutboundTransaction
+    {
+        if ($allocation->outbound_transaction_id) {
+            return OutboundTransaction::lockForUpdate()->findOrFail($allocation->outbound_transaction_id);
+        }
+
+        $existing = OutboundTransaction::where('type', 'return')
+            ->where('ref_no', $allocation->code)
+            ->lockForUpdate()
+            ->first();
+        if ($existing) {
+            $allocation->outbound_transaction_id = $existing->id;
+            $allocation->save();
+            return $existing;
+        }
+
+        $tx = OutboundTransaction::create([
+            'code' => $this->generateCode('OUT-RET'),
+            'type' => 'return',
+            'ref_no' => $allocation->code,
+            'note' => 'Otomatis dari alokasi barang rusak '.$allocation->code,
+            'transacted_at' => $allocation->transacted_at ?? now(),
+            'created_by' => auth()->id(),
+            'status' => 'pending',
+        ]);
+
+        foreach ($allocation->items as $row) {
+            OutboundItem::create([
+                'outbound_transaction_id' => $tx->id,
+                'item_id' => $row->item_id,
+                'stock_source' => 'damaged',
+                'qty' => $row->qty,
+                'note' => $row->note ?? 'Dari alokasi barang rusak '.$allocation->code,
+            ]);
+        }
+
+        $allocation->outbound_transaction_id = $tx->id;
+        $allocation->save();
+
+        return $tx;
     }
 
     private function validatePayload(Request $request): array

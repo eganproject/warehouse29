@@ -4,9 +4,11 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\ItemBundle;
+use App\Models\DamagedItemStock;
 use App\Models\OutboundItem;
 use App\Models\OutboundTransaction;
 use App\Models\Item;
+use App\Models\ItemStock;
 use App\Models\StockMutation;
 use App\Models\SuratJalan;
 use App\Imports\OutboundReturnsImport;
@@ -533,6 +535,9 @@ class OutboundController extends Controller
     private function store(Request $request, string $type)
     {
         $validated = $this->validatePayload($request);
+        if ($type === 'return') {
+            $this->assertOutboundReturnStockAvailable($validated['items']);
+        }
 
         $prefix = match ($type) {
             'picker' => 'OUT-PCK',
@@ -586,6 +591,9 @@ class OutboundController extends Controller
     private function update(Request $request, string $type, int $id)
     {
         $validated = $this->validatePayload($request);
+        if ($type === 'return') {
+            $this->assertOutboundReturnStockAvailable($validated['items']);
+        }
 
         DB::beginTransaction();
         try {
@@ -684,6 +692,15 @@ class OutboundController extends Controller
                 return response()->json(['message' => 'Data sudah disetujui']);
             }
 
+            if ($type === 'return') {
+                $this->assertOutboundReturnStockAvailable(
+                    $tx->items->map(fn ($row) => [
+                        'item_id' => (int) $row->item_id,
+                        'qty' => (int) $row->qty,
+                        'stock_source' => $row->stock_source ?? 'regular',
+                    ])->all()
+                );
+            }
             $this->postStockMovements($tx, $type);
 
             $tx->status = 'approved';
@@ -704,6 +721,52 @@ class OutboundController extends Controller
         }
 
         return response()->json(['message' => 'Outbound berhasil disetujui']);
+    }
+
+    private function assertOutboundReturnStockAvailable(array $items): void
+    {
+        $grouped = collect($items)
+            ->groupBy(fn ($row) => ((int) ($row['item_id'] ?? 0)).'|'.($row['stock_source'] ?? 'regular'))
+            ->map(fn ($rows) => [
+                'item_id' => (int) ($rows->first()['item_id'] ?? 0),
+                'stock_source' => $rows->first()['stock_source'] ?? 'regular',
+                'qty' => (int) $rows->sum('qty'),
+            ]);
+
+        $itemIds = $grouped->pluck('item_id')->filter()->unique()->values()->all();
+        $itemsById = Item::whereIn('id', $itemIds)->get(['id', 'sku', 'is_bundle'])->keyBy('id');
+        $regularStocks = ItemStock::whereIn('item_id', $itemIds)->pluck('stock', 'item_id');
+        $damagedStocks = DamagedItemStock::whereIn('item_id', $itemIds)->pluck('stock', 'item_id');
+
+        foreach ($grouped as $row) {
+            $itemId = (int) $row['item_id'];
+            $qty = (int) $row['qty'];
+            $source = $row['stock_source'] ?? 'regular';
+            $item = $itemsById->get($itemId);
+            $sku = $item?->sku ?? 'item '.$itemId;
+
+            if ($source === 'damaged') {
+                $available = (int) ($damagedStocks[$itemId] ?? 0);
+                if ($available < $qty) {
+                    throw ValidationException::withMessages([
+                        'items' => "Stok gudang rusak tidak mencukupi untuk {$sku}. Tersedia {$available}, diminta {$qty}.",
+                    ]);
+                }
+                continue;
+            }
+
+            if ($item?->is_bundle) {
+                BundleService::assertVirtualStockSufficient($itemId, $qty);
+                continue;
+            }
+
+            $available = (int) ($regularStocks[$itemId] ?? 0);
+            if ($available < $qty) {
+                throw ValidationException::withMessages([
+                    'items' => "Stok gudang reguler tidak mencukupi untuk {$sku}. Tersedia {$available}, diminta {$qty}.",
+                ]);
+            }
+        }
     }
 
     private function postStockMovements(OutboundTransaction $tx, string $type): void

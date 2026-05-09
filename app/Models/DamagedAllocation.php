@@ -19,6 +19,7 @@ class DamagedAllocation extends Model
         'approved_at',
         'created_by',
         'approved_by',
+        'outbound_transaction_id',
     ];
 
     protected $casts = [
@@ -39,5 +40,10 @@ class DamagedAllocation extends Model
     public function approver()
     {
         return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function outboundTransaction()
+    {
+        return $this->belongsTo(OutboundTransaction::class, 'outbound_transaction_id');
     }
 }
