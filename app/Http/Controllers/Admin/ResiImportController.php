@@ -39,16 +39,22 @@ class ResiImportController extends Controller
 
         $summaryOrders = (clone $baseQuery)->count();
         $summarySkus = ResiDetail::whereIn('resi_id', (clone $baseQuery)->select('id'))->count();
+        $summaryBuyerNotes = (clone $baseQuery)
+            ->whereNotNull('catatan_pembeli')
+            ->where('catatan_pembeli', '<>', '')
+            ->count();
 
         return view('admin.inventory.resi-import.index', [
             'importUrl' => route('admin.inventory.resi-import.import'),
             'dataUrl' => route('admin.inventory.resi-import.data'),
+            'buyerNotesUrl' => route('admin.inventory.resi-import.buyer-notes'),
             'filterDate' => $filterDate,
             'filterSearch' => $search,
             'filterStatus' => $status,
             'today' => $today,
             'summaryOrders' => $summaryOrders,
             'summarySkus' => $summarySkus,
+            'summaryBuyerNotes' => $summaryBuyerNotes,
         ]);
     }
 
@@ -69,9 +75,13 @@ class ResiImportController extends Controller
         $recordsTotal = Resi::whereDate('tanggal_upload', $filterDate)->count();
         $summaryOrders = (clone $filterQuery)->count();
         $summarySkus = ResiDetail::whereIn('resi_id', (clone $filterQuery)->select('id'))->count();
+        $summaryBuyerNotes = (clone $filterQuery)
+            ->whereNotNull('catatan_pembeli')
+            ->where('catatan_pembeli', '<>', '')
+            ->count();
 
         $query = Resi::query()
-            ->select(['id', 'id_pesanan', 'no_resi', 'tanggal_pesanan', 'kurir_id', 'status'])
+            ->select(['id', 'id_pesanan', 'no_resi', 'tanggal_pesanan', 'kurir_id', 'catatan_pembeli', 'status'])
             ->selectSub(function ($sub) {
                 $sub->from('packer_scan_outs')
                     ->selectRaw('count(1)')
@@ -109,6 +119,8 @@ class ResiImportController extends Controller
                 'kurir' => $row->kurir?->name ?? '-',
                 'sku' => $skuList,
                 'tanggal_pesanan' => $tanggalOrder,
+                'catatan_pembeli' => $row->catatan_pembeli ?? '',
+                'has_catatan_pembeli' => trim((string) ($row->catatan_pembeli ?? '')) !== '',
                 'status' => $row->status ?? 'active',
                 'has_scan_out' => $hasScanOut,
             ];
@@ -122,7 +134,49 @@ class ResiImportController extends Controller
             'summary' => [
                 'orders' => $summaryOrders,
                 'skus' => $summarySkus,
+                'buyer_notes' => $summaryBuyerNotes,
             ],
+        ]);
+    }
+
+    public function buyerNotes(Request $request)
+    {
+        $today = now()->toDateString();
+        $filterDate = trim((string) $request->input('date', ''));
+        if ($filterDate === '') {
+            $filterDate = $today;
+        }
+        $search = trim((string) $request->input('q', ''));
+        $status = $this->normalizeStatusFilter($request->input('status'));
+
+        $query = Resi::query()
+            ->select(['id', 'id_pesanan', 'no_resi', 'tanggal_pesanan', 'kurir_id', 'catatan_pembeli', 'status'])
+            ->with('kurir')
+            ->whereDate('tanggal_upload', $filterDate)
+            ->whereNotNull('catatan_pembeli')
+            ->where('catatan_pembeli', '<>', '')
+            ->orderByDesc('id');
+
+        $this->applySearch($query, $search);
+        $this->applyStatusFilter($query, $status);
+
+        $rows = $query->get()->map(function ($row) {
+            return [
+                'id' => $row->id,
+                'no_resi' => $row->no_resi ?? '-',
+                'id_pesanan' => $row->id_pesanan ?? '-',
+                'kurir' => $row->kurir?->name ?? '-',
+                'tanggal_pesanan' => $row->tanggal_pesanan?->format('Y-m-d') ?? $row->tanggal_pesanan ?? '-',
+                'status' => $row->status ?? 'active',
+                'catatan_pembeli' => $row->catatan_pembeli ?? '',
+            ];
+        });
+
+        return response()->json([
+            'date' => $filterDate,
+            'status' => $status,
+            'count' => $rows->count(),
+            'data' => $rows,
         ]);
     }
 
@@ -219,6 +273,9 @@ class ResiImportController extends Controller
                     'tanggal_upload' => $today,
                     'uploader_id' => auth()->id(),
                 ];
+                if (array_key_exists('catatan_pembeli', $group)) {
+                    $payload['catatan_pembeli'] = $group['catatan_pembeli'] ?? null;
+                }
                 $kurirId = $this->resolveKurirId($group['kurir'] ?? null, $defaultKurirId);
                 if ($kurirId) {
                     $payload['kurir_id'] = $kurirId;
@@ -525,6 +582,7 @@ class ResiImportController extends Controller
         $query->where(function ($sub) use ($search) {
             $sub->where('no_resi', 'like', "%{$search}%")
                 ->orWhere('id_pesanan', 'like', "%{$search}%")
+                ->orWhere('catatan_pembeli', 'like', "%{$search}%")
                 ->orWhereHas('kurir', function ($kurirQ) use ($search) {
                     $kurirQ->where('name', 'like', "%{$search}%");
                 })

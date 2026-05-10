@@ -15,6 +15,7 @@ class Resi extends Model
         'tanggal_upload',
         'no_resi',
         'kurir_id',
+        'catatan_pembeli',
         'status',
         'canceled_at',
         'canceled_by',
