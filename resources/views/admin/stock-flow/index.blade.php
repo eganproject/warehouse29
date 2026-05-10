@@ -576,7 +576,10 @@
                     const finalizeItem = canFinalizeReturn
                         ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 text-primary btn-finalize" data-id="${data}" data-type="${rowType}">Finalisasi</a></div>`
                         : '';
-                    const editItem = (!isApproved && !isFinalized && perms.update)
+                    const canEdit = perms.update && !isFinalized && (
+                        !isApproved || (isInboundReturnFlow && rowType === 'return')
+                    );
+                    const editItem = canEdit
                         ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 btn-edit" data-id="${data}" data-type="${rowType}">Edit</a></div>`
                         : '';
                     const delItem = (!isApproved && !isFinalized && perms.delete)
