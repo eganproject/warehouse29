@@ -6,6 +6,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="login-url" content="{{ route('login') }}" />
+    <meta name="page-expired-url" content="{{ route('page-expired') }}" />
     <title>@yield('title', 'Import Analytics')</title>
     <link rel="shortcut icon" href="{{ asset('metronic/media/logos/favicon.png') }}" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
@@ -209,11 +210,11 @@
                 modalEl.setAttribute('data-bs-backdrop', 'static');
             };
 
-            const loginUrl = document.querySelector('meta[name="login-url"]')?.getAttribute('content') || '/login';
+            const pageExpiredUrl = document.querySelector('meta[name="page-expired-url"]')?.getAttribute('content') || '/page-expired';
             const isScanOutDesktopPage = () => window.location.pathname.startsWith('/admin/outbound/scan-out');
 
-            const redirectToLogin = () => {
-                window.location.href = loginUrl;
+            const redirectToPageExpired = () => {
+                window.location.href = pageExpiredUrl;
             };
 
             const isInsideModal = (el) => el?.closest?.('.modal') || null;
@@ -408,7 +409,7 @@
                             if (isScanOutDesktopPage()) {
                                 return response;
                             }
-                            redirectToLogin();
+                            redirectToPageExpired();
                         }
                         return response;
                     };
@@ -420,7 +421,7 @@
                             if (isScanOutDesktopPage()) {
                                 return;
                             }
-                            redirectToLogin();
+                            redirectToPageExpired();
                         }
                     });
                 }

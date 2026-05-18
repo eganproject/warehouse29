@@ -48,6 +48,10 @@ Route::get('/healthz', function () {
     return response('OK', 200);
 });
 
+Route::get('/page-expired', function () {
+    return response()->view('errors.419', [], 419);
+})->name('page-expired');
+
 Route::get('/dashboard', [DashboardController::class, 'index'])
     ->middleware(['auth', 'verified'])
     ->name('dashboard');

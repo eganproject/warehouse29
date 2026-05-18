@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="login-url" content="{{ route('login') }}">
+    <meta name="page-expired-url" content="{{ route('page-expired') }}">
     <title>@yield('title', 'Operasional Mobile')</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -286,13 +287,13 @@
     <script>
         (function () {
             if (window.__pageExpiredRedirectPatched) return;
-            const loginUrl = document.querySelector('meta[name="login-url"]')?.getAttribute('content') || '/login';
+            const pageExpiredUrl = document.querySelector('meta[name="page-expired-url"]')?.getAttribute('content') || '/page-expired';
             const originalFetch = window.fetch?.bind(window);
             if (originalFetch) {
                 window.fetch = async (...args) => {
                     const response = await originalFetch(...args);
                     if (response.status === 419) {
-                        window.location.href = loginUrl;
+                        window.location.href = pageExpiredUrl;
                     }
                     return response;
                 };
