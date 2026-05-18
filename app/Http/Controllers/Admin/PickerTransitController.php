@@ -176,7 +176,7 @@ class PickerTransitController extends Controller
 
     public function recalculateToday(Request $request)
     {
-        if ((auth()->user()->email ?? '') !== 'admin@gmail.com') {
+        if ((auth()->user()->email ?? '') !== 'superadmin@gmail.com') {
             abort(403);
         }
 
@@ -253,7 +253,7 @@ class PickerTransitController extends Controller
 
     public function auditPickerRemaining(Request $request)
     {
-        if ((auth()->user()->email ?? '') !== 'admin@gmail.com') {
+        if ((auth()->user()->email ?? '') !== 'superadmin@gmail.com') {
             abort(403);
         }
 

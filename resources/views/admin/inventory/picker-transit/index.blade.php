@@ -91,7 +91,7 @@
             <button type="button" class="btn btn-light" id="picker_filter_apply">Filter</button>
             <button type="button" class="btn btn-light" id="picker_filter_reset">Reset</button>
 
-            @if((auth()->user()->email ?? '') === 'admin@gmail.com')
+            @if((auth()->user()->email ?? '') === 'superadmin@gmail.com')
                 <button type="button" class="btn btn-light-primary" id="picker_recalculate_today" title="Hitung ulang remaining QC transit untuk hari ini.">Recalculate Hari Ini</button>
                 <button type="button" class="btn btn-light" id="picker_audit_remaining" title="Audit SKU yang masih remaining dan indikasi penyebabnya.">Audit Remaining</button>
             @endif

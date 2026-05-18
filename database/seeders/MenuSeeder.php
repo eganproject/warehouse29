@@ -90,7 +90,7 @@ class MenuSeeder extends Seeder
             }
         }
 
-        $adminRole = DB::table('roles')->where('slug', 'admin')->first();
+        $adminRole = DB::table('roles')->where('slug', 'superadmin')->first();
         if ($adminRole) {
             $menus = DB::table('menus')->get();
             foreach ($menus as $m) {
