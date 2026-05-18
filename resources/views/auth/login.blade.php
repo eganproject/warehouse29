@@ -328,22 +328,10 @@
                     <input type="checkbox" name="remember">
                     Ingat saya
                 </label>
-                @if (Route::has('password.request'))
-                    <a class="link" href="{{ route('password.request') }}">Lupa password?</a>
-                @endif
             </div>
 
             <button type="submit" class="submit-btn">Masuk</button>
         </form>
-
-        <div class="footer">
-            Belum punya akun?
-            @if (Route::has('register'))
-                <a href="{{ route('register') }}">Buat akun</a>
-            @else
-                Hubungi admin untuk akses
-            @endif
-        </div>
     </main>
 </div>
 </body>
