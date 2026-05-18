@@ -343,15 +343,35 @@
             }
         };
 
+        const flatpickrWithApply = (el, options = {}) => {
+            return flatpickr(el, {
+                ...options,
+                closeOnSelect: false,
+                onReady: function(selectedDates, dateStr, instance) {
+                    if (typeof options.onReady === 'function') {
+                        options.onReady(selectedDates, dateStr, instance);
+                    }
+                    if (instance.calendarContainer.querySelector('.flatpickr-apply-footer')) {
+                        return;
+                    }
+                    const footer = document.createElement('div');
+                    footer.className = 'flatpickr-apply-footer d-flex justify-content-end border-top p-2';
+                    footer.innerHTML = '<button type="button" class="btn btn-sm btn-primary">Apply</button>';
+                    footer.querySelector('button')?.addEventListener('click', () => instance.close());
+                    instance.calendarContainer.appendChild(footer);
+                },
+            });
+        };
+
         if (typeof flatpickr !== 'undefined') {
             if (dateFromEl) {
-                fpFrom = flatpickr(dateFromEl, { dateFormat: 'Y-m-d', allowInput: true });
+                fpFrom = flatpickrWithApply(dateFromEl, { dateFormat: 'Y-m-d', allowInput: true });
             }
             if (dateToEl) {
-                fpTo = flatpickr(dateToEl, { dateFormat: 'Y-m-d', allowInput: true });
+                fpTo = flatpickrWithApply(dateToEl, { dateFormat: 'Y-m-d', allowInput: true });
             }
             if (transactedAtEl) {
-                fpTransacted = flatpickr(transactedAtEl, { enableTime: true, dateFormat: 'Y-m-d H:i', allowInput: true });
+                fpTransacted = flatpickrWithApply(transactedAtEl, { enableTime: true, dateFormat: 'Y-m-d H:i', allowInput: true });
             }
         }
 
@@ -576,7 +596,10 @@
                     const finalizeItem = canFinalizeReturn
                         ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 text-primary btn-finalize" data-id="${data}" data-type="${rowType}">Finalisasi</a></div>`
                         : '';
-                    const editItem = (!isApproved && !isFinalized && perms.update)
+                    const canEdit = perms.update && !isFinalized && (
+                        !isApproved || (isInboundReturnFlow && rowType === 'return')
+                    );
+                    const editItem = canEdit
                         ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 btn-edit" data-id="${data}" data-type="${rowType}">Edit</a></div>`
                         : '';
                     const delItem = (!isApproved && !isFinalized && perms.delete)

@@ -28,6 +28,10 @@
         box-shadow: 0 20px 50px rgba(15, 23, 42, 0.2);
         min-width: 260px;
     }
+    .buyer-note-text {
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
 </style>
 
 <div class="import-loading-overlay" id="import_loading_overlay">
@@ -52,7 +56,7 @@
     <div class="card-body py-6">
         <div class="text-muted fs-7">
             Header wajib: <strong>ID Pesanan</strong>, <strong>SKU</strong>, <strong>Jumlah</strong>, <strong>Tanggal Pembuatan</strong>.
-            <strong>AWB/No. Tracking</strong> dan <strong>Kurir</strong> opsional.
+            <strong>AWB/No. Tracking</strong>, <strong>Kurir</strong>, dan <strong>Catatan Pembeli</strong> opsional.
         </div>
         <div class="text-muted fs-7 mt-2">
             Format tanggal akan dibaca otomatis (string atau tanggal Excel).
@@ -83,6 +87,9 @@
                 <input type="text" class="form-control form-control-solid w-150px" id="filter_date" placeholder="Tanggal" value="{{ $filterDate ?? '' }}" />
                 <button type="button" class="btn btn-light" id="filter_apply">Filter</button>
                 <button type="button" class="btn btn-light" id="filter_reset">Reset</button>
+                <button type="button" class="btn btn-light-warning" id="btn_catatan_pembeli">
+                    Catatan Pembeli (<span id="summary_buyer_notes">{{ $summaryBuyerNotes ?? 0 }}</span>)
+                </button>
                 <button type="button" class="btn btn-light-primary" id="btn_rekap_sku">Rekap SKU</button>
             </div>
         </div>
@@ -138,8 +145,9 @@
                             <li><strong>Tanggal Pembuatan</strong> (wajib)</li>
                             <li><strong>AWB/No. Tracking</strong> (opsional)</li>
                             <li><strong>Kurir</strong> (opsional)</li>
+                            <li><strong>Catatan Pembeli</strong> (opsional)</li>
                         </ul>
-                        <p class="text-muted small mb-0">Header akan dibaca otomatis menjadi: <code>id_pesanan, awb_no_tracking, kurir, sku, jumlah, tanggal_pembuatan</code></p>
+                        <p class="text-muted small mb-0">Header akan dibaca otomatis menjadi: <code>id_pesanan, awb_no_tracking, kurir, sku, jumlah, tanggal_pembuatan, catatan_pembeli</code></p>
                     </div>
                     <div class="mb-10">
                         <label class="required fs-6 fw-bold form-label mb-2">File Excel</label>
@@ -191,6 +199,48 @@
                         <button type="submit" class="btn btn-danger" id="btn_submit_cancel">Cancel Resi</button>
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="modal_catatan_pembeli" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable mw-900px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bolder">Resi dengan Catatan Pembeli</h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <span class="svg-icon svg-icon-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                            <rect opacity="0.5" x="6" y="17.3137" width="16" height="2" rx="1" transform="rotate(-45 6 17.3137)" fill="black" />
+                            <rect x="7.41422" y="6" width="16" height="2" rx="1" transform="rotate(45 7.41422 6)" fill="black" />
+                        </svg>
+                    </span>
+                </div>
+            </div>
+            <div class="modal-body mx-5 mx-xl-10 my-7">
+                <div class="d-flex flex-wrap align-items-center gap-6 mb-4">
+                    <div class="fw-bold">Tanggal: <span id="buyer_notes_date">-</span></div>
+                    <div class="fw-bold">Jumlah Resi: <span id="buyer_notes_count">0</span></div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-row-dashed align-middle">
+                        <thead>
+                            <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
+                                <th width="6%">No</th>
+                                <th>No Resi</th>
+                                <th>ID Pesanan</th>
+                                <th>Kurir</th>
+                                <th>Catatan Pembeli</th>
+                            </tr>
+                        </thead>
+                        <tbody id="buyer_notes_body">
+                            <tr>
+                                <td colspan="5" class="text-center text-muted py-6">Memuat data...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
@@ -254,6 +304,7 @@
     const importUrl = '{{ $importUrl ?? '' }}';
     const dataUrl = '{{ $dataUrl ?? '' }}';
     const summaryUrl = '{{ route('admin.inventory.resi-import.summary') }}';
+    const buyerNotesUrl = '{{ $buyerNotesUrl ?? '' }}';
     const cancelUrl = '{{ route('admin.inventory.resi-import.cancel') }}';
     const uncancelUrl = '{{ route('admin.inventory.resi-import.uncancel') }}';
     const csrfToken = '{{ csrf_token() }}';
@@ -279,6 +330,12 @@
         const filterApplyBtn = document.getElementById('filter_apply');
         const filterResetBtn = document.getElementById('filter_reset');
         const rekapBtn = document.getElementById('btn_rekap_sku');
+        const buyerNotesBtn = document.getElementById('btn_catatan_pembeli');
+        const buyerNotesModalEl = document.getElementById('modal_catatan_pembeli');
+        const buyerNotesModal = buyerNotesModalEl ? new bootstrap.Modal(buyerNotesModalEl) : null;
+        const buyerNotesDateEl = document.getElementById('buyer_notes_date');
+        const buyerNotesCountEl = document.getElementById('buyer_notes_count');
+        const buyerNotesBodyEl = document.getElementById('buyer_notes_body');
         const rekapModalEl = document.getElementById('modal_rekap_sku');
         const rekapModal = rekapModalEl ? new bootstrap.Modal(rekapModalEl) : null;
         const rekapDateEl = document.getElementById('rekap_date');
@@ -299,10 +356,25 @@
         };
         const summaryOrdersEl = document.getElementById('summary_orders');
         const summarySkusEl = document.getElementById('summary_skus');
+        const summaryBuyerNotesEl = document.getElementById('summary_buyer_notes');
         const labelDateEl = document.getElementById('label_date');
         const tableEl = $('#resi_table');
         let fpDate = null;
         let dt = null;
+
+        const escapeHtml = (value) => String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+
+        const setBuyerNotesCount = (count) => {
+            const normalized = Number(count || 0);
+            if (summaryBuyerNotesEl) summaryBuyerNotesEl.textContent = normalized;
+            if (buyerNotesBtn) buyerNotesBtn.disabled = normalized <= 0;
+        };
+        setBuyerNotesCount(summaryBuyerNotesEl?.textContent || 0);
 
         if (typeof flatpickr !== 'undefined' && filterDateEl) {
             fpDate = flatpickr(filterDateEl, { dateFormat: 'Y-m-d', allowInput: true });
@@ -363,6 +435,7 @@
                 if (json?.summary) {
                     if (summaryOrdersEl) summaryOrdersEl.textContent = json.summary.orders ?? '0';
                     if (summarySkusEl) summarySkusEl.textContent = json.summary.skus ?? '0';
+                    setBuyerNotesCount(json.summary.buyer_notes ?? 0);
                 }
             });
         }
@@ -386,6 +459,70 @@
             if (filterSearchEl) filterSearchEl.value = '';
             if (filterStatusEl) filterStatusEl.value = '';
             reloadTable();
+        });
+
+        buyerNotesBtn?.addEventListener('click', async () => {
+            const dateValue = (filterDateEl?.value || todayStr || '').trim();
+            const statusValue = (filterStatusEl?.value || '').trim();
+            const searchValue = (filterSearchEl?.value || '').trim();
+
+            if (buyerNotesDateEl) buyerNotesDateEl.textContent = dateValue || '-';
+            if (buyerNotesCountEl) buyerNotesCountEl.textContent = '0';
+            if (buyerNotesBodyEl) {
+                buyerNotesBodyEl.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="text-center text-muted py-6">Memuat data...</td>
+                    </tr>
+                `;
+            }
+            buyerNotesModal?.show();
+
+            try {
+                const params = new URLSearchParams();
+                if (dateValue) params.set('date', dateValue);
+                if (statusValue) params.set('status', statusValue);
+                if (searchValue) params.set('q', searchValue);
+                const res = await fetch(`${buyerNotesUrl}?${params.toString()}`);
+                const json = await res.json();
+                if (!res.ok) {
+                    throw new Error(json?.message || 'Gagal memuat catatan pembeli.');
+                }
+
+                const rows = Array.isArray(json?.data) ? json.data : [];
+                if (buyerNotesDateEl) buyerNotesDateEl.textContent = json?.date || dateValue || '-';
+                if (buyerNotesCountEl) buyerNotesCountEl.textContent = json?.count ?? rows.length;
+
+                if (!rows.length) {
+                    if (buyerNotesBodyEl) {
+                        buyerNotesBodyEl.innerHTML = `
+                            <tr>
+                                <td colspan="5" class="text-center text-muted py-6">Tidak ada resi dengan catatan pembeli.</td>
+                            </tr>
+                        `;
+                    }
+                    return;
+                }
+
+                if (buyerNotesBodyEl) {
+                    buyerNotesBodyEl.innerHTML = rows.map((row, idx) => `
+                        <tr>
+                            <td>${idx + 1}</td>
+                            <td>${escapeHtml(row.no_resi || '-')}</td>
+                            <td>${escapeHtml(row.id_pesanan || '-')}</td>
+                            <td>${escapeHtml(row.kurir || '-')}</td>
+                            <td><div class="buyer-note-text">${escapeHtml(row.catatan_pembeli || '-')}</div></td>
+                        </tr>
+                    `).join('');
+                }
+            } catch (err) {
+                if (buyerNotesBodyEl) {
+                    buyerNotesBodyEl.innerHTML = `
+                        <tr>
+                            <td colspan="5" class="text-center text-danger py-6">Gagal memuat catatan pembeli.</td>
+                        </tr>
+                    `;
+                }
+            }
         });
 
         rekapBtn?.addEventListener('click', async () => {

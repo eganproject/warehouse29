@@ -524,7 +524,9 @@ class InboundController extends Controller
         DB::beginTransaction();
         try {
             $tx = InboundTransaction::where('type', $type)->findOrFail($id);
-            if (in_array(($tx->status ?? 'pending'), ['approved', 'finalized'], true)) {
+            $status = $tx->status ?? 'pending';
+            $isEditableApprovedReturn = $type === 'return' && $status === 'approved';
+            if ($status === 'finalized' || ($status === 'approved' && !$isEditableApprovedReturn)) {
                 DB::rollBack();
                 return response()->json(['message' => 'Data sudah diproses dan tidak bisa diubah'], 422);
             }
