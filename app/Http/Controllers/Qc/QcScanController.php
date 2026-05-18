@@ -63,8 +63,9 @@ class QcScanController extends Controller
             return response()->json(['message' => 'Resi sudah dibatalkan, tidak bisa di-QC.'], 422);
         }
 
-        $skuTotals = $this->buildResiSkuTotals($resi);
-        if (empty($skuTotals)) {
+        $skuBuckets = $this->buildResiSkuBuckets($resi);
+        $skuTotals = $skuBuckets['required'];
+        if (empty($skuTotals) && empty($skuBuckets['excluded'])) {
             return response()->json(['message' => 'Resi tidak memiliki detail SKU valid.'], 422);
         }
 
@@ -357,9 +358,23 @@ class QcScanController extends Controller
             ]);
         }
 
-        $skuTotals = $this->buildResiSkuTotals($resi);
+        $skuBuckets = $this->buildResiSkuBuckets($resi);
+        $skuTotals = $skuBuckets['required'];
         if (empty($skuTotals)) {
-            throw ValidationException::withMessages(['resi' => 'Resi tidak memiliki SKU yang perlu QC. Semua detail kosong atau masuk SKU exception.']);
+            if (!empty($skuBuckets['excluded'])) {
+                QcScanResiItem::where('qc_scan_resi_id', $qcResi->id)
+                    ->where('scanned_qty', 0)
+                    ->delete();
+
+                $qcResi->status = 'completed';
+                $qcResi->completed_at = $qcResi->completed_at ?: now();
+                $qcResi->completed_by = $qcResi->completed_by ?: auth()->id();
+                $qcResi->save();
+
+                return $qcResi->fresh(['resi', 'items.item']);
+            }
+
+            throw ValidationException::withMessages(['resi' => 'Resi tidak memiliki detail SKU valid.']);
         }
 
         $itemIdsBySku = Item::whereIn('sku', array_keys($skuTotals))->pluck('id', 'sku')->all();
@@ -380,13 +395,22 @@ class QcScanController extends Controller
 
     private function buildResiSkuTotals(Resi $resi): array
     {
+        return $this->buildResiSkuBuckets($resi)['required'];
+    }
+
+    private function buildResiSkuBuckets(Resi $resi): array
+    {
         $resi->loadMissing('details');
         $exceptionLookup = $this->packerScanExceptionLookup();
         $totals = [];
+        $excludedTotals = [];
         foreach ($resi->details as $detail) {
             $sku = trim((string) ($detail->sku ?? ''));
             $qty = (int) ($detail->qty ?? 0);
             if ($sku !== '' && isset($exceptionLookup[strtolower($sku)])) {
+                if ($qty > 0) {
+                    $excludedTotals[$sku] = ($excludedTotals[$sku] ?? 0) + $qty;
+                }
                 continue;
             }
             if ($sku !== '' && $qty > 0) {
@@ -394,7 +418,11 @@ class QcScanController extends Controller
             }
         }
         ksort($totals, SORT_NATURAL | SORT_FLAG_CASE);
-        return $totals;
+        ksort($excludedTotals, SORT_NATURAL | SORT_FLAG_CASE);
+        return [
+            'required' => $totals,
+            'excluded' => $excludedTotals,
+        ];
     }
 
     private function markCompletedIfReady(QcScanResi $qcResi): void

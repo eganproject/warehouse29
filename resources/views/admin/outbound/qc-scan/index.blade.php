@@ -1243,10 +1243,22 @@
             // Catat resi ke ledger QC. Ini wajib supaya scan SKU bisa diaudit per resi.
             const form = new FormData();
             form.append('resi_id', String(state.resi.id));
-            await fetchJson(routes.qcResiRecord, { method: 'POST', body: form });
+            const recordJson = await fetchJson(routes.qcResiRecord, { method: 'POST', body: form });
             await refreshSession();
 
             updateProgress();
+            if (!state.checklist.length && recordJson.status === 'completed') {
+                const finishedResi = state.resi?.no_resi || state.resi?.id_pesanan || code;
+                setStatus(el.resiStatus, `Resi ${finishedResi} selesai QC otomatis.`, 'ok');
+                swalToast('success', 'Resi Selesai', 'Semua SKU pada resi ini masuk exception.', 2400);
+                state.resi = null;
+                state.checklist = [];
+                if (el.resiCode) el.resiCode.value = '';
+                renderChecklist();
+                focusResi();
+                return;
+            }
+
             goToPhase('scan-sku');
             setStatus(el.skuStatus,
                 json.already_scanned
