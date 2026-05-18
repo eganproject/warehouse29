@@ -90,60 +90,199 @@ class MenuSeeder extends Seeder
             }
         }
 
-        $adminRole = DB::table('roles')->where('slug', 'superadmin')->first();
-        if ($adminRole) {
-            $menus = DB::table('menus')->get();
-            foreach ($menus as $m) {
-                DB::table('permission_menu')->updateOrInsert(
-                    ['role_id' => $adminRole->id, 'menu_id' => $m->id],
-                    [
-                        'can_view' => true,
-                        'can_create' => true,
-                        'can_update' => true,
-                        'can_delete' => true,
-                        'updated_at' => now(),
-                        'created_at' => now(),
-                    ]
-                );
-            }
+        $this->grantAllPermissions('superadmin');
+
+        $permissionSets = [
+            'user' => [
+                'view' => ['dashboard', 'item-stocks'],
+            ],
+            'picker' => [
+                'view' => ['outbound-qc-scan'],
+            ],
+            'packer' => [
+                'view' => ['outbound-scan-out'],
+            ],
+            'admin-scan' => [
+                'view' => ['outbound-scan-out'],
+            ],
+            'captain' => [
+                'view' => [
+                    'dashboard',
+                    'item-stocks',
+                    'stock-mutations',
+                    'picker-transit',
+                    'picking-list',
+                    'outbound-qc-scan-history',
+                    'outbound-packer-scan-outs',
+                    'outbound-picker-report',
+                    'outbound-packer-report',
+                    'report-low-stock',
+                    'report-stock-opname',
+                ],
+            ],
+            'admin-resi' => [
+                'view' => [
+                    'dashboard',
+                    'outbound-qc-scan-history',
+                    'outbound-packer-scan-outs',
+                ],
+                'operate' => ['resi-import'],
+            ],
+            'admin-retur' => [
+                'view' => [
+                    'dashboard',
+                    'item-stocks',
+                    'stock-mutations',
+                    'report-low-stock',
+                ],
+                'operate' => [
+                    'inbound-return',
+                    'outbound-return',
+                    'damaged-goods',
+                    'damaged-allocations',
+                ],
+            ],
+            'admin-gudang' => [
+                'view' => [
+                    'dashboard',
+                    'users',
+                    'roles',
+                    'item-stocks',
+                    'stock-mutations',
+                    'picker-transit',
+                    'picking-list',
+                    'outbound-qc-scan-history',
+                    'outbound-packer-scan-outs',
+                    'outbound-picker-report',
+                    'outbound-packer-report',
+                    'report-low-stock',
+                    'activity-logs',
+                    'report-stock-opname',
+                ],
+                'operate' => [
+                    'divisi',
+                    'kurir',
+                    'categories',
+                    'items',
+                    'stores',
+                    'stock-opname',
+                    'stock-adjustments',
+                    'damaged-goods',
+                    'damaged-allocations',
+                    'resi-import',
+                    'inbound-receiving',
+                    'inbound-return',
+                    'outbound-manual',
+                    'outbound-return',
+                    'outbound-packer-scan-exceptions',
+                ],
+            ],
+            'kepala-gudang' => [
+                'view' => [
+                    'dashboard',
+                    'users',
+                    'roles',
+                    'divisi',
+                    'kurir',
+                    'categories',
+                    'items',
+                    'stores',
+                    'item-stocks',
+                    'stock-mutations',
+                    'picker-transit',
+                    'picking-list',
+                    'outbound-qc-scan-history',
+                    'outbound-packer-scan-outs',
+                    'outbound-picker-report',
+                    'outbound-packer-report',
+                    'report-low-stock',
+                    'activity-logs',
+                    'report-stock-opname',
+                ],
+                'full' => [
+                    'stock-opname',
+                    'stock-adjustments',
+                    'damaged-goods',
+                    'damaged-allocations',
+                    'resi-import',
+                    'inbound-receiving',
+                    'inbound-return',
+                    'outbound-manual',
+                    'outbound-return',
+                    'outbound-packer-scan-exceptions',
+                ],
+            ],
+        ];
+
+        foreach ($permissionSets as $roleSlug => $sets) {
+            $this->grantRolePermissions($roleSlug, $sets);
+        }
+    }
+
+    private function grantAllPermissions(string $roleSlug): void
+    {
+        $role = DB::table('roles')->where('slug', $roleSlug)->first();
+        if (!$role) {
+            return;
         }
 
-        // Allow picker role to access QC Scan Input (admin desktop page) by default.
-        $pickerRole = DB::table('roles')->where('slug', 'picker')->first();
-        if ($pickerRole) {
-            $qcScanMenu = DB::table('menus')->where('slug', 'outbound-qc-scan')->first();
-            if ($qcScanMenu) {
-                DB::table('permission_menu')->updateOrInsert(
-                    ['role_id' => $pickerRole->id, 'menu_id' => $qcScanMenu->id],
-                    [
-                        'can_view' => true,
-                        'can_create' => false,
-                        'can_update' => false,
-                        'can_delete' => false,
-                        'updated_at' => now(),
-                        'created_at' => now(),
-                    ]
-                );
-            }
+        DB::table('permission_menu')->where('role_id', $role->id)->delete();
+
+        foreach (DB::table('menus')->get() as $menu) {
+            $this->grantMenuPermission((int) $role->id, (int) $menu->id, true, true, true, true);
+        }
+    }
+
+    /**
+     * @param array<string,array<int,string>> $sets
+     */
+    private function grantRolePermissions(string $roleSlug, array $sets): void
+    {
+        $role = DB::table('roles')->where('slug', $roleSlug)->first();
+        if (!$role) {
+            return;
         }
 
-        // Allow scan out role to access Scan Out Input (admin desktop page) by default.
-        $scanOutRole = DB::table('roles')->where('slug', 'admin-scan')->first();
-        if ($scanOutRole) {
-            $scanOutMenu = DB::table('menus')->where('slug', 'outbound-scan-out')->first();
-            if ($scanOutMenu) {
-                DB::table('permission_menu')->updateOrInsert(
-                    ['role_id' => $scanOutRole->id, 'menu_id' => $scanOutMenu->id],
-                    [
-                        'can_view' => true,
-                        'can_create' => false,
-                        'can_update' => false,
-                        'can_delete' => false,
-                        'updated_at' => now(),
-                        'created_at' => now(),
-                    ]
-                );
-            }
+        DB::table('permission_menu')->where('role_id', $role->id)->delete();
+
+        $this->grantMenus((int) $role->id, $sets['view'] ?? [], true, false, false, false);
+        $this->grantMenus((int) $role->id, $sets['operate'] ?? [], true, true, true, false);
+        $this->grantMenus((int) $role->id, $sets['full'] ?? [], true, true, true, true);
+    }
+
+    /**
+     * @param array<int,string> $menuSlugs
+     */
+    private function grantMenus(int $roleId, array $menuSlugs, bool $canView, bool $canCreate, bool $canUpdate, bool $canDelete): void
+    {
+        if (empty($menuSlugs)) {
+            return;
         }
+
+        $menus = DB::table('menus')->whereIn('slug', $menuSlugs)->get(['id']);
+        foreach ($menus as $menu) {
+            $this->grantMenuPermission($roleId, (int) $menu->id, $canView, $canCreate, $canUpdate, $canDelete);
+        }
+    }
+
+    private function grantMenuPermission(
+        int $roleId,
+        int $menuId,
+        bool $canView,
+        bool $canCreate,
+        bool $canUpdate,
+        bool $canDelete
+    ): void {
+        DB::table('permission_menu')->updateOrInsert(
+            ['role_id' => $roleId, 'menu_id' => $menuId],
+            [
+                'can_view' => $canView,
+                'can_create' => $canCreate,
+                'can_update' => $canUpdate,
+                'can_delete' => $canDelete,
+                'updated_at' => now(),
+                'created_at' => now(),
+            ]
+        );
     }
 }

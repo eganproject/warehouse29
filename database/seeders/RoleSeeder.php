@@ -17,6 +17,7 @@ class RoleSeeder extends Seeder
             ['name' => 'Scan Out', 'slug' => 'admin-scan', 'description' => 'Role mobile khusus scan out'],
             ['name' => 'Captain', 'slug' => 'captain', 'description' => 'Role captain gudang'],
             ['name' => 'Admin Retur', 'slug' => 'admin-retur', 'description' => 'Role admin retur'],
+            ['name' => 'Admin Resi', 'slug' => 'admin-resi', 'description' => 'Role admin import dan pengelolaan resi'],
             ['name' => 'Kepala Gudang', 'slug' => 'kepala-gudang', 'description' => 'Role kepala gudang'],
             ['name' => 'Admin Gudang', 'slug' => 'admin-gudang', 'description' => 'Role admin gudang'],
         ];
