@@ -366,6 +366,13 @@
                         </div>
                     </div>
                     <div class="card-toolbar gap-2">
+                        <select class="form-select form-select-solid form-select-sm w-100px" id="qc_resi_history_limit" aria-label="Jumlah data riwayat">
+                            <option value="10" selected>10</option>
+                            <option value="20">20</option>
+                            <option value="50">50</option>
+                            <option value="100">100</option>
+                            <option value="500">500</option>
+                        </select>
                         <div class="d-flex align-items-center position-relative">
                             <i class="fa-solid fa-magnifying-glass position-absolute ms-3 text-gray-500 fs-8"></i>
                             <input type="text" class="form-control form-control-solid form-control-sm w-175px ps-9" id="qc_resi_history_search" placeholder="Cari resi..." />
@@ -707,6 +714,7 @@
         itemsBody:        document.getElementById('qc_items_body'),
         pendingResisBody: document.getElementById('qc_pending_resis_body'),
         resiHistorySearch: document.getElementById('qc_resi_history_search'),
+        resiHistoryLimit: document.getElementById('qc_resi_history_limit'),
         resiHistoryBody:  document.getElementById('qc_resi_history_body'),
         btnRefreshHistory: document.getElementById('btn_refresh_resi_history'),
         historyDetailModalEl: document.getElementById('modal_qc_resi_history_detail'),
@@ -962,7 +970,8 @@
         if (!el.resiHistoryBody) return;
         const rows = (Array.isArray(resis) ? [...resis] : [])
             .filter(row => matchesResiHistorySearch(row))
-            .sort((a, b) => String(b.scanned_at || '').localeCompare(String(a.scanned_at || '')));
+            .sort((a, b) => String(b.scanned_at || '').localeCompare(String(a.scanned_at || '')))
+            .slice(0, resiHistoryLimit());
 
         if (!rows.length) {
             const hasKeyword = (el.resiHistorySearch?.value || '').trim() !== '';
@@ -1000,6 +1009,12 @@
                 </td>
             </tr>`;
         }).join('');
+    }
+
+    function resiHistoryLimit() {
+        const allowed = [10, 20, 50, 100, 500];
+        const value = Number(el.resiHistoryLimit?.value || 10);
+        return allowed.includes(value) ? value : 10;
     }
 
     function matchesResiHistorySearch(row) {
@@ -1557,6 +1572,9 @@
             historySearchTimer = setTimeout(() => {
                 renderResiHistory(state.session?.resis || []);
             }, 150);
+        });
+        el.resiHistoryLimit?.addEventListener('change', () => {
+            renderResiHistory(state.session?.resis || []);
         });
 
         el.resiHistoryBody?.addEventListener('click', (e) => {

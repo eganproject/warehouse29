@@ -19,6 +19,13 @@
         </div>
         <div class="card-toolbar">
             <div class="d-flex align-items-center gap-2 me-4">
+                <select class="form-select form-select-solid w-100px" id="filter_scan_out_limit" aria-label="Jumlah data">
+                    <option value="10" selected>10</option>
+                    <option value="20">20</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                    <option value="500">500</option>
+                </select>
                 <input type="text" class="form-control form-control-solid w-150px" id="filter_date_from" placeholder="Dari" value="{{ $today ?? '' }}" />
                 <input type="text" class="form-control form-control-solid w-150px" id="filter_date_to" placeholder="Sampai" value="{{ $today ?? '' }}" />
                 <button type="button" class="btn btn-light" id="filter_date_apply">Filter</button>
@@ -58,6 +65,7 @@
         const searchInput = document.querySelector('[data-kt-filter="search"]');
         const dateFromEl = document.getElementById('filter_date_from');
         const dateToEl = document.getElementById('filter_date_to');
+        const limitSelect = document.getElementById('filter_scan_out_limit');
         const dateApplyBtn = document.getElementById('filter_date_apply');
         const dateResetBtn = document.getElementById('filter_date_reset');
         let fpFrom = null;
@@ -84,6 +92,7 @@
             serverSide: true,
             dom: 'rtip',
             order: [[2, 'desc']],
+            pageLength: Number(limitSelect?.value || 10),
             ajax: {
                 url: dataUrl,
                 dataSrc: 'data',
@@ -111,6 +120,9 @@
 
         const reloadTable = () => dt.ajax.reload();
         searchInput?.addEventListener('keyup', reloadTable);
+        limitSelect?.addEventListener('change', () => {
+            dt.page.len(Number(limitSelect.value || 10)).draw();
+        });
         dateApplyBtn?.addEventListener('click', reloadTable);
         dateResetBtn?.addEventListener('click', () => {
             if (fpFrom && todayStr) fpFrom.setDate(todayStr, true);

@@ -46,7 +46,11 @@ class PackerScanOutHistoryController extends Controller
         $recordsFiltered = (clone $query)->count();
 
         $start = (int) $request->input('start', 0);
+        $allowedLengths = [10, 20, 50, 100, 500];
         $length = (int) $request->input('length', 10);
+        if (!in_array($length, $allowedLengths, true)) {
+            $length = 10;
+        }
         if ($length > 0) {
             $query->skip($start)->take($length);
         }
