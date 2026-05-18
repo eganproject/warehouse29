@@ -23,8 +23,8 @@ class UserSeeder extends Seeder
             ]
         );
 
-        $admin = DB::table('users')->where('email', 'admin@gmail.com')->first();
-        $adminRole = DB::table('roles')->where('slug', 'admin')->first();
+        $admin = DB::table('users')->where('email', 'superadmin@gmail.com')->first();
+        $adminRole = DB::table('roles')->where('slug', 'superadmin')->first();
 
         if ($admin && $adminRole) {
             DB::table('role_user')->updateOrInsert(
