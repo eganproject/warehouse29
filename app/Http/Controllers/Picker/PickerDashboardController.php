@@ -19,9 +19,9 @@ class PickerDashboardController extends Controller
         return view('picker.dashboard', [
             'routes' => [
                 'opname' => route('opname.index'),
-                'picker' => route('picker.index'),
-                'scanOut' => $isAdminScanOnly ? route('admin.outbound.scan-out.index') : route('picker.scan-out.index'),
-                'scanOutV2' => $isAdminScanOnly ? route('admin.outbound.scan-out.index') : route('picker.scan-out-v2.index'),
+                'picker' => route('admin.outbound.qc-scan.index'),
+                'scanOut' => route('admin.outbound.scan-out.index'),
+                'scanOutV2' => route('admin.outbound.scan-out.index'),
                 'pickingList' => route('picker.picking-list.index'),
                 'logout' => route('logout'),
             ],

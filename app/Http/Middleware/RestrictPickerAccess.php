@@ -45,14 +45,14 @@ class RestrictPickerAccess
         $isAdminQcScanRoute = $routeName === 'admin.outbound.qc-scan.index' || $path === 'admin/outbound/qc-scan';
         $isAdminScanOutRoute = str_starts_with($routeName, 'admin.outbound.scan-out')
             || str_starts_with($path, 'admin/outbound/scan-out');
-        $isAdminScanOutHistoryDataRoute = $routeName === 'admin.outbound.packer-scan-outs.data'
-            || $path === 'admin/outbound/packer-scan-outs/data';
+        $isAdminScanOutHistoryRoute = str_starts_with($routeName, 'admin.outbound.packer-scan-outs')
+            || str_starts_with($path, 'admin/outbound/packer-scan-outs');
 
         if ($hasPicker || $hasPacker) {
             if (
                 ($hasPicker && $isAdminQcScanRoute)
                 || $isAdminScanOutRoute
-                || $isAdminScanOutHistoryDataRoute
+                || ($hasPacker && $isAdminScanOutHistoryRoute)
                 || $isPickerRoute
                 || $isScanOutRoute
                 || $isQcRoute
@@ -65,12 +65,12 @@ class RestrictPickerAccess
         }
 
         if ($hasAdminScan && !$hasPicker && !$hasPacker) {
-            if ($isScanOutRoute || $isAdminScanOutRoute || $isAdminScanOutHistoryDataRoute || $isLogoutRoute) {
+            if ($isScanOutRoute || $isAdminScanOutRoute || $isAdminScanOutHistoryRoute || $isLogoutRoute) {
                 return $next($request);
             }
         }
 
-        if ($isAdminScanOutRoute || $isAdminScanOutHistoryDataRoute) {
+        if ($isAdminScanOutRoute || $isAdminScanOutHistoryRoute) {
             return response()->json([
                 'message' => 'Akses scan out desktop tidak valid. Tetap di halaman scan out.',
             ], 403);

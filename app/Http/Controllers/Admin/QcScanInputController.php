@@ -8,8 +8,15 @@ class QcScanInputController extends Controller
 {
     public function index()
     {
+        $roles = auth()->user()?->roles()->pluck('slug') ?? collect();
+        $isLimitedQcScanUser = $roles->contains('picker')
+            && !$roles->contains('packer')
+            && !$roles->contains('admin-scan')
+            && $roles->diff(['picker', 'packer', 'admin-scan'])->isEmpty();
+
         return view('admin.outbound.qc-scan.index', [
             'today' => now()->toDateString(),
+            'isLimitedQcScanUser' => $isLimitedQcScanUser,
             'routes' => [
                 'dashboard' => route('admin.dashboard'),
                 'pickerTransit' => route('admin.inventory.picker-transit.index'),

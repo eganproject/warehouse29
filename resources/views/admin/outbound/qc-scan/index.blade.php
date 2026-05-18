@@ -311,10 +311,12 @@
                             </div>
                         </div>
                     </div>
-                    <div class="card-toolbar">
-                        <a href="{{ $routes['pickingList'] }}" class="btn btn-sm btn-light me-2">Picking List</a>
-                        <a href="{{ $routes['pickerTransit'] }}" class="btn btn-sm btn-light">QC Transit</a>
-                    </div>
+                    @if(empty($isLimitedQcScanUser))
+                        <div class="card-toolbar">
+                            <a href="{{ $routes['pickingList'] }}" class="btn btn-sm btn-light me-2">Picking List</a>
+                            <a href="{{ $routes['pickerTransit'] }}" class="btn btn-sm btn-light">QC Transit</a>
+                        </div>
+                    @endif
                 </div>
                 <div class="card-body pt-5 pb-7">
                     <div class="alert alert-light-primary d-flex align-items-start gap-3 py-3 px-4 mb-6">

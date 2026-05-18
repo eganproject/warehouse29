@@ -14,12 +14,12 @@
         $hasAdminScan = $roles->contains('admin-scan');
         $hasOnlyMobileRole = $roles->diff(['picker', 'packer', 'admin-scan'])->isEmpty();
 
-        if ($hasAdminScan && !$hasPicker && !$hasPacker && $hasOnlyMobileRole && Route::has('admin.outbound.scan-out.index')) {
+        if ($hasPicker && $hasOnlyMobileRole && Route::has('admin.outbound.qc-scan.index')) {
+            $targetUrl = route('admin.outbound.qc-scan.index');
+            $targetLabel = 'Kembali ke QC Scan';
+        } elseif (($hasPacker || $hasAdminScan) && $hasOnlyMobileRole && Route::has('admin.outbound.scan-out.index')) {
             $targetUrl = route('admin.outbound.scan-out.index');
             $targetLabel = 'Kembali ke Scan Out';
-        } elseif (($hasPicker || $hasPacker) && $hasOnlyMobileRole && Route::has('picker.dashboard')) {
-            $targetUrl = route('picker.dashboard');
-            $targetLabel = 'Kembali ke Dashboard Mobile';
         } else {
             $allowedMenuIds = Perm::viewableMenuIds($user);
             $menu = MenuModel::query()

@@ -100,10 +100,10 @@ class MenuSeeder extends Seeder
                 'view' => ['outbound-qc-scan'],
             ],
             'packer' => [
-                'view' => ['outbound-scan-out'],
+                'view' => ['outbound-scan-out', 'outbound-packer-scan-outs'],
             ],
             'admin-scan' => [
-                'view' => ['outbound-scan-out'],
+                'view' => ['outbound-scan-out', 'outbound-packer-scan-outs'],
             ],
             'captain' => [
                 'view' => [
