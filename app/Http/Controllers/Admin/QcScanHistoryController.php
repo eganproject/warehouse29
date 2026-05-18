@@ -9,7 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
-class PickerHistoryController extends Controller
+class QcScanHistoryController extends Controller
 {
     public function index()
     {
@@ -23,8 +23,8 @@ class PickerHistoryController extends Controller
         }
         $users = $userQuery->get(['id', 'name']);
 
-        return view('admin.outbound.picker-sessions.index', [
-            'dataUrl' => route('admin.outbound.picker-sessions.data'),
+        return view('admin.outbound.qc-scan-history.index', [
+            'dataUrl' => route('admin.outbound.qc-scan-history.data'),
             'users' => $users,
             'today' => now()->toDateString(),
         ]);

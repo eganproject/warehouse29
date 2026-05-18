@@ -14,7 +14,7 @@ use App\Http\Controllers\Admin\DamagedAllocationController;
 use App\Http\Controllers\Admin\ResiImportController;
 use App\Http\Controllers\Admin\PickerTransitController;
 use App\Http\Controllers\Admin\PickingListController;
-use App\Http\Controllers\Admin\PickerHistoryController;
+use App\Http\Controllers\Admin\QcScanHistoryController;
 use App\Http\Controllers\Admin\PackerHistoryController;
 use App\Http\Controllers\Admin\PackerScanExceptionController;
 use App\Http\Controllers\Admin\PackerPackingReportController;
@@ -290,9 +290,9 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         Route::get('/returns/{id}/detail', [OutboundController::class, 'returnsDetail'])->name('returns.detail');
         Route::post('/returns/{id}/approve', [OutboundController::class, 'returnsApprove'])->name('returns.approve');
 
-        Route::get('/picker-sessions', [PickerHistoryController::class, 'index'])->name('picker-sessions.index');
-        Route::get('/picker-sessions/data', [PickerHistoryController::class, 'data'])->name('picker-sessions.data');
-        Route::delete('/picker-sessions/{id}', [PickerHistoryController::class, 'destroy'])->name('picker-sessions.destroy');
+        Route::get('/qc-scan-history', [QcScanHistoryController::class, 'index'])->name('qc-scan-history.index');
+        Route::get('/qc-scan-history/data', [QcScanHistoryController::class, 'data'])->name('qc-scan-history.data');
+        Route::delete('/qc-scan-history/{id}', [QcScanHistoryController::class, 'destroy'])->name('qc-scan-history.destroy');
 
         Route::get('/qc-scan', [QcScanInputController::class, 'index'])->name('qc-scan.index');
         Route::get('/scan-out', [PackerScanOutInputController::class, 'index'])->name('scan-out.index');
