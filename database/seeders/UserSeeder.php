@@ -14,7 +14,7 @@ class UserSeeder extends Seeder
         DB::table('users')->updateOrInsert(
             ['email' => 'superadmin@gmail.com'],
             [
-                'name' => 'Administrator',
+                'name' => 'Super Administrator',
                 'divisi_id' => $this->divisiId('tanpa divisi'),
                 'password' => Hash::make('Password29!2'),
                 'email_verified_at' => now(),

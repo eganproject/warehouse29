@@ -10,7 +10,7 @@ class RoleSeeder extends Seeder
     public function run(): void
     {
         $roles = [
-            ['name' => 'Administrator', 'slug' => 'admin', 'description' => 'Full access to system'],
+            ['name' => 'Super Administrator', 'slug' => 'superadmin', 'description' => 'Full access to system'],
             ['name' => 'User', 'slug' => 'user', 'description' => 'Standard user role'],
             ['name' => 'QC Scan', 'slug' => 'picker', 'description' => 'Role QC scan input barang ke QC transit'],
             ['name' => 'Packer', 'slug' => 'packer', 'description' => 'Role mobile lama untuk flow packing sebelumnya'],

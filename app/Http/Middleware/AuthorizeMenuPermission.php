@@ -19,8 +19,8 @@ class AuthorizeMenuPermission
         $route = $request->route();
         $routeName = $route?->getName() ?? '';
 
-        // Only enforce for named admin routes
-        if (str_starts_with($routeName, 'admin.')) {
+        // Only enforce for named superadmin routes
+        if (str_starts_with($routeName, 'superadmin.')) {
             if (!PermissionSupport::can($user, $routeName)) {
                 abort(403, 'Anda tidak memiliki akses ke halaman ini');
             }
