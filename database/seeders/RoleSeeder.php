@@ -13,8 +13,12 @@ class RoleSeeder extends Seeder
             ['name' => 'Administrator', 'slug' => 'admin', 'description' => 'Full access to system'],
             ['name' => 'User', 'slug' => 'user', 'description' => 'Standard user role'],
             ['name' => 'QC Scan', 'slug' => 'picker', 'description' => 'Role QC scan input barang ke QC transit'],
-            ['name' => 'Packer (Legacy)', 'slug' => 'packer', 'description' => 'Role mobile lama untuk flow packing sebelumnya'],
+            ['name' => 'Packer', 'slug' => 'packer', 'description' => 'Role mobile lama untuk flow packing sebelumnya'],
             ['name' => 'Scan Out', 'slug' => 'admin-scan', 'description' => 'Role mobile khusus scan out'],
+            ['name' => 'Captain', 'slug' => 'captain', 'description' => 'Role captain gudang'],
+            ['name' => 'Admin Retur', 'slug' => 'admin-retur', 'description' => 'Role admin retur'],
+            ['name' => 'Kepala Gudang', 'slug' => 'kepala-gudang', 'description' => 'Role kepala gudang'],
+            ['name' => 'Admin Gudang', 'slug' => 'admin-gudang', 'description' => 'Role admin gudang'],
         ];
 
         foreach ($roles as $role) {
