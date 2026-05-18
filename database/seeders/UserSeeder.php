@@ -12,11 +12,11 @@ class UserSeeder extends Seeder
     {
         // Create or update admin user.
         DB::table('users')->updateOrInsert(
-            ['email' => 'admin@gmail.com'],
+            ['email' => 'superadmin@gmail.com'],
             [
                 'name' => 'Administrator',
                 'divisi_id' => $this->divisiId('tanpa divisi'),
-                'password' => Hash::make('Password!2'),
+                'password' => Hash::make('Password29!2'),
                 'email_verified_at' => now(),
                 'updated_at' => now(),
                 'created_at' => now(),
