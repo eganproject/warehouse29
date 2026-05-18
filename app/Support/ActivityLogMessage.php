@@ -276,7 +276,7 @@ class ActivityLogMessage
             'admin.masterdata.stores' => ['label' => 'store', 'table' => 'stores'],
             'admin.masterdata.menus' => ['label' => 'menu', 'table' => 'menus'],
             'admin.outbound.packer-scan-exceptions' => ['label' => 'SKU exception packer', 'table' => 'packer_scan_exceptions', 'id_param' => 'exception'],
-            'admin.outbound.picker-sessions' => ['label' => 'history scan picker', 'table' => 'qc_scan_resis'],
+            'admin.outbound.qc-scan-history' => ['label' => 'history QC scan', 'table' => 'qc_scan_resis'],
         ];
 
         foreach ($resources as $prefix => $config) {

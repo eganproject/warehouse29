@@ -24,6 +24,13 @@
                 <option value="in_progress">Belum Lengkap</option>
                 <option value="completed">Selesai</option>
             </select>
+            <select id="filter_limit" class="form-select form-select-solid w-110px" aria-label="Jumlah data">
+                <option value="10" selected>10 / hal</option>
+                <option value="20">20 / hal</option>
+                <option value="50">50 / hal</option>
+                <option value="100">100 / hal</option>
+                <option value="500">500 / hal</option>
+            </select>
             <button type="button" class="btn btn-primary px-4" id="filter_apply">
                 <i class="bi bi-funnel me-1"></i>Terapkan
             </button>
@@ -35,7 +42,7 @@
 
     <div class="card-body py-6">
         <div class="table-responsive">
-            <table class="table align-middle table-row-dashed fs-6 gy-4" id="picker_sessions_table">
+            <table class="table align-middle table-row-dashed fs-6 gy-4" id="qc_scan_history_table">
                 <thead>
                     <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
                         <th>No Resi</th>
@@ -100,15 +107,16 @@
 @push('scripts')
 <script>
     const dataUrl      = '{{ $dataUrl }}';
-    const deleteUrlTpl = '{{ route('admin.outbound.picker-sessions.destroy', ':id') }}';
+    const deleteUrlTpl = '{{ route('admin.outbound.qc-scan-history.destroy', ':id') }}';
     const csrfToken    = '{{ csrf_token() }}';
     const todayStr     = '{{ $today ?? '' }}';
 
     document.addEventListener('DOMContentLoaded', () => {
-        const tableEl = $('#picker_sessions_table');
+        const tableEl = $('#qc_scan_history_table');
         const searchInput = document.getElementById('qc_search');
         const userSelect = document.getElementById('filter_picker_user');
         const statusSelect = document.getElementById('filter_picker_status');
+        const limitSelect = document.getElementById('filter_limit');
         const dateFromEl = document.getElementById('filter_date_from');
         const dateToEl = document.getElementById('filter_date_to');
         const applyBtn = document.getElementById('filter_apply');
@@ -148,6 +156,7 @@
             serverSide: true,
             dom: 'rtip',
             order: [[3, 'desc']],
+            pageLength: Number(limitSelect?.value || 10),
             ajax: {
                 url: dataUrl,
                 dataSrc: 'data',
@@ -228,10 +237,17 @@
             searchTimer = setTimeout(reloadTable, 400);
         });
         applyBtn?.addEventListener('click', reloadTable);
+        limitSelect?.addEventListener('change', () => {
+            dt.page.len(Number(limitSelect.value || 10)).draw();
+        });
         resetBtn?.addEventListener('click', () => {
             if (searchInput) searchInput.value = '';
             setSelectValue(userSelect, '');
             setSelectValue(statusSelect, '');
+            if (limitSelect) {
+                limitSelect.value = '10';
+                dt.page.len(10);
+            }
             if (fpFrom && todayStr) fpFrom.setDate(todayStr, true);
             else if (dateFromEl) dateFromEl.value = todayStr || '';
             if (fpTo && todayStr) fpTo.setDate(todayStr, true);
