@@ -676,13 +676,6 @@
             focusActive();
             return;
         }
-        const remaining = Number(item.qty || 0) - Number(item.scanned_qty || 0);
-        if (qty > remaining) {
-            qty = remaining;
-            el.skuQty.value = String(qty);
-            setStatus(el.skuStatus, `Qty disesuaikan ke ${qty}.`, 'warn');
-        }
-
         setBusy(true);
         setStatus(el.skuStatus, `Memproses ${code} qty ${qty}...`, 'warn');
         try {

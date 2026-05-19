@@ -1378,22 +1378,6 @@
             return;
         }
 
-        // ── Validasi 3: Qty tidak boleh melebihi sisa resi ──
-        const remaining = checkItem.qty - checkItem.scanned_qty;
-        if (qty > remaining) {
-            qty = remaining;
-            if (el.skuQty) el.skuQty.value = String(qty);
-            notifyScanIssue({
-                target: el.skuStatus,
-                icon: 'warning',
-                title: 'Qty Disesuaikan',
-                code,
-                detail: `Qty scan melebihi sisa. Sistem pakai qty ${qty} karena sisa SKU ini ${remaining}.`,
-                action: 'Lanjut scan. Tidak perlu input ulang.',
-                timer: 3600,
-            });
-        }
-
         // ── Pastikan ringkasan scan hari ini termuat ──
         if (!state.session || state.session.status !== 'active') {
             const ok = await startSession();
