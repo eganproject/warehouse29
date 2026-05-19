@@ -79,7 +79,7 @@
 <div class="screen">
     <div class="topbar">
         <div>
-            <div class="brand">Gudang 29</div>
+            <div class="brand">{{ config('app.name') }}</div>
             <div class="subtitle">Dashboard Operasional</div>
         </div>
         <form method="POST" action="{{ $routes['logout'] }}">

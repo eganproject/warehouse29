@@ -162,7 +162,7 @@
         <div class="card-title">
             <div class="report-letterhead">
                 <div class="report-brand">
-                    <div class="brand-name">Gudang 29</div>
+                    <div class="brand-name">{{ config('app.name') }}</div>
                     <div class="brand-sub">Warehouse Operations Report</div>
                 </div>
                 <div>

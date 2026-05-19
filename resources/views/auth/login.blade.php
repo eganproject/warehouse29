@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="shortcut icon" href="{{ asset('metronic/media/logos/favicon.png') }}" />
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Gudang 29 | Login</title>
+    <title>{{ config('app.name') }} | Login</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -277,10 +277,10 @@
     <main class="card">
         <div class="brand">
             <div class="logo">
-                <img src="{{ asset('metronic/media/logos/favicon.png') }}" alt="Gudang 29">
+                <img src="{{ asset('metronic/media/logos/favicon.png') }}" alt="{{ config('app.name') }}">
             </div>
             <div>
-                <h1>Login ke Gudang 29</h1>
+                <h1>Login ke {{ config('app.name') }}</h1>
                 <p>Masuk untuk mengelola stok, inbound, outbound, dan opname.</p>
             </div>
         </div>

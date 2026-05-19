@@ -138,7 +138,7 @@
 <div class="screen">
     <div class="topbar">
         <div>
-            <div class="brand">Gudang 29</div>
+            <div class="brand">{{ config('app.name') }}</div>
             <div class="subtitle">Scan Out Gudang</div>
         </div>
         <div class="topbar-actions">

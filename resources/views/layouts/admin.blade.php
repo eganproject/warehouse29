@@ -7,7 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="login-url" content="{{ route('login') }}" />
     <meta name="page-expired-url" content="{{ route('page-expired') }}" />
-    <title>@yield('title', 'Import Analytics')</title>
+    <title>@yield('title', config('app.name'))</title>
     <link rel="shortcut icon" href="{{ asset('metronic/media/logos/favicon.png') }}" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
         integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A=="
@@ -159,7 +159,7 @@
     </style>
     @stack('styles')
     @yield('styles')
-    <meta name="description" content="Import Analytics dashboard" />
+    <meta name="description" content="{{ config('app.name') }} dashboard" />
     <meta name="keywords" content="import analytics,dashboard,analytics" />
     <meta property="og:locale" content="en_US" />
     <meta property="og:type" content="website" />

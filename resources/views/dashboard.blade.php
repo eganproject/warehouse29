@@ -13,16 +13,16 @@ License: For each use you must have a valid license purchased only from above li
 <html lang="en">
 	<!--begin::Head-->
 	<head><base href="">
-		<title>Import Analytics</title>
-		<meta name="description" content="Import Analytics dashboard" />
-		<meta name="keywords" content="Import Analytics, dashboard, analytics" />
+		<title>{{ config('app.name') }}</title>
+		<meta name="description" content="{{ config('app.name') }} dashboard" />
+		<meta name="keywords" content="{{ config('app.name') }}, dashboard, analytics" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta charset="utf-8" />
 		<meta property="og:locale" content="en_US" />
 		<meta property="og:type" content="article" />
-		<meta property="og:title" content="Import Analytics" />
+		<meta property="og:title" content="{{ config('app.name') }}" />
 		<meta property="og:url" content="https://keenthemes.com/metronic" />
-		<meta property="og:site_name" content="Import Analytics" />
+		<meta property="og:site_name" content="{{ config('app.name') }}" />
 		<link rel="canonical" href="https://preview.keenthemes.com/metronic8" />
 		<link rel="shortcut icon" href="metronic/media/logos/favicon.ico" />
 		<!--begin::Fonts-->
