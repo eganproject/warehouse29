@@ -390,6 +390,8 @@ class QcScanController extends Controller
             );
         }
 
+        $this->markCompletedIfReady($qcResi);
+
         return $qcResi->fresh(['resi', 'items.item']);
     }
 
