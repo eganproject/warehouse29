@@ -11,6 +11,7 @@ use App\Models\Item;
 use App\Models\ItemStock;
 use App\Models\StockMutation;
 use App\Models\SuratJalan;
+use App\Exports\OutboundReturnsTemplateExport;
 use App\Imports\OutboundReturnsImport;
 use App\Models\DamagedStockMutation;
 use App\Support\BundleService;
@@ -271,6 +272,14 @@ class OutboundController extends Controller
         }
     }
 
+    public function returnsTemplate()
+    {
+        return Excel::download(
+            new OutboundReturnsTemplateExport(),
+            'template-import-retur-outbound.xlsx'
+        );
+    }
+
     public function returnsImport(Request $request)
     {
         $request->validate([
@@ -396,6 +405,10 @@ class OutboundController extends Controller
             'importTitle' => match ($type) {
                 'return' => 'Import Retur Outbound',
                 'manual' => 'Import Manual Outbound',
+                default => null,
+            },
+            'templateUrl' => match ($type) {
+                'return' => route('admin.outbound.returns.template'),
                 default => null,
             },
         ]);
