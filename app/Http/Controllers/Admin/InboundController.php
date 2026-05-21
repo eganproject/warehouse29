@@ -9,6 +9,7 @@ use App\Models\Item;
 use App\Models\DamagedGood;
 use App\Models\DamagedGoodItem;
 use App\Models\StockMutation;
+use App\Exports\InboundReturnsTemplateExport;
 use App\Imports\InboundReceiptsImport;
 use App\Imports\InboundReturnsImport;
 use App\Support\DamagedStockService;
@@ -105,6 +106,14 @@ class InboundController extends Controller
     public function returnsFinalize(int $id)
     {
         return $this->finalizeReturn($id);
+    }
+
+    public function returnsTemplate()
+    {
+        return Excel::download(
+            new InboundReturnsTemplateExport(),
+            'template-import-retur-inbound.xlsx'
+        );
     }
 
     public function returnsImport(Request $request)
@@ -304,6 +313,10 @@ class InboundController extends Controller
             'importTitle' => match ($type) {
                 'receipt' => 'Import Penerimaan Barang',
                 'return' => 'Import Retur Inbound',
+                default => null,
+            },
+            'templateUrl' => match ($type) {
+                'return' => route('admin.inbound.returns.template'),
                 default => null,
             },
         ]);
