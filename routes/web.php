@@ -197,6 +197,8 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         Route::get('/damaged-goods/data', [DamagedGoodsController::class, 'data'])->name('damaged-goods.data');
         Route::get('/damaged-goods/stock-summary', [DamagedGoodsController::class, 'stockSummary'])->name('damaged-goods.stock-summary');
         Route::post('/damaged-goods', [DamagedGoodsController::class, 'store'])->name('damaged-goods.store');
+        Route::post('/damaged-goods/import', [DamagedGoodsController::class, 'import'])->name('damaged-goods.import');
+        Route::get('/damaged-goods/template', [DamagedGoodsController::class, 'template'])->name('damaged-goods.template');
         Route::get('/damaged-goods/{id}', [DamagedGoodsController::class, 'show'])->name('damaged-goods.show');
         Route::put('/damaged-goods/{id}', [DamagedGoodsController::class, 'update'])->name('damaged-goods.update');
         Route::delete('/damaged-goods/{id}', [DamagedGoodsController::class, 'destroy'])->name('damaged-goods.destroy');

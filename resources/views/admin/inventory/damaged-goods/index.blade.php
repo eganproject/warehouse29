@@ -58,6 +58,7 @@
         </div>
         <div class="card-toolbar">
             @if($canCreate)
+                <button type="button" class="btn btn-light-primary me-3" id="btn_import_damage" data-bs-toggle="modal" data-bs-target="#modal_import_damage">Import Excel</button>
                 <button type="button" class="btn btn-primary" id="btn_open_damage" data-bs-toggle="modal" data-bs-target="#modal_damaged_goods">Tambah</button>
             @endif
         </div>
@@ -148,6 +149,44 @@
         </div>
     </div>
 </div>
+@if($canCreate)
+<div class="modal fade" id="modal_import_damage" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered mw-650px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="fw-bolder">Import Barang Rusak</h2>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                    <span class="svg-icon svg-icon-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                            <rect opacity="0.5" x="6" y="17.3137" width="16" height="2" rx="1" transform="rotate(-45 6 17.3137)" fill="black" />
+                            <rect x="7.41422" y="6" width="16" height="2" rx="1" transform="rotate(45 7.41422 6)" fill="black" />
+                        </svg>
+                    </span>
+                </div>
+            </div>
+            <div class="modal-body scroll-y mx-5 mx-xl-15 my-7">
+                <div class="mb-6">
+                    <div class="text-muted fs-7">
+                        Header minimal: <strong>sku</strong>, <strong>qty</strong>.<br>
+                        Opsional: <strong>source_type</strong> (display / inbound_return, default display), <strong>source_ref</strong>, <strong>note</strong>, <strong>item_note</strong>, <strong>transacted_at</strong>.<br>
+                        Baris dengan <strong>source_ref</strong> sama akan digabung menjadi satu transaksi. Data hasil import berstatus Menunggu dan perlu disetujui.
+                    </div>
+                    <a href="{{ $templateUrl }}" class="btn btn-sm btn-light-success mt-3">Download Template Excel</a>
+                </div>
+                <div class="fv-row mb-6">
+                    <label class="required fs-6 fw-bold form-label mb-2">File Excel</label>
+                    <input type="file" class="form-control form-control-solid" id="import_damage_file" accept=".xlsx,.xls" />
+                    <div class="invalid-feedback d-block" id="error_import_damage_file"></div>
+                </div>
+                <div class="text-end">
+                    <button type="button" class="btn btn-light me-3" data-bs-dismiss="modal">Batal</button>
+                    <button type="button" class="btn btn-primary" id="btn_import_damage_submit">Import</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+@endif
 @endsection
 
 @push('scripts')
@@ -155,6 +194,7 @@
     const dataUrl = '{{ $dataUrl }}';
     const storeUrl = '{{ $storeUrl }}';
     const stockSummaryUrl = '{{ $stockSummaryUrl }}';
+    const importUrl = '{{ $importUrl }}';
     const showUrlTpl = '{{ route('admin.inventory.damaged-goods.show', ':id') }}';
     const updateUrlTpl = '{{ route('admin.inventory.damaged-goods.update', ':id') }}';
     const deleteUrlTpl = '{{ route('admin.inventory.damaged-goods.destroy', ':id') }}';
@@ -437,6 +477,64 @@
 
         const reloadTable = () => { dt.ajax.reload(); summaryTable.ajax.reload(); };
         searchInput?.addEventListener('keyup', reloadTable);
+
+        // --- Import Excel ---
+        const importBtn = document.getElementById('btn_import_damage');
+        const importModalEl = document.getElementById('modal_import_damage');
+        const importModal = importModalEl ? new bootstrap.Modal(importModalEl) : null;
+        const importInput = document.getElementById('import_damage_file');
+        const importError = document.getElementById('error_import_damage_file');
+        const importSubmit = document.getElementById('btn_import_damage_submit');
+
+        importBtn?.addEventListener('click', () => {
+            if (importInput) importInput.value = '';
+            if (importError) importError.textContent = '';
+        });
+
+        importSubmit?.addEventListener('click', async () => {
+            if (!importUrl) return;
+            if (importError) importError.textContent = '';
+            const file = importInput?.files?.[0];
+            if (!file) {
+                if (importError) importError.textContent = 'Pilih file Excel terlebih dahulu.';
+                return;
+            }
+            const formData = new FormData();
+            formData.append('file', file);
+            try {
+                const res = await fetch(importUrl, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': csrfToken,
+                        'Accept': 'application/json',
+                    },
+                    body: formData,
+                });
+                const text = await res.text();
+                let json;
+                try { json = JSON.parse(text); } catch (err) {
+                    if (typeof Swal !== 'undefined') Swal.fire('Error', 'Respons server tidak valid', 'error');
+                    return;
+                }
+                if (!res.ok) {
+                    const msg = json?.errors?.file?.[0] || json?.message;
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire('Error', msg || 'Gagal import', 'error');
+                    } else if (importError) {
+                        importError.textContent = msg || 'Gagal import';
+                    }
+                    return;
+                }
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire('Berhasil', json.message || 'Import berhasil', 'success');
+                }
+                if (importInput) importInput.value = '';
+                importModal?.hide();
+                reloadTable();
+            } catch (err) {
+                if (typeof Swal !== 'undefined') Swal.fire('Error', 'Gagal import', 'error');
+            }
+        });
 
         tableEl.on('click', '.btn-edit', async function(e) {
             e.preventDefault();

@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exports\DamagedGoodsTemplateExport;
 use App\Http\Controllers\Controller;
+use App\Imports\DamagedGoodsImport;
 use App\Models\DamagedGood;
 use App\Models\DamagedGoodItem;
 use App\Models\DamagedStockMutation;
@@ -18,6 +20,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Maatwebsite\Excel\Facades\Excel;
 
 class DamagedGoodsController extends Controller
 {
@@ -30,7 +33,89 @@ class DamagedGoodsController extends Controller
             'dataUrl' => route('admin.inventory.damaged-goods.data'),
             'storeUrl' => route('admin.inventory.damaged-goods.store'),
             'stockSummaryUrl' => route('admin.inventory.damaged-goods.stock-summary'),
+            'importUrl' => route('admin.inventory.damaged-goods.import'),
+            'templateUrl' => route('admin.inventory.damaged-goods.template'),
         ]);
+    }
+
+    public function template()
+    {
+        return Excel::download(
+            new DamagedGoodsTemplateExport(),
+            'template-import-barang-rusak.xlsx'
+        );
+    }
+
+    public function import(Request $request)
+    {
+        $request->validate([
+            'file' => ['required', 'file', 'mimes:xlsx,xls', 'max:5120'],
+        ]);
+
+        $import = new DamagedGoodsImport();
+        DB::beginTransaction();
+        try {
+            Excel::import($import, $request->file('file'));
+            $groups = $import->groups ?? [];
+            if (empty($groups)) {
+                throw ValidationException::withMessages([
+                    'file' => 'Tidak ada data valid untuk diimport',
+                ]);
+            }
+
+            $createdTx = 0;
+            $createdItems = 0;
+            foreach ($groups as $group) {
+                $transactedAt = now();
+                if (!empty($group['transacted_at'])) {
+                    try {
+                        $transactedAt = Carbon::parse($group['transacted_at']);
+                    } catch (\Throwable $e) {
+                        throw ValidationException::withMessages([
+                            'file' => 'Format transacted_at tidak valid: '.$group['transacted_at'],
+                        ]);
+                    }
+                }
+
+                $damage = DamagedGood::create([
+                    'code' => $this->generateCode('DMG'),
+                    'source_type' => $group['source_type'],
+                    'source_ref' => $group['source_ref'] ?? null,
+                    'note' => $group['note'] ?? null,
+                    'transacted_at' => $transactedAt,
+                    'created_by' => auth()->id(),
+                    'status' => 'pending',
+                ]);
+                $createdTx++;
+
+                foreach ($group['items'] as $row) {
+                    DamagedGoodItem::create([
+                        'damaged_good_id' => $damage->id,
+                        'item_id' => $row['item_id'],
+                        'qty' => $row['qty'],
+                        'note' => $row['note'] ?? null,
+                    ]);
+                    $createdItems++;
+                }
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Import barang rusak berhasil. Silakan tinjau lalu setujui datanya.',
+                'transactions' => $createdTx,
+                'items' => $createdItems,
+            ]);
+        } catch (ValidationException $e) {
+            DB::rollBack();
+            throw $e;
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json([
+                'message' => 'Gagal import barang rusak',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
     }
 
     public function stockSummary(Request $request)
