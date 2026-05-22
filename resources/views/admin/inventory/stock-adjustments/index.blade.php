@@ -153,6 +153,7 @@
 <script>
     const dataUrl = '{{ $dataUrl }}';
     const storeUrl = '{{ $storeUrl }}';
+    const detailUrlTpl = '{{ route('admin.inventory.stock-adjustments.detail', ':id') }}';
     const showUrlTpl = '{{ route('admin.inventory.stock-adjustments.show', ':id') }}';
     const updateUrlTpl = '{{ route('admin.inventory.stock-adjustments.update', ':id') }}';
     const deleteUrlTpl = '{{ route('admin.inventory.stock-adjustments.destroy', ':id') }}';
@@ -396,12 +397,13 @@
                 { data: 'note' },
                 { data: 'id', orderable: false, searchable: false, className: 'text-end', render: (data, type, row) => {
                     const isApproved = row?.status === 'approved';
+                    const detailItem = `<div class="menu-item px-3"><a href="${detailUrlTpl.replace(':id', data)}" class="menu-link px-3">Detail</a></div>`;
                     const approveItem = (!isApproved && canUpdate)
                         ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 text-success btn-approve" data-id="${data}">Approve</a></div>`
                         : '';
                     const editItem = (!isApproved && canUpdate) ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 btn-edit" data-id="${data}">Edit</a></div>` : '';
                     const delItem = (!isApproved && canDelete) ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 text-danger btn-delete" data-id="${data}">Hapus</a></div>` : '';
-                    const actions = `${approveItem}${editItem}${delItem}`;
+                    const actions = `${detailItem}${approveItem}${editItem}${delItem}`;
                     if (!actions) return '';
                     return `
                         <div class="text-end">

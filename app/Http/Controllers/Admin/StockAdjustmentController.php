@@ -230,6 +230,23 @@ class StockAdjustmentController extends Controller
         ]);
     }
 
+    public function detail(int $id)
+    {
+        $adjustment = StockAdjustment::with(['items.item', 'creator', 'approver'])
+            ->findOrFail($id);
+
+        $totalIn = (int) $adjustment->items->where('direction', 'in')->sum('qty');
+        $totalOut = (int) $adjustment->items->where('direction', 'out')->sum('qty');
+
+        return view('admin.inventory.stock-adjustments.detail', [
+            'adjustment' => $adjustment,
+            'totalIn' => $totalIn,
+            'totalOut' => $totalOut,
+            'netQty' => $totalIn - $totalOut,
+            'backUrl' => route('admin.inventory.stock-adjustments.index'),
+        ]);
+    }
+
     public function update(Request $request, int $id)
     {
         $validated = $this->validatePayload($request);
