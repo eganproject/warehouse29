@@ -3,7 +3,8 @@
     "allow": [
       "Bash(php -r ' *)",
       "Bash(php -l app/Http/Controllers/Admin/PickerReportController.php)",
-      "Bash(git checkout *)"
+      "Bash(git checkout *)",
+      "Bash(php -l app/Http/Controllers/Picker/PickerDashboardController.php)"
     ]
   }
 }

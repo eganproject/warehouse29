@@ -1,3 +1,8 @@
+@php
+    $headerUser = auth()->user();
+    $headerRoleSlugs = $headerUser ? $headerUser->roles()->pluck('slug') : collect();
+    $canSwitchMobile = $headerRoleSlugs->intersect(['picker', 'packer', 'admin-scan'])->isNotEmpty();
+@endphp
 <div id="kt_header" class="header" data-kt-sticky="true" data-kt-sticky-name="header"
     data-kt-sticky-offset="{default: '200px', lg: '300px'}">
     <!--begin::Container-->
@@ -30,6 +35,16 @@
         <div class="d-flex align-items-center">
             <!--begin::Topbar-->
             <div class="d-flex align-items-center flex-shrink-0">
+                @if($canSwitchMobile)
+                    <!--begin::Switch to mobile dashboard-->
+                    <a href="{{ route('picker.dashboard') }}"
+                        class="btn btn-sm btn-light-primary fw-bold d-flex align-items-center gap-2 me-2 me-lg-3"
+                        title="Pindah ke tampilan dashboard mobile">
+                        <i class="fa-solid fa-mobile-screen-button fs-5"></i>
+                        <span class="d-none d-sm-inline">Tampilan Mobile</span>
+                    </a>
+                    <!--end::Switch to mobile dashboard-->
+                @endif
                 <!--begin::User-->
                 <div class="d-flex align-items-center ms-3 ms-lg-4" id="kt_header_user_menu_toggle">
                     <!--begin::Menu- wrapper-->

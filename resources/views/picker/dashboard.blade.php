@@ -74,6 +74,24 @@
         font-weight: 700;
         margin-bottom: 6px;
     }
+    .topbar-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .switch-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border: 1px solid var(--brand);
+        background: rgba(15, 118, 110, 0.1);
+        color: var(--brand);
+        padding: 8px 12px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+        text-decoration: none;
+    }
 </style>
 
 <div class="screen">
@@ -82,10 +100,17 @@
             <div class="brand">{{ config('app.name') }}</div>
             <div class="subtitle">Dashboard Operasional</div>
         </div>
-        <form method="POST" action="{{ $routes['logout'] }}">
-            @csrf
-            <button type="submit" class="logout">Logout</button>
-        </form>
+        <div class="topbar-actions">
+            @if(!empty($showDesktop))
+                <a href="{{ $routes['desktop'] }}" class="switch-btn" title="Pindah ke tampilan desktop">
+                    &#x1F5A5; Desktop
+                </a>
+            @endif
+            <form method="POST" action="{{ $routes['logout'] }}">
+                @csrf
+                <button type="submit" class="logout">Logout</button>
+            </form>
+        </div>
     </div>
 
     <div class="welcome-card">

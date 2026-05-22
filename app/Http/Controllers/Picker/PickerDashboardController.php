@@ -24,11 +24,13 @@ class PickerDashboardController extends Controller
                 'scanOutV2' => route('admin.outbound.scan-out.index'),
                 'pickingList' => route('picker.picking-list.index'),
                 'logout' => route('logout'),
+                'desktop' => route('admin.dashboard'),
             ],
             'showPicking' => ($hasPicker || $hasPacker || $hasOtherRoles) && !$isAdminScanOnly,
             'showScanOut' => ($hasAdminScan || $hasOtherRoles) && !$hasPicker && !$hasPacker,
             'showScanOutV2' => ($hasAdminScan || $hasOtherRoles) && !$hasPicker && !$hasPacker,
             'showPickingList' => ($hasPicker || $hasPacker || $hasOtherRoles) && !$isAdminScanOnly,
+            'showDesktop' => $hasOtherRoles,
         ]);
     }
 }
