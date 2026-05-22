@@ -102,63 +102,6 @@
         </div>
     </div>
 </div>
-
-<div class="modal fade" id="modal_opname_detail" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered mw-900px">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 class="fw-bolder">Detail Stock Opname</h2>
-                <div class="d-flex align-items-center gap-2">
-                    <a href="#" class="btn btn-light-primary btn-sm" id="btn_export_opname">Export Excel</a>
-                    <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
-                        <span class="svg-icon svg-icon-1">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
-                                <rect opacity="0.5" x="6" y="17.3137" width="16" height="2" rx="1" transform="rotate(-45 6 17.3137)" fill="black" />
-                                <rect x="7.41422" y="6" width="16" height="2" rx="1" transform="rotate(45 7.41422 6)" fill="black" />
-                            </svg>
-                        </span>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-body scroll-y mx-5 mx-xl-15 my-7">
-                <div class="row mb-6">
-                    <div class="col-md-3">
-                        <div class="fw-bold text-gray-600">Kode</div>
-                        <div id="opname_detail_code">-</div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="fw-bold text-gray-600">Tanggal</div>
-                        <div id="opname_detail_date">-</div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="fw-bold text-gray-600">Input</div>
-                        <div id="opname_detail_creator">-</div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="fw-bold text-gray-600">Catatan</div>
-                        <div id="opname_detail_note">-</div>
-                    </div>
-                </div>
-
-                <div class="table-responsive">
-                    <table class="table align-middle table-row-dashed fs-6 gy-5">
-                        <thead>
-                            <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
-                                <th>Item</th>
-                                <th>System</th>
-                                <th>Counted</th>
-                                <th>Adjust</th>
-                                <th>Catatan</th>
-                                <th>Input</th>
-                            </tr>
-                        </thead>
-                        <tbody id="opname_detail_items"></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 @endsection
 
 @push('scripts')
@@ -166,7 +109,6 @@
     const dataUrl = '{{ $dataUrl }}';
     const storeUrl = '{{ $storeUrl }}';
     const detailUrlTpl = '{{ route('admin.inventory.stock-opname.show', ':id') }}';
-    const exportUrlTpl = '{{ route('admin.inventory.stock-opname.export', ':id') }}';
     const approveUrlTpl = '{{ route('admin.inventory.stock-opname.approve', ':id') }}';
     const deleteUrlTpl = '{{ route('admin.inventory.stock-opname.destroy', ':id') }}';
     const csrfToken = '{{ csrf_token() }}';
@@ -188,7 +130,6 @@
         const dateToEl = document.getElementById('filter_date_to');
         const filterApplyBtn = document.getElementById('filter_apply');
         const filterResetBtn = document.getElementById('filter_reset');
-        const exportBtn = document.getElementById('btn_export_opname');
         let fpFrom = null;
         let fpTo = null;
         let fpTransacted = null;
@@ -403,7 +344,7 @@
                 { data: 'total_adjustment' },
                 { data: 'note' },
                 { data: 'id', orderable:false, searchable:false, className:'text-end', render: (data, type, row) => {
-                    const detailItem = `<div class="menu-item px-3"><a href="#" class="menu-link px-3 btn-detail" data-id="${data}">Detail</a></div>`;
+                    const detailItem = `<div class="menu-item px-3"><a href="${detailUrlTpl.replace(':id', data)}" class="menu-link px-3">Detail</a></div>`;
                     const isCompleted = row?.status === 'completed';
                     const approveItem = (!isCompleted && canUpdate)
                         ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 text-success btn-approve" data-id="${data}">Selesaikan</a></div>`
@@ -588,52 +529,6 @@
             }
         });
 
-        const detailModalEl = document.getElementById('modal_opname_detail');
-        const detailModal = detailModalEl ? new bootstrap.Modal(detailModalEl) : null;
-        const setText = (id, value) => {
-            const el = document.getElementById(id);
-            if (el) el.textContent = value ?? '-';
-        };
-
-        tableEl.on('click', '.btn-detail', async function(e) {
-            e.preventDefault();
-            const id = this.getAttribute('data-id');
-            if (!id) return;
-            if (exportBtn) {
-                exportBtn.href = exportUrlTpl.replace(':id', id);
-            }
-            try {
-                const res = await fetch(detailUrlTpl.replace(':id', id), { headers: { 'Accept': 'application/json' }});
-                const json = await res.json();
-                if (!res.ok) {
-                    if (typeof Swal !== 'undefined') Swal.fire('Error', json.message || 'Gagal memuat data', 'error');
-                    return;
-                }
-                const batch = json.batch || {};
-                setText('opname_detail_code', batch.code);
-                setText('opname_detail_date', batch.transacted_at);
-                setText('opname_detail_creator', batch.creator);
-                setText('opname_detail_note', batch.note);
-
-                const items = json.items || [];
-                const rows = items.map((row) => `
-                    <tr>
-                        <td>${row.item}</td>
-                        <td>${row.system_qty}</td>
-                        <td>${row.counted_qty}</td>
-                        <td>${row.adjustment}</td>
-                        <td>${row.note || '-'}</td>
-                        <td>${row.created_by || '-'}</td>
-                    </tr>
-                `).join('');
-                const tbody = document.getElementById('opname_detail_items');
-                if (tbody) tbody.innerHTML = rows || '<tr><td colspan="6" class="text-center text-muted">Tidak ada item.</td></tr>';
-
-                detailModal?.show();
-            } catch (err) {
-                if (typeof Swal !== 'undefined') Swal.fire('Error', 'Gagal memuat data', 'error');
-            }
-        });
     });
 </script>
 @endpush

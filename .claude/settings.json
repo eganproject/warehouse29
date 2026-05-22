@@ -5,7 +5,9 @@
       "Bash(php -l app/Http/Controllers/Admin/PickerReportController.php)",
       "Bash(git checkout *)",
       "Bash(php -l app/Http/Controllers/Picker/PickerDashboardController.php)",
-      "Bash(php -l app/Http/Controllers/Auth/AuthenticatedSessionController.php)"
+      "Bash(php -l app/Http/Controllers/Auth/AuthenticatedSessionController.php)",
+      "Bash(php -l app/Http/Controllers/Admin/StockOpnameController.php)",
+      "Bash(php -r 'try { $c = file_get_contents\\('\\\\''storage/framework/views/'\\\\''\\); } catch \\(\\\\Throwable $e\\) {} echo '\\\\''done'\\\\'';')"
     ]
   }
 }

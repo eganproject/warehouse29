@@ -103,32 +103,33 @@ class StockOpnameController extends Controller
 
     public function show(int $id)
     {
-        $opname = StockOpname::with(['creator:id,name', 'items.item:id,sku,name', 'items.creator:id,name'])
-            ->find($id);
+        $opname = StockOpname::with([
+            'creator:id,name',
+            'completer:id,name',
+            'items.item:id,sku,name',
+            'items.creator:id,name',
+        ])->find($id);
+
         if (!$opname) {
-            return response()->json(['message' => 'Data tidak ditemukan'], 404);
+            abort(404, 'Stock opname tidak ditemukan');
         }
 
-        return response()->json([
-            'batch' => [
-                'id' => $opname->id,
-                'code' => $opname->code,
-                'transacted_at' => $opname->transacted_at?->format('Y-m-d H:i'),
-                'note' => $opname->note ?? '-',
-                'creator' => $opname->creator?->name ?? '-',
-                'status' => $opname->status ?? 'open',
-            ],
-            'items' => $opname->items->map(function ($row) {
-                return [
-                    'id' => $row->id,
-                    'item' => trim(($row->item?->sku ?? '').' - '.($row->item?->name ?? '')),
-                    'system_qty' => (int) $row->system_qty,
-                    'counted_qty' => (int) $row->counted_qty,
-                    'adjustment' => (int) $row->adjustment,
-                    'note' => $row->note ?? '-',
-                    'created_by' => $row->creator?->name ?? '-',
-                ];
-            })->values(),
+        $items = $opname->items->sortBy('id')->values();
+        $diffItems = $items->filter(fn ($row) => (int) $row->adjustment !== 0)->values();
+        $plusItems = $diffItems->filter(fn ($row) => (int) $row->adjustment > 0);
+        $minusItems = $diffItems->filter(fn ($row) => (int) $row->adjustment < 0);
+
+        return view('admin.inventory.stock-opname.show', [
+            'opname' => $opname,
+            'items' => $items,
+            'diffItems' => $diffItems,
+            'totalSku' => $items->count(),
+            'diffSkuCount' => $diffItems->count(),
+            'plusSkuCount' => $plusItems->count(),
+            'minusSkuCount' => $minusItems->count(),
+            'plusQty' => (int) $plusItems->sum('adjustment'),
+            'minusQty' => (int) $minusItems->sum('adjustment'),
+            'totalAdjustment' => (int) $items->sum('adjustment'),
         ]);
     }
 
