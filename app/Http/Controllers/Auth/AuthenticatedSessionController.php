@@ -35,11 +35,11 @@ class AuthenticatedSessionController extends Controller
             $hasPacker = $roles->contains('packer');
             $hasAdminScan = $roles->contains('admin-scan');
             $hasOtherRoles = $roles->diff(['picker', 'packer', 'admin-scan'])->isNotEmpty();
-            if (!$hasOtherRoles && $hasPicker) {
-                return redirect()->route('admin.outbound.qc-scan.index');
+            if (!$hasOtherRoles && ($hasPicker || $hasPacker)) {
+                return redirect()->route('picker.dashboard');
             }
 
-            if (!$hasOtherRoles && ($hasPacker || $hasAdminScan)) {
+            if (!$hasOtherRoles && $hasAdminScan) {
                 return redirect()->route('admin.outbound.scan-out.index');
             }
         }
