@@ -131,7 +131,6 @@
         font-size: 30px;
         font-weight: 800;
         line-height: 1.1;
-        margin-top: 4px;
         color: #0f172a;
         letter-spacing: -0.02em;
     }
@@ -146,6 +145,41 @@
     .stat-card--blue  { --accent: var(--dash-blue);  --accent-soft: rgba(37, 99, 235, 0.1); }
     .stat-card--green { --accent: var(--dash-green); --accent-soft: rgba(5, 150, 105, 0.1); }
     .stat-card--red   { --accent: var(--dash-red);   --accent-soft: rgba(220, 38, 38, 0.1); }
+
+    .stat-value-row {
+        display: flex;
+        align-items: baseline;
+        gap: 9px;
+        margin-top: 4px;
+    }
+    .stat-percent {
+        font-size: 12px;
+        font-weight: 800;
+        padding: 2px 9px;
+        border-radius: 999px;
+        color: var(--accent, var(--dash-blue));
+        background: var(--accent-soft, rgba(37, 99, 235, 0.1));
+        white-space: nowrap;
+    }
+    .stat-progress {
+        height: 6px;
+        border-radius: 999px;
+        background: #eef2f7;
+        overflow: hidden;
+        margin-top: 11px;
+    }
+    .stat-progress-bar {
+        height: 100%;
+        border-radius: 999px;
+        background: var(--accent, var(--dash-blue));
+        transition: width 0.4s ease;
+    }
+    .stat-progress-text {
+        font-size: 11.5px;
+        color: #64748b;
+        font-weight: 600;
+        margin-top: 6px;
+    }
 
     /* ---------- Kurir cards ---------- */
     .kurir-grid {
@@ -452,6 +486,15 @@
                 </form>
             </div>
 
+            @php
+                $totalResiVal = (int) ($totalResi ?? 0);
+                $totalScanVal = (int) ($totalScanOut ?? 0);
+                $totalCancelVal = (int) ($totalResiCanceled ?? 0);
+                $grandTotal = $totalResiVal + $totalCancelVal;
+                $activePercent = $grandTotal > 0 ? round($totalResiVal / $grandTotal * 100) : 0;
+                $scanPercent = $totalResiVal > 0 ? min(100, round($totalScanVal / $totalResiVal * 100)) : 0;
+                $cancelPercent = $grandTotal > 0 ? round($totalCancelVal / $grandTotal * 100) : 0;
+            @endphp
             <div class="stats-grid">
                 <div class="stat-card stat-card--blue">
                     <div class="stat-icon"><i class="fa-solid fa-boxes-stacked"></i></div>
@@ -462,7 +505,14 @@
                                 <i class="fa-solid fa-info"></i>
                             </span>
                         </div>
-                        <div class="stat-value">{{ number_format($totalResi ?? 0) }}</div>
+                        <div class="stat-value-row">
+                            <span class="stat-value">{{ number_format($totalResiVal) }}</span>
+                            <span class="stat-percent">{{ $activePercent }}%</span>
+                        </div>
+                        <div class="stat-progress">
+                            <div class="stat-progress-bar" style="width: {{ $activePercent }}%"></div>
+                        </div>
+                        <div class="stat-progress-text">{{ $activePercent }}% dari {{ number_format($grandTotal) }} total resi</div>
                         <div class="stat-meta"><i class="fa-regular fa-clock"></i> Update {{ $totalResiUpdated ?? '-' }}</div>
                     </div>
                 </div>
@@ -475,7 +525,14 @@
                                 <i class="fa-solid fa-info"></i>
                             </span>
                         </div>
-                        <div class="stat-value">{{ number_format($totalScanOut ?? 0) }}</div>
+                        <div class="stat-value-row">
+                            <span class="stat-value">{{ number_format($totalScanVal) }}</span>
+                            <span class="stat-percent">{{ $scanPercent }}%</span>
+                        </div>
+                        <div class="stat-progress">
+                            <div class="stat-progress-bar" style="width: {{ $scanPercent }}%"></div>
+                        </div>
+                        <div class="stat-progress-text">{{ $scanPercent }}% resi aktif sudah scan out</div>
                         <div class="stat-meta"><i class="fa-regular fa-clock"></i> Update {{ $totalScanUpdated ?? '-' }}</div>
                     </div>
                 </div>
@@ -488,7 +545,14 @@
                                 <i class="fa-solid fa-info"></i>
                             </span>
                         </div>
-                        <div class="stat-value text-danger">{{ number_format($totalResiCanceled ?? 0) }}</div>
+                        <div class="stat-value-row">
+                            <span class="stat-value text-danger">{{ number_format($totalCancelVal) }}</span>
+                            <span class="stat-percent">{{ $cancelPercent }}%</span>
+                        </div>
+                        <div class="stat-progress">
+                            <div class="stat-progress-bar" style="width: {{ $cancelPercent }}%"></div>
+                        </div>
+                        <div class="stat-progress-text">{{ $cancelPercent }}% dari {{ number_format($grandTotal) }} total resi</div>
                         <div class="stat-meta">Tidak termasuk resi aktif</div>
                     </div>
                 </div>

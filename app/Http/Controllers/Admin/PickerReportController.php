@@ -25,6 +25,8 @@ class PickerReportController extends Controller
         return view('admin.outbound.picker-reports.index', [
             'dataUrl' => route('admin.outbound.picker-reports.data'),
             'divisis' => $divisis,
+            'today' => now()->toDateString(),
+            'generatedBy' => $authUser?->name ?? '-',
         ]);
     }
 
@@ -36,6 +38,17 @@ class PickerReportController extends Controller
 
         $recordsTotal = DB::query()->fromSub($baseQuery, 't')->count();
         $recordsFiltered = DB::query()->fromSub($query, 't')->count();
+
+        $summaryRow = DB::query()->fromSub($query, 't')
+            ->selectRaw('COUNT(DISTINCT t.user_id) as picker_count')
+            ->selectRaw('COUNT(DISTINCT t.report_date) as day_count')
+            ->selectRaw('COALESCE(SUM(t.batch_count), 0) as batch_total')
+            ->selectRaw('COALESCE(SUM(t.sku_count), 0) as sku_total')
+            ->selectRaw('COALESCE(SUM(t.total_qty), 0) as qty_total')
+            ->selectRaw('COALESCE(SUM(t.total_seconds), 0) as seconds_total')
+            ->first();
+        $qtyTotal = (int) ($summaryRow->qty_total ?? 0);
+        $secondsTotal = (int) ($summaryRow->seconds_total ?? 0);
 
         $start = (int) $request->input('start', 0);
         $length = (int) $request->input('length', 10);
@@ -83,6 +96,14 @@ class PickerReportController extends Controller
             'recordsTotal' => $recordsTotal,
             'recordsFiltered' => $recordsFiltered,
             'data' => $data,
+            'summary' => [
+                'picker_count' => (int) ($summaryRow->picker_count ?? 0),
+                'day_count'    => (int) ($summaryRow->day_count ?? 0),
+                'batch_total'  => (int) ($summaryRow->batch_total ?? 0),
+                'sku_total'    => (int) ($summaryRow->sku_total ?? 0),
+                'qty_total'    => $qtyTotal,
+                'productivity' => $secondsTotal > 0 ? round($qtyTotal / ($secondsTotal / 3600), 1) : 0,
+            ],
         ]);
     }
 
