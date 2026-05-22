@@ -131,47 +131,65 @@ class DashboardController extends Controller
         $kurir = Kurir::query()->findOrFail((int) $validated['kurir_id'], ['id', 'name']);
 
         $resis = Resi::query()
+            ->with('details:id,resi_id,sku,qty')
             ->where('kurir_id', $kurir->id)
             ->whereDate('tanggal_upload', $date)
             ->orderByDesc('updated_at')
             ->orderByDesc('id')
             ->get(['id', 'id_pesanan', 'no_resi', 'tanggal_upload', 'status']);
 
-        $scanOuts = PackerScanOut::query()
-            ->with('scanner:id,name')
+        $scannedResiIds = PackerScanOut::query()
             ->whereIn('resi_id', $resis->pluck('id'))
-            ->orderByDesc('scanned_at')
-            ->get(['id', 'resi_id', 'scan_type', 'scan_code', 'scanned_at', 'scanned_by'])
-            ->unique('resi_id')
-            ->keyBy('resi_id');
+            ->pluck('resi_id')
+            ->flip();
 
-        $activeResis = $resis->filter(function ($resi) {
-            return ($resi->status ?? 'active') !== 'canceled';
-        })->values();
+        $data = $resis->map(function ($resi) use ($scannedResiIds) {
+            $isCanceled = ($resi->status ?? 'active') === 'canceled';
+            $isScanned = $scannedResiIds->has($resi->id);
 
-        $pendingResis = $activeResis->filter(function ($resi) use ($scanOuts) {
-            return !$scanOuts->has($resi->id);
-        })->values();
+            if ($isCanceled) {
+                $statusKey = 'canceled';
+                $statusLabel = 'Dibatalkan';
+            } elseif ($isScanned) {
+                $statusKey = 'scanned';
+                $statusLabel = 'Sudah Scan Out';
+            } else {
+                $statusKey = 'pending';
+                $statusLabel = 'Belum Scan Out';
+            }
 
-        $data = $pendingResis->map(function ($resi) {
+            $items = $resi->details
+                ->map(fn ($detail) => [
+                    'sku' => $detail->sku ?: '-',
+                    'qty' => (int) $detail->qty,
+                ])
+                ->values();
+
             return [
                 'id_pesanan' => $resi->id_pesanan ?? '-',
                 'no_resi' => $resi->no_resi ?? '-',
-                'status' => 'Belum Scan Out',
+                'status_key' => $statusKey,
+                'status_label' => $statusLabel,
                 'tanggal_upload' => $resi->tanggal_upload
                     ? Carbon::parse($resi->tanggal_upload)->format('Y-m-d')
                     : '-',
+                'items' => $items,
+                'total_qty' => (int) $items->sum('qty'),
             ];
         })->values();
+
+        $scannedTotal = $data->where('status_key', 'scanned')->count();
+        $pendingTotal = $data->where('status_key', 'pending')->count();
+        $canceledTotal = $data->where('status_key', 'canceled')->count();
 
         return response()->json([
             'meta' => [
                 'kurir_name' => $kurir->name,
                 'date' => $date,
-                'total_resi' => $activeResis->count(),
-                'scanned_total' => $activeResis->count() - $pendingResis->count(),
-                'remaining_total' => $pendingResis->count(),
-                'canceled_total' => $resis->count() - $activeResis->count(),
+                'total_resi' => $scannedTotal + $pendingTotal,
+                'scanned_total' => $scannedTotal,
+                'remaining_total' => $pendingTotal,
+                'canceled_total' => $canceledTotal,
             ],
             'data' => $data,
         ]);
