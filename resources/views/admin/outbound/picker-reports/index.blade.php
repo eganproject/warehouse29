@@ -98,7 +98,6 @@
     }
     .pr-doc-period { font-size: 12px; color: #475569; margin-top: 4px; }
     .pr-doc-period .sep { color: #cbd5e1; margin: 0 6px; }
-    .pr-active-view { display: none; }
 
     /* ---------- Summary tiles ---------- */
     .pr-summary-grid {
@@ -143,44 +142,65 @@
     .pr-tile--amber  { --tile: var(--pr-amber);  --tile-soft: rgba(180, 83, 9, 0.12); }
     .pr-tile--indigo { --tile: var(--pr-indigo); --tile-soft: rgba(67, 56, 202, 0.1); }
 
-    /* ---------- Tabs & table ---------- */
-    .pr-tabs { border-bottom: 1px solid #e2e8f0; margin-bottom: 16px; }
-    .pr-tabs .nav-link {
-        font-weight: 700;
-        font-size: 13px;
-        color: #64748b;
-        border: none;
-        padding: 10px 16px;
-    }
-    .pr-tabs .nav-link.active {
-        color: var(--pr-blue);
-        border-bottom: 2.5px solid var(--pr-blue);
-        background: transparent;
-    }
-    #picker_reports_table thead th,
-    #picker_sku_table thead th {
+    /* ---------- Table ---------- */
+    #qc_report_table thead th {
         background: #f1f5f9;
         color: #475569;
         font-size: 10.5px;
         white-space: nowrap;
         border-bottom: 1.5px solid #e2e8f0 !important;
     }
-    #picker_reports_table tbody td,
-    #picker_sku_table tbody td { vertical-align: middle; }
-    .pr-num { font-variant-numeric: tabular-nums; font-weight: 700; }
+    #qc_report_table tbody td { vertical-align: middle; }
+    .pr-num { font-variant-numeric: tabular-nums; }
     .pr-chip {
         display: inline-flex;
         align-items: center;
         gap: 5px;
-        padding: 3px 9px;
+        padding: 3px 10px;
         border-radius: 999px;
-        font-size: 11px;
-        font-weight: 700;
-        background: #eef2f7;
-        color: #475569;
+        font-size: 12px;
+        font-weight: 800;
     }
     .pr-chip--blue  { background: rgba(29, 78, 216, 0.1);  color: #1d4ed8; }
     .pr-chip--green { background: rgba(4, 120, 87, 0.12);  color: #047857; }
+    .pr-chip--amber { background: rgba(180, 83, 9, 0.12);  color: #b45309; }
+    .pr-progress {
+        height: 7px;
+        border-radius: 999px;
+        background: #eef2f7;
+        overflow: hidden;
+        min-width: 80px;
+    }
+    .pr-progress-bar { height: 100%; border-radius: 999px; }
+    .pr-status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 4px 9px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+        white-space: nowrap;
+    }
+    .pr-status-badge--done { background: rgba(4, 120, 87, 0.12); color: #047857; }
+    .pr-status-badge--wip  { background: rgba(180, 83, 9, 0.12); color: #b45309; }
+    .pr-sku-list { display: flex; flex-wrap: wrap; gap: 5px; }
+    .pr-sku-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 3px 8px;
+        border-radius: 7px;
+        background: #f1f5f9;
+        border: 1px solid #e2e8f0;
+        font-size: 11px;
+        font-weight: 600;
+        color: #334155;
+    }
+    .pr-sku-chip i { font-size: 9px; color: #94a3b8; }
+    .pr-sku-chip b { font-weight: 800; }
+    .pr-sku-chip.is-done b { color: #047857; }
+    .pr-sku-chip.is-wip b { color: #b45309; }
 
     /* ---------- Signature (print only) ---------- */
     .pr-doc-sign { display: none; }
@@ -189,22 +209,17 @@
     @media print {
         @page { size: A4 landscape; margin: 10mm; }
         #kt_header, #kt_toolbar, #kt_footer,
-        .pr-no-print, .pr-tabs,
+        .pr-no-print,
         .dataTables_paginate, .dataTables_length, .dataTables_processing { display: none !important; }
         body { background: #fff !important; }
         #kt_content_container, .content { padding: 0 !important; margin: 0 !important; }
         .pr-doc { border: none !important; box-shadow: none !important; }
         .pr-doc .card-body { padding: 0 !important; }
-        .pr-active-view { display: block !important; }
         .pr-tile { break-inside: avoid; }
-        .tab-pane { display: block !important; opacity: 1 !important; }
-        .tab-pane:not(.active) { display: none !important; }
-        #picker_reports_table, #picker_sku_table { font-size: 9.5px; }
-        #picker_reports_table thead th,
-        #picker_sku_table thead th { background: #e2e8f0 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-        #picker_reports_table th, #picker_reports_table td,
-        #picker_sku_table th, #picker_sku_table td { border: 0.5px solid #cbd5e1 !important; }
-        .pr-tile-icon, .pr-brand-logo, .pr-chip {
+        #qc_report_table { font-size: 9.5px; }
+        #qc_report_table thead th { background: #e2e8f0 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        #qc_report_table th, #qc_report_table td { border: 0.5px solid #cbd5e1 !important; }
+        .pr-tile-icon, .pr-brand-logo, .pr-chip, .pr-status-badge, .pr-progress-bar {
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
         }
@@ -237,7 +252,7 @@
                     <span class="pr-field-label">Cari Petugas QC</span>
                     <div class="position-relative">
                         <i class="bi bi-search position-absolute ms-3 text-gray-500 fs-6" style="top:50%;transform:translateY(-50%)"></i>
-                        <input type="text" class="form-control form-control-solid ps-10" id="filter_search_picker" placeholder="Nama petugas QC" autocomplete="off" />
+                        <input type="text" class="form-control form-control-solid ps-10" id="filter_search" placeholder="Nama petugas QC" autocomplete="off" />
                     </div>
                 </div>
                 <div class="pr-field pr-col-4">
@@ -261,17 +276,17 @@
                 </div>
                 <div class="pr-field pr-col-3">
                     <span class="pr-field-label">Tanggal Dari</span>
-                    <input type="text" class="form-control form-control-solid" id="filter_date_from" placeholder="Semua tanggal" autocomplete="off" />
+                    <input type="text" class="form-control form-control-solid" id="filter_date_from" placeholder="Semua tanggal" value="{{ $today ?? '' }}" autocomplete="off" />
                 </div>
                 <div class="pr-field pr-col-3">
                     <span class="pr-field-label">Tanggal Sampai</span>
-                    <input type="text" class="form-control form-control-solid" id="filter_date_to" placeholder="Semua tanggal" autocomplete="off" />
+                    <input type="text" class="form-control form-control-solid" id="filter_date_to" placeholder="Semua tanggal" value="{{ $today ?? '' }}" autocomplete="off" />
                 </div>
                 <div class="pr-field pr-col-12">
                     <div class="pr-preset-group" id="pr_preset_group">
                         <span class="pr-field-label me-1 align-self-center">Rentang Cepat:</span>
-                        <button type="button" class="pr-preset active" data-range="all">Semua</button>
-                        <button type="button" class="pr-preset" data-range="today">Hari Ini</button>
+                        <button type="button" class="pr-preset" data-range="all">Semua</button>
+                        <button type="button" class="pr-preset active" data-range="today">Hari Ini</button>
                         <button type="button" class="pr-preset" data-range="yesterday">Kemarin</button>
                         <button type="button" class="pr-preset" data-range="7d">7 Hari</button>
                         <button type="button" class="pr-preset" data-range="30d">30 Hari</button>
@@ -298,10 +313,10 @@
             {{-- Kop dokumen --}}
             <div class="pr-doc-head">
                 <div class="pr-brand">
-                    <div class="pr-brand-logo"><i class="bi bi-box-seam"></i></div>
+                    <div class="pr-brand-logo"><i class="bi bi-clipboard2-check"></i></div>
                     <div>
                         <div class="pr-brand-name">{{ config('app.name', 'Warehouse 29') }}</div>
-                        <div class="pr-brand-sub">Sistem Manajemen Gudang &mdash; Laporan Operasional</div>
+                        <div class="pr-brand-sub">Sistem Manajemen Gudang &mdash; Divisi Quality Control</div>
                     </div>
                 </div>
                 <div class="pr-doc-meta">
@@ -311,9 +326,8 @@
             </div>
 
             <div class="pr-doc-titlebar">
-                <h2 class="pr-doc-title">LAPORAN QC SCAN</h2>
+                <h2 class="pr-doc-title">LAPORAN QC SCAN PER PETUGAS</h2>
                 <div class="pr-doc-period" id="pr_period_text">Periode: Semua Tanggal</div>
-                <div class="pr-active-view" id="pr_active_view">Bagian: Ringkasan QC per Petugas</div>
             </div>
 
             {{-- Ringkasan --}}
@@ -322,16 +336,24 @@
                     <div class="pr-tile-icon"><i class="bi bi-people"></i></div>
                     <div>
                         <div class="pr-tile-label">Petugas QC</div>
-                        <div class="pr-tile-value" id="sum_picker">0</div>
+                        <div class="pr-tile-value" id="sum_petugas">0</div>
                         <div class="pr-tile-sub" id="sum_days">0 hari aktif</div>
                     </div>
                 </div>
-                <div class="pr-tile pr-tile--green">
-                    <div class="pr-tile-icon"><i class="bi bi-collection"></i></div>
+                <div class="pr-tile pr-tile--indigo">
+                    <div class="pr-tile-icon"><i class="bi bi-clipboard-data"></i></div>
                     <div>
-                        <div class="pr-tile-label">Total Batch QC</div>
-                        <div class="pr-tile-value" id="sum_batch">0</div>
-                        <div class="pr-tile-sub">batch discan</div>
+                        <div class="pr-tile-label">Total Resi Discan</div>
+                        <div class="pr-tile-value" id="sum_resi">0</div>
+                        <div class="pr-tile-sub">resi diproses QC</div>
+                    </div>
+                </div>
+                <div class="pr-tile pr-tile--green">
+                    <div class="pr-tile-icon"><i class="bi bi-check2-circle"></i></div>
+                    <div>
+                        <div class="pr-tile-label">QC Selesai</div>
+                        <div class="pr-tile-value" id="sum_completed">0</div>
+                        <div class="pr-tile-sub" id="sum_completed_pct">0% dari total</div>
                     </div>
                 </div>
                 <div class="pr-tile pr-tile--amber">
@@ -339,86 +361,31 @@
                     <div>
                         <div class="pr-tile-label">Total Qty Discan</div>
                         <div class="pr-tile-value" id="sum_qty">0</div>
-                        <div class="pr-tile-sub" id="sum_sku">0 baris SKU</div>
-                    </div>
-                </div>
-                <div class="pr-tile pr-tile--indigo">
-                    <div class="pr-tile-icon"><i class="bi bi-speedometer2"></i></div>
-                    <div>
-                        <div class="pr-tile-label">Produktivitas</div>
-                        <div class="pr-tile-value" id="sum_productivity">0</div>
-                        <div class="pr-tile-sub">qty / jam rata-rata</div>
+                        <div class="pr-tile-sub">qty SKU terverifikasi</div>
                     </div>
                 </div>
             </div>
 
-            {{-- Tabs --}}
-            <ul class="nav nav-tabs pr-tabs" role="tablist">
-                <li class="nav-item" role="presentation">
-                    <a class="nav-link active" data-bs-toggle="tab" href="#tab_report_picker" role="tab">
-                        <i class="bi bi-person-badge me-1"></i>Ringkasan QC per Petugas
-                    </a>
-                </li>
-                <li class="nav-item" role="presentation">
-                    <a class="nav-link" data-bs-toggle="tab" href="#tab_report_sku" role="tab">
-                        <i class="bi bi-upc-scan me-1"></i>Ringkasan per SKU
-                    </a>
-                </li>
-            </ul>
-
-            <div class="tab-content">
-                {{-- Tab 1: per petugas --}}
-                <div class="tab-pane fade show active" id="tab_report_picker" role="tabpanel">
-                    <div class="table-responsive">
-                        <table class="table align-middle table-row-bordered fs-7 gy-3" id="picker_reports_table">
-                            <thead>
-                                <tr class="text-start text-gray-500 fw-bolder text-uppercase gs-0">
-                                    <th class="text-center" width="44">No</th>
-                                    <th>Tanggal</th>
-                                    <th>Petugas QC</th>
-                                    <th class="text-center">Batch</th>
-                                    <th class="text-center">SKU</th>
-                                    <th class="text-center">Qty</th>
-                                    <th class="text-center">Rata2 Qty/Batch</th>
-                                    <th class="text-center">Rata2 SKU/Batch</th>
-                                    <th class="text-center">Rata2 Durasi</th>
-                                    <th class="text-center">Total Durasi</th>
-                                    <th>Produktivitas</th>
-                                    <th>Jam Kerja</th>
-                                    <th class="text-end pr-no-print" width="80">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody></tbody>
-                        </table>
-                    </div>
-                </div>
-
-                {{-- Tab 2: per SKU --}}
-                <div class="tab-pane fade" id="tab_report_sku" role="tabpanel">
-                    <div class="d-flex justify-content-end mb-3 pr-no-print">
-                        <div class="position-relative" style="max-width:280px">
-                            <i class="bi bi-search position-absolute ms-3 text-gray-500 fs-6" style="top:50%;transform:translateY(-50%)"></i>
-                            <input type="text" class="form-control form-control-solid ps-10" id="filter_search_sku" placeholder="Cari SKU / nama item" autocomplete="off" />
-                        </div>
-                    </div>
-                    <div class="table-responsive">
-                        <table class="table align-middle table-row-bordered fs-7 gy-3" id="picker_sku_table">
-                            <thead>
-                                <tr class="text-start text-gray-500 fw-bolder text-uppercase gs-0">
-                                    <th class="text-center" width="44">No</th>
-                                    <th>SKU</th>
-                                    <th>Nama Item</th>
-                                    <th class="text-center">Total Qty</th>
-                                    <th class="text-center">Jumlah Batch</th>
-                                    <th class="text-center">Petugas QC</th>
-                                    <th class="text-center">Rata2 Qty/Batch</th>
-                                    <th>Rincian Petugas QC (Qty)</th>
-                                </tr>
-                            </thead>
-                            <tbody></tbody>
-                        </table>
-                    </div>
-                </div>
+            {{-- Tabel --}}
+            <div class="table-responsive">
+                <table class="table align-middle table-row-bordered fs-7 gy-3" id="qc_report_table">
+                    <thead>
+                        <tr class="text-start text-gray-500 fw-bolder text-uppercase gs-0">
+                            <th class="text-center" width="44">No</th>
+                            <th>Tanggal</th>
+                            <th>Petugas QC</th>
+                            <th class="text-center">Total Resi</th>
+                            <th class="text-center">Selesai</th>
+                            <th class="text-center">Belum</th>
+                            <th width="150">Penyelesaian</th>
+                            <th class="text-center">SKU</th>
+                            <th class="text-center">Qty (Scan/Wajib)</th>
+                            <th>Jam Kerja</th>
+                            <th class="text-end pr-no-print" width="80">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
             </div>
 
             {{-- Tanda tangan (hanya tampil saat dicetak) --}}
@@ -442,7 +409,7 @@
 
 {{-- ============ Modal Detail ============ --}}
 <div class="modal fade" id="modal_report_detail" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered mw-900px modal-dialog-scrollable">
+    <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
                 <div>
@@ -454,43 +421,47 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <div class="pr-summary-grid mb-5" style="grid-template-columns:repeat(3,1fr)">
-                    <div class="pr-tile pr-tile--blue">
-                        <div class="pr-tile-icon"><i class="bi bi-collection"></i></div>
-                        <div><div class="pr-tile-label">Batch</div><div class="pr-tile-value fs-3" id="detail_batch">-</div></div>
+                <div class="pr-summary-grid mb-4">
+                    <div class="pr-tile pr-tile--indigo">
+                        <div class="pr-tile-icon"><i class="bi bi-clipboard-data"></i></div>
+                        <div><div class="pr-tile-label">Total Resi</div><div class="pr-tile-value fs-3" id="detail_total">0</div></div>
                     </div>
                     <div class="pr-tile pr-tile--green">
-                        <div class="pr-tile-icon"><i class="bi bi-upc-scan"></i></div>
-                        <div><div class="pr-tile-label">SKU</div><div class="pr-tile-value fs-3" id="detail_sku">-</div></div>
+                        <div class="pr-tile-icon"><i class="bi bi-check2-circle"></i></div>
+                        <div><div class="pr-tile-label">Selesai</div><div class="pr-tile-value fs-3" id="detail_completed">0</div></div>
                     </div>
                     <div class="pr-tile pr-tile--amber">
+                        <div class="pr-tile-icon"><i class="bi bi-hourglass-split"></i></div>
+                        <div><div class="pr-tile-label">Belum Lengkap</div><div class="pr-tile-value fs-3" id="detail_pending">0</div></div>
+                    </div>
+                    <div class="pr-tile pr-tile--blue">
                         <div class="pr-tile-icon"><i class="bi bi-box-seam"></i></div>
-                        <div><div class="pr-tile-label">Total Qty</div><div class="pr-tile-value fs-3" id="detail_qty">-</div></div>
+                        <div><div class="pr-tile-label">Qty Discan</div><div class="pr-tile-value fs-3" id="detail_qty">0</div></div>
                     </div>
                 </div>
-                <div class="row g-3 mb-5">
-                    <div class="col-6 col-md-3"><div class="text-muted fs-8">Rata2 Qty/Batch</div><div class="fw-bold" id="detail_avg_qty">-</div></div>
-                    <div class="col-6 col-md-3"><div class="text-muted fs-8">Rata2 SKU/Batch</div><div class="fw-bold" id="detail_avg_sku">-</div></div>
-                    <div class="col-6 col-md-3"><div class="text-muted fs-8">Rata2 Durasi</div><div class="fw-bold" id="detail_avg_duration">-</div></div>
-                    <div class="col-6 col-md-3"><div class="text-muted fs-8">Total Durasi</div><div class="fw-bold" id="detail_total_duration">-</div></div>
-                    <div class="col-6 col-md-3"><div class="text-muted fs-8">Produktivitas</div><div class="fw-bold" id="detail_productivity">-</div></div>
-                    <div class="col-6 col-md-3"><div class="text-muted fs-8">Jam Kerja</div><div class="fw-bold" id="detail_range">-</div></div>
-                    <div class="col-6 col-md-3"><div class="text-muted fs-8">Tanggal</div><div class="fw-bold" id="detail_date">-</div></div>
-                    <div class="col-6 col-md-3"><div class="text-muted fs-8">Petugas QC</div><div class="fw-bold" id="detail_picker">-</div></div>
+
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                    <h6 class="fw-bold text-gray-700 mb-0">
+                        <i class="bi bi-list-ul me-1 text-primary"></i>Daftar Resi yang Discan
+                    </h6>
+                    <div class="position-relative" style="max-width:280px">
+                        <i class="bi bi-search position-absolute ms-3 text-gray-500 fs-6" style="top:50%;transform:translateY(-50%)"></i>
+                        <input type="text" class="form-control form-control-solid form-control-sm ps-9" id="detail_search" placeholder="Cari resi / SKU" autocomplete="off" />
+                    </div>
                 </div>
-                <h6 class="fw-bold text-gray-700 mb-3"><i class="bi bi-list-ul me-1 text-primary"></i>Rincian Item</h6>
                 <div class="table-responsive">
-                    <table class="table table-row-dashed align-middle fs-7">
+                    <table class="table table-row-dashed align-middle fs-7" id="detail_table">
                         <thead>
-                            <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
-                                <th width="8%">No</th>
-                                <th>SKU</th>
-                                <th>Nama Item</th>
-                                <th class="text-end">Qty</th>
+                            <tr class="text-start text-gray-400 fw-bolder fs-8 text-uppercase gs-0">
+                                <th width="44" class="text-center">No</th>
+                                <th>No Resi &amp; Pesanan</th>
+                                <th>Status</th>
+                                <th>Waktu Scan</th>
+                                <th>SKU &amp; Qty (Scan/Wajib)</th>
                             </tr>
                         </thead>
-                        <tbody id="detail_items">
-                            <tr><td colspan="4" class="text-center text-muted py-4">Belum ada data.</td></tr>
+                        <tbody id="detail_body">
+                            <tr><td colspan="5" class="text-center text-muted py-4">Belum ada data.</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -503,14 +474,12 @@
 @push('scripts')
 <script>
     const dataUrl   = '{{ $dataUrl }}';
-    const skuUrl    = '{{ route('admin.outbound.picker-reports.sku') }}';
     const detailUrl = '{{ route('admin.outbound.picker-reports.detail') }}';
+    const todayStr  = '{{ $today ?? '' }}';
 
     document.addEventListener('DOMContentLoaded', () => {
-        const tableEl = $('#picker_reports_table');
-        const skuTableEl = $('#picker_sku_table');
-        const searchPicker = document.getElementById('filter_search_picker');
-        const searchSku = document.getElementById('filter_search_sku');
+        const tableEl = $('#qc_report_table');
+        const searchInput = document.getElementById('filter_search');
         const divisiSelect = document.getElementById('filter_divisi');
         const limitSelect = document.getElementById('filter_limit');
         const dateFromEl = document.getElementById('filter_date_from');
@@ -520,10 +489,11 @@
         const printBtn = document.getElementById('btn_print_report');
         const presetGroup = document.getElementById('pr_preset_group');
         const periodText = document.getElementById('pr_period_text');
-        const activeViewEl = document.getElementById('pr_active_view');
         const printedAtEl = document.getElementById('pr_printed_at');
         const detailModalEl = document.getElementById('modal_report_detail');
         const detailModal = detailModalEl ? new bootstrap.Modal(detailModalEl) : null;
+        const detailSearchEl = document.getElementById('detail_search');
+        const detailBody = document.getElementById('detail_body');
 
         const ID_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
         const esc = v => String(v ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
@@ -586,7 +556,7 @@
                 setDate(fpFrom, dateFromEl, from);
                 setDate(fpTo, dateToEl, to);
                 markPreset(range);
-                reloadAll();
+                reloadTable();
             });
         });
         [dateFromEl, dateToEl].forEach(el => el?.addEventListener('change', () => markPreset(null)));
@@ -609,188 +579,189 @@
 
         const updateSummary = (s) => {
             if (!s) return;
-            setText('sum_picker', num(s.picker_count));
+            const total = Number(s.resi_total || 0);
+            const completed = Number(s.completed_total || 0);
+            const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+            setText('sum_petugas', num(s.petugas_count));
             setText('sum_days', `${num(s.day_count)} hari aktif`);
-            setText('sum_batch', num(s.batch_total));
+            setText('sum_resi', num(total));
+            setText('sum_completed', num(completed));
+            setText('sum_completed_pct', `${pct}% dari total`);
             setText('sum_qty', num(s.qty_total));
-            setText('sum_sku', `${num(s.sku_total)} baris SKU`);
-            setText('sum_productivity', num(s.productivity));
         };
 
-        // ---------- DataTables ----------
-        const langID = {
-            processing: 'Memuat data...',
-            emptyTable: 'Belum ada data laporan QC scan.',
-            zeroRecords: 'Tidak ada data yang cocok dengan filter.',
-            info: 'Menampilkan _START_ - _END_ dari _TOTAL_ baris',
-            infoEmpty: 'Menampilkan 0 baris',
-            infoFiltered: '(disaring dari _MAX_ total)',
-            paginate: { first: 'Awal', last: 'Akhir', next: 'Berikutnya', previous: 'Sebelumnya' },
-        };
-
-        const buildAjax = (url, getSearch, withSummary) => ({
-            url,
-            data(d) {
-                d.q = getSearch() || '';
-                d.divisi_id = divisiSelect?.value || '';
-                d.date_from = dateFromEl?.value || '';
-                d.date_to = dateToEl?.value || '';
-            },
-            dataSrc(json) {
-                if (withSummary && json.summary) {
-                    updateSummary(json.summary);
-                    updatePeriodText();
-                }
-                return json.data || [];
-            },
-        });
-
-        const rowNo = (data, type, row, meta) => meta.settings._iDisplayStart + meta.row + 1;
-
+        // ---------- DataTable ----------
         const dt = tableEl.DataTable({
             processing: true,
             serverSide: true,
             dom: 'rtip',
             ordering: false,
             pageLength: Number(limitSelect?.value || 10),
-            language: langID,
-            ajax: buildAjax(dataUrl, () => searchPicker?.value || '', true),
+            language: {
+                processing: 'Memuat data...',
+                emptyTable: 'Belum ada data QC scan.',
+                zeroRecords: 'Tidak ada data yang cocok dengan filter.',
+                info: 'Menampilkan _START_ - _END_ dari _TOTAL_ baris',
+                infoEmpty: 'Menampilkan 0 baris',
+                infoFiltered: '(disaring dari _MAX_ total)',
+                paginate: { first: 'Awal', last: 'Akhir', next: 'Berikutnya', previous: 'Sebelumnya' },
+            },
+            ajax: {
+                url: dataUrl,
+                data(d) {
+                    d.q = searchInput?.value || '';
+                    d.divisi_id = divisiSelect?.value || '';
+                    d.date_from = dateFromEl?.value || '';
+                    d.date_to = dateToEl?.value || '';
+                },
+                dataSrc(json) {
+                    updateSummary(json.summary);
+                    updatePeriodText();
+                    return json.data || [];
+                },
+            },
             columns: [
-                { data: null, className: 'text-center text-muted fw-semibold', render: rowNo },
+                { data: null, className: 'text-center text-muted fw-semibold', render: (d, t, r, meta) => meta.settings._iDisplayStart + meta.row + 1 },
                 { data: 'date', render: d => `<span class="fw-bold">${esc(formatDateID(d)) || '-'}</span>` },
-                { data: 'picker', render: d => `<span class="fw-semibold text-gray-800">${esc(d) || '-'}</span>` },
-                { data: 'batch_count', className: 'text-center', render: d => `<span class="pr-chip pr-chip--blue">${num(d)}</span>` },
-                { data: 'sku_count', className: 'text-center pr-num', render: num },
-                { data: 'qty', className: 'text-center pr-num', render: d => `<span class="pr-chip pr-chip--green">${num(d)}</span>` },
-                { data: 'avg_qty', className: 'text-center pr-num', render: num },
-                { data: 'avg_sku', className: 'text-center pr-num', render: num },
-                { data: 'avg_duration', className: 'text-center' },
-                { data: 'total_duration', className: 'text-center' },
-                { data: 'productivity', render: d => `<span class="fw-bold text-primary">${esc(d) || '-'}</span>` },
+                { data: 'petugas', render: d => `<span class="fw-semibold text-gray-800">${esc(d) || '-'}</span>` },
+                { data: 'total_resi', className: 'text-center', render: d => `<span class="pr-chip pr-chip--blue">${num(d)}</span>` },
+                { data: 'completed', className: 'text-center pr-num fw-bold text-success', render: num },
+                { data: 'pending', className: 'text-center pr-num fw-bold text-warning', render: num },
+                {
+                    data: 'completion_pct',
+                    render(d) {
+                        const pct = Number(d || 0);
+                        const color = pct >= 100 ? '#047857' : (pct > 0 ? '#b45309' : '#cbd5e1');
+                        return `<div class="d-flex align-items-center gap-2">
+                                    <div class="pr-progress flex-grow-1"><div class="pr-progress-bar" style="width:${pct}%;background:${color}"></div></div>
+                                    <span class="fw-bold fs-8">${pct}%</span>
+                                </div>`;
+                    },
+                },
+                { data: 'sku_lines', className: 'text-center pr-num', render: num },
+                {
+                    data: 'scanned_qty',
+                    className: 'text-center pr-num',
+                    render: (d, t, row) => `<span class="fw-bold">${num(d)}</span> <span class="text-muted">/ ${num(row.required_qty)}</span>`,
+                },
                 { data: 'range', render: d => `<span class="text-muted"><i class="bi bi-clock me-1"></i>${esc(d) || '-'}</span>` },
                 {
                     data: null,
                     orderable: false,
                     className: 'text-end pr-no-print',
-                    render: (data, type, row) =>
-                        `<button type="button" class="btn btn-sm btn-light-primary btn-detail px-3 py-1" data-date="${esc(row.date)}" data-user="${esc(String(row.user_id))}">
-                            <i class="bi bi-eye"></i>
+                    render: (d, t, row) =>
+                        `<button type="button" class="btn btn-sm btn-light-primary btn-detail px-3 py-1" data-date="${esc(row.date)}" data-user="${esc(String(row.user_id))}" data-petugas="${esc(row.petugas)}">
+                            <i class="bi bi-eye me-1"></i>Detail
                         </button>`,
                 },
             ],
         });
 
-        const dtSku = skuTableEl.DataTable({
-            processing: true,
-            serverSide: true,
-            dom: 'rtip',
-            ordering: false,
-            pageLength: Number(limitSelect?.value || 10),
-            language: langID,
-            ajax: buildAjax(skuUrl, () => searchSku?.value || '', false),
-            columns: [
-                { data: null, className: 'text-center text-muted fw-semibold', render: rowNo },
-                { data: 'sku', render: d => `<span class="fw-bold font-monospace text-primary">${esc(d) || '-'}</span>` },
-                { data: 'name', render: d => esc(d) || '-' },
-                { data: 'total_qty', className: 'text-center pr-num', render: d => `<span class="pr-chip pr-chip--green">${num(d)}</span>` },
-                { data: 'batch_count', className: 'text-center pr-num', render: num },
-                { data: 'picker_count', className: 'text-center pr-num', render: num },
-                { data: 'avg_qty', className: 'text-center pr-num', render: num },
-                { data: 'picker_list', render: d => `<span class="text-muted fs-8">${esc(d) || '-'}</span>` },
-            ],
-        });
-
-        const reloadAll = () => { dt.ajax.reload(); dtSku.ajax.reload(); };
-
-        // ---------- Tab handling ----------
-        document.querySelectorAll('a[data-bs-toggle="tab"]').forEach(tab => {
-            tab.addEventListener('shown.bs.tab', (e) => {
-                dt.columns.adjust();
-                dtSku.columns.adjust();
-                if (activeViewEl) {
-                    activeViewEl.textContent = e.target.getAttribute('href') === '#tab_report_sku'
-                        ? 'Bagian: Ringkasan per SKU'
-                        : 'Bagian: Ringkasan QC per Petugas';
-                }
-            });
-        });
+        const reloadTable = () => dt.ajax.reload();
 
         // ---------- Filter events ----------
-        let pickerTimer = null, skuTimer = null;
-        searchPicker?.addEventListener('input', () => {
-            clearTimeout(pickerTimer);
-            pickerTimer = setTimeout(() => dt.ajax.reload(), 400);
+        let searchTimer = null;
+        searchInput?.addEventListener('input', () => {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(reloadTable, 400);
         });
-        searchSku?.addEventListener('input', () => {
-            clearTimeout(skuTimer);
-            skuTimer = setTimeout(() => dtSku.ajax.reload(), 400);
-        });
-        applyBtn?.addEventListener('click', reloadAll);
-        $(divisiSelect).on('change', reloadAll);
-        limitSelect?.addEventListener('change', () => {
-            const len = Number(limitSelect.value || 10);
-            dt.page.len(len).draw();
-            dtSku.page.len(len).draw();
-        });
+        applyBtn?.addEventListener('click', reloadTable);
+        $(divisiSelect).on('change', reloadTable);
+        limitSelect?.addEventListener('change', () => dt.page.len(Number(limitSelect.value || 10)).draw());
         resetBtn?.addEventListener('click', () => {
-            if (searchPicker) searchPicker.value = '';
-            if (searchSku) searchSku.value = '';
+            if (searchInput) searchInput.value = '';
             if (divisiSelect) {
                 divisiSelect.value = '';
                 if ($(divisiSelect).data('select2')) $(divisiSelect).val('').trigger('change.select2');
             }
-            if (limitSelect) { limitSelect.value = '10'; dt.page.len(10); dtSku.page.len(10); }
-            setDate(fpFrom, dateFromEl, '');
-            setDate(fpTo, dateToEl, '');
-            markPreset('all');
-            reloadAll();
+            if (limitSelect) { limitSelect.value = '10'; dt.page.len(10); }
+            setDate(fpFrom, dateFromEl, todayStr);
+            setDate(fpTo, dateToEl, todayStr);
+            markPreset('today');
+            reloadTable();
         });
 
         printBtn?.addEventListener('click', () => window.print());
 
         // ---------- Detail modal ----------
+        let detailRows = [];
+
+        const skuChips = (items) => {
+            if (!Array.isArray(items) || !items.length) return '<span class="text-muted">-</span>';
+            return '<div class="pr-sku-list">' + items.map(it => {
+                const done = Number(it.scanned_qty) >= Number(it.required_qty);
+                return `<span class="pr-sku-chip ${done ? 'is-done' : 'is-wip'}" title="${esc(it.name)}">
+                            <i class="bi bi-cube"></i>${esc(it.sku) || '-'}
+                            <b>${num(it.scanned_qty)}/${num(it.required_qty)}</b>
+                        </span>`;
+            }).join('') + '</div>';
+        };
+
+        const statusBadge = (status) => status === 'completed'
+            ? '<span class="pr-status-badge pr-status-badge--done"><i class="bi bi-check-circle-fill"></i>Selesai</span>'
+            : '<span class="pr-status-badge pr-status-badge--wip"><i class="bi bi-hourglass-split"></i>Belum Lengkap</span>';
+
+        const renderDetailRows = () => {
+            if (!detailBody) return;
+            const keyword = (detailSearchEl?.value || '').trim().toLowerCase();
+            const rows = detailRows.filter(r => {
+                if (!keyword) return true;
+                const hay = [r.no_resi, r.id_pesanan, ...(r.items || []).map(i => i.sku)].join(' ').toLowerCase();
+                return hay.includes(keyword);
+            });
+            if (!rows.length) {
+                detailBody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-4">${keyword ? 'Tidak ada resi yang cocok.' : 'Tidak ada resi.'}</td></tr>`;
+                return;
+            }
+            detailBody.innerHTML = rows.map((r, i) => `
+                <tr>
+                    <td class="text-center text-muted">${i + 1}</td>
+                    <td>
+                        <span class="fw-bold font-monospace text-primary">${esc(r.no_resi) || '-'}</span>
+                        <div class="text-muted fs-8">Pesanan: ${esc(r.id_pesanan) || '-'}</div>
+                    </td>
+                    <td>${statusBadge(r.status)}</td>
+                    <td><span class="fw-semibold">${esc(r.scanned_at) || '-'}</span>
+                        <div class="text-muted fs-8">${r.completed_at && r.completed_at !== '-' ? 'Selesai ' + esc(r.completed_at) : 'Belum selesai'}</div>
+                    </td>
+                    <td>${skuChips(r.items)}</td>
+                </tr>`).join('');
+        };
+
+        detailSearchEl?.addEventListener('input', renderDetailRows);
+
         tableEl.on('click', '.btn-detail', async function(e) {
             e.preventDefault();
             const date = this.getAttribute('data-date');
             const userId = this.getAttribute('data-user');
-            if (!date || !userId) return;
+            const petugas = this.getAttribute('data-petugas') || '-';
+            if (!date || !userId || !detailModal) return;
+
+            detailRows = [];
+            if (detailSearchEl) detailSearchEl.value = '';
+            setText('detail_subtitle', `${petugas} • ${formatDateID(date)}`);
+            ['detail_total', 'detail_completed', 'detail_pending', 'detail_qty'].forEach(id => setText(id, '0'));
+            if (detailBody) detailBody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-4"><span class="spinner-border spinner-border-sm me-2"></span>Memuat data...</td></tr>`;
+            detailModal.show();
+
             try {
                 const url = `${detailUrl}?date=${encodeURIComponent(date)}&user_id=${encodeURIComponent(userId)}`;
                 const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
                 const json = await res.json();
-                if (!res.ok) {
-                    if (typeof Swal !== 'undefined') Swal.fire('Error', json.message || 'Gagal memuat detail', 'error');
-                    return;
-                }
-                setText('detail_subtitle', `${formatDateID(json.date)} • ${json.picker || '-'}`);
-                setText('detail_date', formatDateID(json.date));
-                setText('detail_picker', json.picker);
-                setText('detail_batch', num(json.batch_count));
-                setText('detail_sku', num(json.sku_count));
-                setText('detail_qty', num(json.qty));
-                setText('detail_avg_qty', json.avg_qty ?? '-');
-                setText('detail_avg_sku', json.avg_sku ?? '-');
-                setText('detail_avg_duration', json.avg_duration ?? '-');
-                setText('detail_total_duration', json.total_duration ?? '-');
-                setText('detail_productivity', json.productivity ?? '-');
-                setText('detail_range', `${json.first_started_at || '-'} - ${json.last_submitted_at || '-'}`);
+                if (!res.ok) throw new Error(json?.message || 'Gagal memuat detail');
 
-                const items = json.items || [];
-                const tbody = document.getElementById('detail_items');
-                if (tbody) {
-                    tbody.innerHTML = items.length
-                        ? items.map((row, i) => `
-                            <tr>
-                                <td class="text-muted">${i + 1}</td>
-                                <td><span class="fw-bold font-monospace">${esc(row.sku) || '-'}</span></td>
-                                <td>${esc(row.name) || '-'}</td>
-                                <td class="text-end fw-semibold">${num(row.qty)}</td>
-                            </tr>`).join('')
-                        : '<tr><td colspan="4" class="text-center text-muted py-4">Tidak ada item.</td></tr>';
-                }
-                detailModal?.show();
+                setText('detail_subtitle', `${json.petugas || petugas} • ${formatDateID(json.date)}`);
+                setText('detail_total', num(json.total_resi));
+                setText('detail_completed', num(json.completed));
+                setText('detail_pending', num(json.pending));
+                setText('detail_qty', `${num(json.scanned_qty)} / ${num(json.required_qty)}`);
+                detailRows = Array.isArray(json.resis) ? json.resis : [];
+                renderDetailRows();
             } catch (err) {
-                if (typeof Swal !== 'undefined') Swal.fire('Error', 'Gagal memuat detail', 'error');
+                if (detailBody) {
+                    detailBody.innerHTML = `<tr><td colspan="5" class="text-center text-danger py-4">
+                        <i class="bi bi-exclamation-triangle me-1"></i>${esc(err.message || 'Gagal memuat detail')}</td></tr>`;
+                }
             }
         });
 

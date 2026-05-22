@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Divisi;
-use App\Models\PickerSession;
-use App\Models\PickerSessionItem;
+use App\Models\QcScanResi;
+use App\Models\QcScanResiItem;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -40,15 +40,12 @@ class PickerReportController extends Controller
         $recordsFiltered = DB::query()->fromSub($query, 't')->count();
 
         $summaryRow = DB::query()->fromSub($query, 't')
-            ->selectRaw('COUNT(DISTINCT t.user_id) as picker_count')
+            ->selectRaw('COUNT(DISTINCT t.user_id) as petugas_count')
             ->selectRaw('COUNT(DISTINCT t.report_date) as day_count')
-            ->selectRaw('COALESCE(SUM(t.batch_count), 0) as batch_total')
-            ->selectRaw('COALESCE(SUM(t.sku_count), 0) as sku_total')
-            ->selectRaw('COALESCE(SUM(t.total_qty), 0) as qty_total')
-            ->selectRaw('COALESCE(SUM(t.total_seconds), 0) as seconds_total')
+            ->selectRaw('COALESCE(SUM(t.total_resi), 0) as resi_total')
+            ->selectRaw('COALESCE(SUM(t.completed_resi), 0) as completed_total')
+            ->selectRaw('COALESCE(SUM(t.scanned_qty), 0) as qty_total')
             ->first();
-        $qtyTotal = (int) ($summaryRow->qty_total ?? 0);
-        $secondsTotal = (int) ($summaryRow->seconds_total ?? 0);
 
         $start = (int) $request->input('start', 0);
         $length = (int) $request->input('length', 10);
@@ -59,35 +56,27 @@ class PickerReportController extends Controller
         $rows = $query->get();
 
         $data = $rows->map(function ($row) {
-            $firstStarted = $row->first_started_at
-                ? Carbon::parse($row->first_started_at)->format('H:i')
-                : '';
-            $lastSubmitted = $row->last_submitted_at
-                ? Carbon::parse($row->last_submitted_at)->format('H:i')
-                : '';
-            $range = ($firstStarted !== '' && $lastSubmitted !== '') ? "{$firstStarted} - {$lastSubmitted}" : '-';
+            $firstScan = $row->first_scan_at ? Carbon::parse($row->first_scan_at)->format('H:i') : '';
+            $lastScan = $row->last_scan_at ? Carbon::parse($row->last_scan_at)->format('H:i') : '';
+            $range = ($firstScan !== '' && $lastScan !== '') ? "{$firstScan} - {$lastScan}" : '-';
 
-            $batchCount = (int) $row->batch_count;
-            $skuCount = (int) $row->sku_count;
-            $totalQty = (int) $row->total_qty;
-            $avgQty = $batchCount > 0 ? round($totalQty / $batchCount, 1) : 0;
-            $avgSku = $batchCount > 0 ? round($skuCount / $batchCount, 1) : 0;
-            $totalSeconds = (int) round($row->total_seconds ?? 0);
-            $qtyPerHour = $totalSeconds > 0 ? round($totalQty / ($totalSeconds / 3600), 1) : 0;
+            $totalResi = (int) $row->total_resi;
+            $completed = (int) $row->completed_resi;
+            $pending = (int) $row->pending_resi;
+            $completionPct = $totalResi > 0 ? (int) round($completed / $totalResi * 100) : 0;
 
             return [
-                'date' => $row->report_date,
-                'user_id' => (int) $row->user_id,
-                'picker' => $row->picker ?? '-',
-                'batch_count' => $batchCount,
-                'sku_count' => $skuCount,
-                'qty' => $totalQty,
-                'avg_qty' => $avgQty,
-                'avg_sku' => $avgSku,
-                'avg_duration' => $this->formatDuration((int) round($row->avg_seconds ?? 0)),
-                'total_duration' => $this->formatDuration($totalSeconds),
-                'productivity' => $qtyPerHour > 0 ? "{$qtyPerHour} qty/jam" : '-',
-                'range' => $range,
+                'date'           => $row->report_date,
+                'user_id'        => (int) $row->user_id,
+                'petugas'        => $row->petugas ?? '-',
+                'total_resi'     => $totalResi,
+                'completed'      => $completed,
+                'pending'        => $pending,
+                'completion_pct' => $completionPct,
+                'sku_lines'      => (int) $row->sku_lines,
+                'required_qty'   => (int) $row->required_qty,
+                'scanned_qty'    => (int) $row->scanned_qty,
+                'range'          => $range,
             ];
         });
 
@@ -97,12 +86,11 @@ class PickerReportController extends Controller
             'recordsFiltered' => $recordsFiltered,
             'data' => $data,
             'summary' => [
-                'picker_count' => (int) ($summaryRow->picker_count ?? 0),
-                'day_count'    => (int) ($summaryRow->day_count ?? 0),
-                'batch_total'  => (int) ($summaryRow->batch_total ?? 0),
-                'sku_total'    => (int) ($summaryRow->sku_total ?? 0),
-                'qty_total'    => $qtyTotal,
-                'productivity' => $secondsTotal > 0 ? round($qtyTotal / ($secondsTotal / 3600), 1) : 0,
+                'petugas_count'   => (int) ($summaryRow->petugas_count ?? 0),
+                'day_count'       => (int) ($summaryRow->day_count ?? 0),
+                'resi_total'      => (int) ($summaryRow->resi_total ?? 0),
+                'completed_total' => (int) ($summaryRow->completed_total ?? 0),
+                'qty_total'       => (int) ($summaryRow->qty_total ?? 0),
             ],
         ]);
     }
@@ -118,146 +106,102 @@ class PickerReportController extends Controller
         $userId = (int) $validated['user_id'];
 
         $authUser = $request->user();
-        if ($authUser) {
-            $divisiId = $authUser->divisi_id;
-            if ($divisiId !== null && (int) $divisiId !== 1) {
-                $targetUser = User::find($userId);
-                if (!$targetUser || (int) $targetUser->divisi_id !== (int) $divisiId) {
-                    return response()->json(['message' => 'Tidak diizinkan'], 403);
-                }
+        if ($authUser && $authUser->divisi_id !== null && (int) $authUser->divisi_id !== 1) {
+            $targetUser = User::find($userId);
+            if (!$targetUser || (int) $targetUser->divisi_id !== (int) $authUser->divisi_id) {
+                return response()->json(['message' => 'Tidak diizinkan'], 403);
             }
         }
 
-        $items = $this->fetchItems($date, $userId);
-        $totalQty = (int) $items->sum('qty');
-        $skuCount = (int) $items->count();
+        $qcResis = QcScanResi::query()
+            ->with([
+                'resi:id,no_resi,id_pesanan',
+                'items:id,qc_scan_resi_id,item_id,sku,required_qty,scanned_qty',
+                'items.item:id,name',
+            ])
+            ->where('scanned_by', $userId)
+            ->whereDate('scanned_at', $date)
+            ->orderBy('scanned_at')
+            ->get();
 
-        $batchQuery = PickerSession::query()
-            ->where('status', 'submitted')
-            ->whereDate('submitted_at', $date)
-            ->where('user_id', $userId);
-
-        $batchStats = (clone $batchQuery)
-            ->selectRaw('COUNT(*) as batch_count')
-            ->selectRaw('AVG(TIMESTAMPDIFF(SECOND, started_at, submitted_at)) as avg_seconds')
-            ->selectRaw('SUM(TIMESTAMPDIFF(SECOND, started_at, submitted_at)) as total_seconds')
-            ->selectRaw('MIN(started_at) as first_started_at')
-            ->selectRaw('MIN(submitted_at) as first_submitted_at')
-            ->selectRaw('MAX(submitted_at) as last_submitted_at')
-            ->whereNotNull('started_at')
-            ->first();
-
-        $batchCount = (int) ($batchStats->batch_count ?? 0);
-        $first = $batchStats?->first_submitted_at ?? null;
-        $last = $batchStats?->last_submitted_at ?? null;
-        $firstStarted = $batchStats?->first_started_at ?? null;
-        $avgSeconds = (int) round($batchStats?->avg_seconds ?? 0);
-        $totalSeconds = (int) round($batchStats?->total_seconds ?? 0);
-        $avgQty = $batchCount > 0 ? round($totalQty / $batchCount, 1) : 0;
-        $avgSku = $batchCount > 0 ? round($skuCount / $batchCount, 1) : 0;
-        $productivity = $totalSeconds > 0 ? round($totalQty / ($totalSeconds / 3600), 1) : 0;
-
-        $pickerName = User::where('id', $userId)->value('name') ?? '-';
-
-        return response()->json([
-            'date' => $date,
-            'picker' => $pickerName,
-            'batch_count' => $batchCount,
-            'sku_count' => $skuCount,
-            'qty' => $totalQty,
-            'avg_qty' => $avgQty,
-            'avg_sku' => $avgSku,
-            'avg_duration' => $this->formatDuration($avgSeconds),
-            'total_duration' => $this->formatDuration($totalSeconds),
-            'productivity' => $productivity > 0 ? "{$productivity} qty/jam" : '-',
-            'first_started_at' => $firstStarted ? Carbon::parse($firstStarted)->format('H:i') : '-',
-            'first_submitted_at' => $first ? Carbon::parse($first)->format('H:i') : '-',
-            'last_submitted_at' => $last ? Carbon::parse($last)->format('H:i') : '-',
-            'items' => $items,
-        ]);
-    }
-
-    public function skuSummary(Request $request)
-    {
-        $authUser = $request->user();
-        $baseQuery = $this->buildSkuSummaryQuery($request, $authUser, false);
-        $query = $this->buildSkuSummaryQuery($request, $authUser, true);
-
-        $recordsTotal = DB::query()->fromSub($baseQuery, 't')->count();
-        $recordsFiltered = DB::query()->fromSub($query, 't')->count();
-
-        $start = (int) $request->input('start', 0);
-        $length = (int) $request->input('length', 10);
-        if ($length > 0) {
-            $query->skip($start)->take($length);
-        }
-
-        $rows = $query->get();
-
-        $data = $rows->map(function ($row) {
-            $totalQty = (int) $row->total_qty;
-            $batchCount = (int) $row->batch_count;
-            $avgQty = $batchCount > 0 ? round($totalQty / $batchCount, 1) : 0;
+        $resis = $qcResis->map(function ($qc) {
+            $items = $qc->items->map(fn ($it) => [
+                'sku' => $it->sku,
+                'name' => $it->item?->name ?? '-',
+                'required_qty' => (int) $it->required_qty,
+                'scanned_qty' => (int) $it->scanned_qty,
+            ])->values();
 
             return [
-                'sku' => $row->sku ?? '-',
-                'name' => $row->name ?? '-',
-                'total_qty' => $totalQty,
-                'batch_count' => $batchCount,
-                'picker_count' => (int) $row->picker_count,
-                'avg_qty' => $avgQty,
-                'picker_list' => $row->picker_list ?? '-',
+                'no_resi'      => $qc->resi?->no_resi ?? '-',
+                'id_pesanan'   => $qc->resi?->id_pesanan ?? '-',
+                'status'       => $qc->status,
+                'scanned_at'   => $qc->scanned_at ? Carbon::parse($qc->scanned_at)->format('H:i') : '-',
+                'completed_at' => $qc->completed_at ? Carbon::parse($qc->completed_at)->format('H:i') : '-',
+                'sku_count'    => $items->count(),
+                'required_qty' => (int) $items->sum('required_qty'),
+                'scanned_qty'  => (int) $items->sum('scanned_qty'),
+                'items'        => $items,
             ];
-        });
+        })->values();
+
+        $totalResi = $resis->count();
+        $completed = $qcResis->where('status', 'completed')->count();
 
         return response()->json([
-            'draw' => (int) $request->input('draw'),
-            'recordsTotal' => $recordsTotal,
-            'recordsFiltered' => $recordsFiltered,
-            'data' => $data,
+            'date'         => $date,
+            'petugas'      => User::where('id', $userId)->value('name') ?? '-',
+            'total_resi'   => $totalResi,
+            'completed'    => $completed,
+            'pending'      => max(0, $totalResi - $completed),
+            'total_sku'    => (int) $resis->sum('sku_count'),
+            'required_qty' => (int) $resis->sum('required_qty'),
+            'scanned_qty'  => (int) $resis->sum('scanned_qty'),
+            'resis'        => $resis,
         ]);
     }
 
     private function buildReportQuery(Request $request, $authUser, bool $applyFilters)
     {
-        $sessionAgg = PickerSession::query()
-            ->selectRaw('DATE(picker_sessions.submitted_at) as report_date')
-            ->selectRaw('picker_sessions.user_id')
-            ->selectRaw('COUNT(*) as batch_count')
-            ->selectRaw('AVG(TIMESTAMPDIFF(SECOND, picker_sessions.started_at, picker_sessions.submitted_at)) as avg_seconds')
-            ->selectRaw('SUM(TIMESTAMPDIFF(SECOND, picker_sessions.started_at, picker_sessions.submitted_at)) as total_seconds')
-            ->selectRaw('MIN(picker_sessions.started_at) as first_started_at')
-            ->selectRaw('MIN(picker_sessions.submitted_at) as first_submitted_at')
-            ->selectRaw('MAX(picker_sessions.submitted_at) as last_submitted_at')
-            ->where('picker_sessions.status', 'submitted')
-            ->whereNotNull('picker_sessions.submitted_at')
-            ->whereNotNull('picker_sessions.started_at')
-            ->groupByRaw('DATE(picker_sessions.submitted_at)')
-            ->groupBy('picker_sessions.user_id');
+        $resiAgg = QcScanResi::query()
+            ->selectRaw('DATE(qc_scan_resis.scanned_at) as report_date')
+            ->selectRaw('qc_scan_resis.scanned_by as user_id')
+            ->selectRaw('COUNT(*) as total_resi')
+            ->selectRaw("SUM(CASE WHEN qc_scan_resis.status = 'completed' THEN 1 ELSE 0 END) as completed_resi")
+            ->selectRaw("SUM(CASE WHEN qc_scan_resis.status <> 'completed' THEN 1 ELSE 0 END) as pending_resi")
+            ->selectRaw('MIN(qc_scan_resis.scanned_at) as first_scan_at')
+            ->selectRaw('MAX(qc_scan_resis.scanned_at) as last_scan_at')
+            ->whereNotNull('qc_scan_resis.scanned_at')
+            ->whereNotNull('qc_scan_resis.scanned_by')
+            ->groupByRaw('DATE(qc_scan_resis.scanned_at)')
+            ->groupBy('qc_scan_resis.scanned_by');
 
-        $itemsAgg = PickerSessionItem::query()
-            ->join('picker_sessions', 'picker_sessions.id', '=', 'picker_session_items.picker_session_id')
-            ->selectRaw('DATE(picker_sessions.submitted_at) as report_date')
-            ->selectRaw('picker_sessions.user_id as user_id')
-            ->selectRaw('COUNT(DISTINCT picker_session_items.item_id) as sku_count')
-            ->selectRaw('SUM(picker_session_items.qty) as total_qty')
-            ->where('picker_sessions.status', 'submitted')
-            ->whereNotNull('picker_sessions.submitted_at')
-            ->groupByRaw('DATE(picker_sessions.submitted_at)')
-            ->groupBy('picker_sessions.user_id');
+        $itemAgg = QcScanResiItem::query()
+            ->join('qc_scan_resis', 'qc_scan_resis.id', '=', 'qc_scan_resi_items.qc_scan_resi_id')
+            ->selectRaw('DATE(qc_scan_resis.scanned_at) as report_date')
+            ->selectRaw('qc_scan_resis.scanned_by as user_id')
+            ->selectRaw('COUNT(*) as sku_lines')
+            ->selectRaw('COALESCE(SUM(qc_scan_resi_items.required_qty), 0) as required_qty')
+            ->selectRaw('COALESCE(SUM(qc_scan_resi_items.scanned_qty), 0) as scanned_qty')
+            ->whereNotNull('qc_scan_resis.scanned_at')
+            ->whereNotNull('qc_scan_resis.scanned_by')
+            ->groupByRaw('DATE(qc_scan_resis.scanned_at)')
+            ->groupBy('qc_scan_resis.scanned_by');
 
         $query = DB::query()
-            ->fromSub($sessionAgg, 's')
-            ->join('users', 'users.id', '=', 's.user_id')
-            ->leftJoinSub($itemsAgg, 'i', function ($join) {
-                $join->on('i.report_date', '=', 's.report_date')
-                    ->on('i.user_id', '=', 's.user_id');
+            ->fromSub($resiAgg, 'r')
+            ->join('users', 'users.id', '=', 'r.user_id')
+            ->leftJoinSub($itemAgg, 'i', function ($join) {
+                $join->on('i.report_date', '=', 'r.report_date')
+                    ->on('i.user_id', '=', 'r.user_id');
             })
-            ->selectRaw('s.report_date, s.user_id, users.name as picker, s.batch_count')
-            ->selectRaw('COALESCE(i.sku_count, 0) as sku_count')
-            ->selectRaw('COALESCE(i.total_qty, 0) as total_qty')
-            ->selectRaw('s.avg_seconds, s.total_seconds, s.first_started_at, s.first_submitted_at, s.last_submitted_at')
-            ->orderByRaw('s.report_date desc')
+            ->selectRaw('r.report_date, r.user_id, users.name as petugas')
+            ->selectRaw('r.total_resi, r.completed_resi, r.pending_resi')
+            ->selectRaw('r.first_scan_at, r.last_scan_at')
+            ->selectRaw('COALESCE(i.sku_lines, 0) as sku_lines')
+            ->selectRaw('COALESCE(i.required_qty, 0) as required_qty')
+            ->selectRaw('COALESCE(i.scanned_qty, 0) as scanned_qty')
+            ->orderByRaw('r.report_date desc')
             ->orderBy('users.name');
 
         if ($authUser) {
@@ -276,142 +220,26 @@ class PickerReportController extends Controller
             if ($divisiId) {
                 $query->where('users.divisi_id', $divisiId);
             }
-
-            $this->applyDateFilter($query, $request, 's.report_date', true);
-        }
-
-        return $query;
-    }
-
-    private function buildSkuSummaryQuery(Request $request, $authUser, bool $applyFilters)
-    {
-        $userAgg = PickerSessionItem::query()
-            ->join('picker_sessions', 'picker_sessions.id', '=', 'picker_session_items.picker_session_id')
-            ->join('items', 'items.id', '=', 'picker_session_items.item_id')
-            ->join('users', 'users.id', '=', 'picker_sessions.user_id')
-            ->selectRaw('picker_session_items.item_id as item_id')
-            ->selectRaw('users.id as user_id')
-            ->selectRaw('users.name as picker')
-            ->selectRaw('SUM(picker_session_items.qty) as qty')
-            ->where('picker_sessions.status', 'submitted')
-            ->whereNotNull('picker_sessions.submitted_at')
-            ->groupBy('picker_session_items.item_id', 'users.id', 'users.name');
-
-        if ($authUser) {
-            $divisiId = $authUser->divisi_id;
-            if ($divisiId !== null && (int) $divisiId !== 1) {
-                $userAgg->where('users.divisi_id', $divisiId);
-            }
-        }
-
-        if ($applyFilters) {
-            $search = trim((string) $request->input('q', ''));
-            if ($search !== '') {
-                $userAgg->where(function ($q) use ($search) {
-                    $q->where('items.sku', 'like', "%{$search}%")
-                        ->orWhere('items.name', 'like', "%{$search}%");
-                });
-            }
-            $divisiId = $request->integer('divisi_id');
-            if ($divisiId) {
-                $userAgg->where('users.divisi_id', $divisiId);
-            }
-
-            $this->applyDateFilter($userAgg, $request);
-        }
-
-        $pickerListAgg = DB::query()
-            ->fromSub($userAgg, 'u')
-            ->selectRaw('u.item_id')
-            ->selectRaw('GROUP_CONCAT(CONCAT(u.picker, " (", u.qty, ")") ORDER BY u.picker SEPARATOR ", ") as picker_list')
-            ->groupBy('u.item_id');
-
-        $query = PickerSessionItem::query()
-            ->join('picker_sessions', 'picker_sessions.id', '=', 'picker_session_items.picker_session_id')
-            ->join('items', 'items.id', '=', 'picker_session_items.item_id')
-            ->join('users', 'users.id', '=', 'picker_sessions.user_id')
-            ->leftJoinSub($pickerListAgg, 'p', function ($join) {
-                $join->on('p.item_id', '=', 'items.id');
-            })
-            ->selectRaw('items.sku, items.name')
-            ->selectRaw('SUM(picker_session_items.qty) as total_qty')
-            ->selectRaw('COUNT(DISTINCT picker_sessions.id) as batch_count')
-            ->selectRaw('COUNT(DISTINCT picker_sessions.user_id) as picker_count')
-            ->selectRaw('COALESCE(MAX(p.picker_list), "-") as picker_list')
-            ->where('picker_sessions.status', 'submitted')
-            ->whereNotNull('picker_sessions.submitted_at')
-            ->groupBy('items.id', 'items.sku', 'items.name')
-            ->orderBy('items.sku');
-
-        if ($authUser) {
-            $divisiId = $authUser->divisi_id;
-            if ($divisiId !== null && (int) $divisiId !== 1) {
-                $query->where('users.divisi_id', $divisiId);
-            }
-        }
-
-        if ($applyFilters) {
-            $search = trim((string) $request->input('q', ''));
-            if ($search !== '') {
-                $query->where(function ($q) use ($search) {
-                    $q->where('items.sku', 'like', "%{$search}%")
-                        ->orWhere('items.name', 'like', "%{$search}%");
-                });
-            }
-            $divisiId = $request->integer('divisi_id');
-            if ($divisiId) {
-                $query->where('users.divisi_id', $divisiId);
-            }
-
             $this->applyDateFilter($query, $request);
         }
 
         return $query;
     }
 
-    private function fetchItems(string $date, int $userId)
-    {
-        return PickerSessionItem::query()
-            ->join('picker_sessions', 'picker_sessions.id', '=', 'picker_session_items.picker_session_id')
-            ->join('items', 'items.id', '=', 'picker_session_items.item_id')
-            ->where('picker_sessions.status', 'submitted')
-            ->whereDate('picker_sessions.submitted_at', $date)
-            ->where('picker_sessions.user_id', $userId)
-            ->groupBy('items.id', 'items.sku', 'items.name')
-            ->selectRaw('items.sku, items.name, SUM(picker_session_items.qty) as qty')
-            ->orderBy('items.sku')
-            ->get();
-    }
-
-    private function applyDateFilter($query, Request $request, string $column = 'picker_sessions.submitted_at', bool $dateOnly = false): void
+    private function applyDateFilter($query, Request $request): void
     {
         $dateFrom = $request->input('date_from');
         $dateTo = $request->input('date_to');
 
         try {
             if ($dateFrom) {
-                $from = Carbon::parse($dateFrom);
-                $query->where($column, '>=', $dateOnly ? $from->toDateString() : $from->startOfDay());
+                $query->where('r.report_date', '>=', Carbon::parse($dateFrom)->toDateString());
             }
             if ($dateTo) {
-                $to = Carbon::parse($dateTo);
-                $query->where($column, '<=', $dateOnly ? $to->toDateString() : $to->endOfDay());
+                $query->where('r.report_date', '<=', Carbon::parse($dateTo)->toDateString());
             }
         } catch (\Throwable) {
             // ignore invalid date filters
         }
-    }
-
-    private function formatDuration(int $seconds): string
-    {
-        if ($seconds <= 0) {
-            return '-';
-        }
-        $hours = intdiv($seconds, 3600);
-        $minutes = intdiv($seconds % 3600, 60);
-        if ($hours > 0) {
-            return sprintf('%dj %dm', $hours, $minutes);
-        }
-        return sprintf('%dm', $minutes);
     }
 }

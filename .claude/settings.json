@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(php -r ' *)",
-      "Bash(php -l app/Http/Controllers/Admin/PickerReportController.php)"
+      "Bash(php -l app/Http/Controllers/Admin/PickerReportController.php)",
+      "Bash(git checkout *)"
     ]
   }
 }
