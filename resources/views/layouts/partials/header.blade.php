@@ -97,6 +97,18 @@
                             <a href="{{ \Illuminate\Support\Facades\Route::has('profile.show') ? route('profile.show') : '#' }}" class="menu-link px-5">My Profile</a>
                         </div>
                         <!--end::Menu item-->
+                        @if($canSwitchMobile)
+                            <!--begin::Menu item-->
+                            <div class="menu-item px-5">
+                                <a href="{{ url('/mobile') }}" class="menu-link px-5">
+                                    <span class="menu-icon">
+                                        <i class="fa-solid fa-mobile-screen-button fs-5"></i>
+                                    </span>
+                                    <span class="menu-title">Tampilan Mobile</span>
+                                </a>
+                            </div>
+                            <!--end::Menu item-->
+                        @endif
                         <!--begin::Menu separator-->
                         <div class="separator my-2"></div>
                         <!--end::Menu separator-->
