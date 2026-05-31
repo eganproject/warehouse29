@@ -42,5 +42,7 @@ class StockServiceIdempotencyTest extends TestCase
         $this->assertSame($first?->id, $second?->id);
         $this->assertSame(5, (int) ItemStock::where('item_id', $item->id)->value('stock'));
         $this->assertSame(1, StockMutation::where('idempotency_key', $key)->count());
+        $this->assertSame(0, (int) $first->stock_before);
+        $this->assertSame(5, (int) $first->stock_after);
     }
 }

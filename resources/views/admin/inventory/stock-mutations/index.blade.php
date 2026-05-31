@@ -37,6 +37,8 @@
                         <th>Submit By</th>
                         <th>Arah</th>
                         <th>Qty</th>
+                        <th class="text-end">Stok Sebelum</th>
+                        <th class="text-end">Stok Sesudah</th>
                         <th>Sumber</th>
                         <th>Kode</th>
                         <th>Catatan</th>
@@ -79,7 +81,7 @@
                     </div>
                 </div>
                 <div class="row mb-6">
-                    <div class="col-md-6">
+                    <div class="col-md-4">
                         <div class="fw-bold text-gray-600">Item</div>
                         <div id="mutation_item">-</div>
                     </div>
@@ -92,16 +94,24 @@
                         <div id="mutation_qty">-</div>
                     </div>
                     <div class="col-md-2">
-                        <div class="fw-bold text-gray-600">Sumber</div>
-                        <div id="mutation_source">-</div>
+                        <div class="fw-bold text-gray-600">Stok Sebelum</div>
+                        <div id="mutation_stock_before">-</div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="fw-bold text-gray-600">Stok Sesudah</div>
+                        <div id="mutation_stock_after">-</div>
                     </div>
                 </div>
                 <div class="row mb-6">
                     <div class="col-md-4">
+                        <div class="fw-bold text-gray-600">Sumber</div>
+                        <div id="mutation_source">-</div>
+                    </div>
+                    <div class="col-md-4">
                         <div class="fw-bold text-gray-600">Kode Sumber</div>
                         <div id="mutation_source_code">-</div>
                     </div>
-                    <div class="col-md-8">
+                    <div class="col-md-4">
                         <div class="fw-bold text-gray-600">Catatan</div>
                         <div id="mutation_note">-</div>
                     </div>
@@ -205,6 +215,8 @@
                 { data: 'user' },
                 { data: 'direction' },
                 { data: 'qty' },
+                { data: 'stock_before', className: 'text-end', render: data => data === null || data === undefined ? '-' : data },
+                { data: 'stock_after', className: 'text-end fw-bold', render: data => data === null || data === undefined ? '-' : data },
                 { data: 'source' },
                 { data: 'source_code' },
                 { data: 'note' },
@@ -266,6 +278,8 @@
                 setText('mutation_item', m.item);
                 setText('mutation_direction', m.direction);
                 setText('mutation_qty', m.qty);
+                setText('mutation_stock_before', m.stock_before);
+                setText('mutation_stock_after', m.stock_after);
                 setText('mutation_source', m.source);
                 setText('mutation_source_code', m.source_code);
                 setText('mutation_note', m.note);

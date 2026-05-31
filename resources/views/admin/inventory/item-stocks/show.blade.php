@@ -136,6 +136,8 @@
                         <th>Tanggal</th>
                         <th>Arah</th>
                         <th class="text-end">Qty</th>
+                        <th class="text-end">Stok Sebelum</th>
+                        <th class="text-end">Stok Sesudah</th>
                         <th>Sumber</th>
                         <th>Kode Sumber</th>
                         <th>Catatan</th>
@@ -159,6 +161,14 @@
                         </td>
                         <td class="text-end fw-bold {{ $mut->direction === 'in' ? 'text-success' : 'text-danger' }}">
                             {{ $mut->direction === 'in' ? '+' : '-' }}{{ number_format($mut->qty) }}
+                        </td>
+                        <td class="text-end">
+                            @php($stockBefore = $mut->stockBeforeValue())
+                            {{ $stockBefore === null ? '-' : number_format($stockBefore) }}
+                        </td>
+                        <td class="text-end fw-bold">
+                            @php($stockAfter = $mut->stockAfterValue())
+                            {{ $stockAfter === null ? '-' : number_format($stockAfter) }}
                         </td>
                         <td>
                             @php
@@ -195,7 +205,7 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="7" class="text-center text-muted py-8">Belum ada riwayat mutasi</td>
+                        <td colspan="9" class="text-center text-muted py-8">Belum ada riwayat mutasi</td>
                     </tr>
                     @endforelse
                 </tbody>
