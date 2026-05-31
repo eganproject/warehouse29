@@ -129,6 +129,21 @@
         </div>
     </div>
     <div class="card-body py-4">
+        @php
+            $sourceLabels = [
+                'inbound' => 'Inbound',
+                'outbound' => 'Outbound',
+                'adjustment' => 'Penyesuaian',
+                'opname' => 'Stock Opname',
+                'damaged' => 'Barang Rusak',
+            ];
+            $subtypeLabels = [
+                'receipt' => 'Penerimaan',
+                'return' => 'Retur',
+                'manual' => 'Manual',
+                'picker' => 'QC Scan',
+            ];
+        @endphp
         <div class="table-responsive">
             <table class="table align-middle table-row-dashed fs-6 gy-4">
                 <thead>
@@ -171,26 +186,9 @@
                             {{ $stockAfter === null ? '-' : number_format($stockAfter) }}
                         </td>
                         <td>
-                            @php
-                                $sourceLabel = match($mut->source_type) {
-                                    'inbound' => 'Inbound',
-                                    'outbound' => 'Outbound',
-                                    'adjustment' => 'Penyesuaian',
-                                    'opname' => 'Stock Opname',
-                                    'damaged' => 'Barang Rusak',
-                                    default => ucfirst($mut->source_type ?? '-'),
-                                };
-                                $subtypeLabel = match($mut->source_subtype) {
-                                    'receipt' => 'Penerimaan',
-                                    'return' => 'Retur',
-                                    'manual' => 'Manual',
-                                    'picker' => 'QC Scan',
-                                    default => $mut->source_subtype ? ucfirst($mut->source_subtype) : null,
-                                };
-                            @endphp
-                            <span>{{ $sourceLabel }}</span>
-                            @if($subtypeLabel)
-                                <span class="text-muted fs-8"> / {{ $subtypeLabel }}</span>
+                            <span>{{ $sourceLabels[$mut->source_type] ?? ucfirst($mut->source_type ?? '-') }}</span>
+                            @if($mut->source_subtype)
+                                <span class="text-muted fs-8"> / {{ $subtypeLabels[$mut->source_subtype] ?? ucfirst($mut->source_subtype) }}</span>
                             @endif
                         </td>
                         <td class="text-nowrap">
