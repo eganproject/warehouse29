@@ -14,11 +14,24 @@
                         <path d="M11 19C6.55556 19 3 15.4444 3 11C3 6.55556 6.55556 3 11 3C15.4444 3 19 6.55556 19 11C19 15.4444 15.4444 19 11 19ZM11 5C7.53333 5 5 7.53333 5 11C5 14.4667 7.53333 17 11 17C14.4667 17 17 14.4667 17 11C17 7.53333 14.4667 5 11 5Z" fill="black" />
                     </svg>
                 </span>
-                <input type="text" class="form-control form-control-solid w-250px ps-14" placeholder="Search items" data-kt-filter="search" />
+                <textarea class="form-control form-control-solid w-300px ps-14" rows="2" placeholder="Cari SKU / nama. Multi SKU pisahkan koma, spasi, atau baris baru" data-kt-filter="search"></textarea>
             </div>
         </div>
         <div class="card-toolbar">
-            <button type="button" class="btn btn-light-primary" id="btn_export_item_stocks">Export Excel</button>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <select class="form-select form-select-solid w-150px" id="filter_item_stock_search_mode" aria-label="Mode pencarian">
+                    <option value="like" selected>Kemiripan</option>
+                    <option value="exact">Persis</option>
+                </select>
+                <select class="form-select form-select-solid w-100px" id="filter_item_stock_limit" aria-label="Jumlah data">
+                    <option value="10" selected>10</option>
+                    <option value="20">20</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                </select>
+                <button type="button" class="btn btn-light" id="filter_item_stock_reset">Reset</button>
+                <button type="button" class="btn btn-light-primary" id="btn_export_item_stocks">Export Excel</button>
+            </div>
         </div>
     </div>
     <div class="card-body py-6">
@@ -50,6 +63,9 @@
     document.addEventListener('DOMContentLoaded', () => {
         const tableEl = $('#item_stocks_table');
         const searchInput = document.querySelector('[data-kt-filter="search"]');
+        const searchModeSelect = document.getElementById('filter_item_stock_search_mode');
+        const limitSelect = document.getElementById('filter_item_stock_limit');
+        const resetBtn = document.getElementById('filter_item_stock_reset');
         const exportBtn = document.getElementById('btn_export_item_stocks');
 
         if (!tableEl.length || !$.fn.DataTable) {
@@ -62,11 +78,13 @@
             serverSide: true,
             dom: 'rtip',
             order: [[0, 'desc']],
+            pageLength: Number(limitSelect?.value || 10),
             ajax: {
                 url: dataUrl,
                 dataSrc: 'data',
                 data: function(params) {
                     params.q = searchInput?.value || '';
+                    params.search_mode = searchModeSelect?.value || 'like';
                 }
             },
             columns: [
@@ -87,10 +105,27 @@
         });
 
         const reloadTable = () => dt.ajax.reload();
-        searchInput?.addEventListener('keyup', reloadTable);
+        searchInput?.addEventListener('input', reloadTable);
+        searchModeSelect?.addEventListener('change', reloadTable);
+        limitSelect?.addEventListener('change', () => {
+            dt.page.len(Number(limitSelect.value || 10)).draw();
+        });
+        resetBtn?.addEventListener('click', () => {
+            if (searchInput) searchInput.value = '';
+            if (searchModeSelect) searchModeSelect.value = 'like';
+            if (limitSelect) {
+                limitSelect.value = '10';
+                dt.page.len(10).draw();
+            }
+            reloadTable();
+        });
         exportBtn?.addEventListener('click', () => {
             const q = searchInput?.value?.trim() || '';
-            const url = q ? `${exportUrl}?q=${encodeURIComponent(q)}` : exportUrl;
+            const params = new URLSearchParams();
+            if (q) params.set('q', q);
+            params.set('search_mode', searchModeSelect?.value || 'like');
+            const query = params.toString();
+            const url = query ? `${exportUrl}?${query}` : exportUrl;
             window.location.href = url;
         });
     });

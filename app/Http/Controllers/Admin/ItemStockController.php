@@ -48,20 +48,18 @@ class ItemStockController extends Controller
         $query = Item::with(['stock'])->orderBy('name');
 
         $search = trim((string) $request->input('q', ''));
-        if ($search !== '') {
-            $query->where(function ($q) use ($search) {
-                $q->where('sku', 'like', "%{$search}%")
-                    ->orWhere('name', 'like', "%{$search}%")
-                    ->orWhere('address', 'like', "%{$search}%")
-                    ->orWhere('description', 'like', "%{$search}%");
-            });
-        }
+        $searchMode = $request->input('search_mode') === 'exact' ? 'exact' : 'like';
+        $this->applySearch($query, $search, $searchMode);
 
         $recordsTotal = Item::count();
         $recordsFiltered = (clone $query)->count();
 
         $start = (int) $request->input('start', 0);
         $length = (int) $request->input('length', 10);
+        $allowedLengths = [10, 20, 50, 100];
+        if (! in_array($length, $allowedLengths, true)) {
+            $length = 10;
+        }
         if ($length > 0) {
             $query->skip($start)->take($length);
         }
@@ -97,8 +95,40 @@ class ItemStockController extends Controller
     public function export(Request $request)
     {
         $search = trim((string) $request->input('q', ''));
+        $searchMode = $request->input('search_mode') === 'exact' ? 'exact' : 'like';
         $filename = 'item-stocks-'.now()->format('YmdHis').'.xlsx';
 
-        return Excel::download(new ItemStocksExport($search), $filename);
+        return Excel::download(new ItemStocksExport($search, $searchMode), $filename);
+    }
+
+    private function applySearch($query, string $search, string $mode): void
+    {
+        if ($search === '') {
+            return;
+        }
+
+        $skus = $this->parseSkuTerms($search);
+        if ($mode === 'exact') {
+            $query->whereIn('sku', $skus);
+
+            return;
+        }
+
+        $query->where(function ($q) use ($search, $skus) {
+            foreach ($skus as $sku) {
+                $q->orWhere('sku', 'like', "%{$sku}%");
+            }
+
+            $q->orWhere('name', 'like', "%{$search}%")
+                ->orWhere('address', 'like', "%{$search}%")
+                ->orWhere('description', 'like', "%{$search}%");
+        });
+    }
+
+    private function parseSkuTerms(string $search): array
+    {
+        $terms = preg_split('/[\s,;]+/', $search, -1, PREG_SPLIT_NO_EMPTY);
+
+        return array_values(array_unique(array_map('trim', $terms ?: [])));
     }
 }
