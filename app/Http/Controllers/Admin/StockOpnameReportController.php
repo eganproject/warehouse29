@@ -13,8 +13,11 @@ class StockOpnameReportController extends Controller
 {
     public function index()
     {
+        $latestOpnameDate = $this->latestCompletedOpnameDate();
+
         return view('admin.reports.stock-opname.index', [
             'dataUrl' => route('admin.reports.stock-opname.data'),
+            'latestOpnameDate' => $latestOpnameDate,
         ]);
     }
 
@@ -162,14 +165,24 @@ class StockOpnameReportController extends Controller
 
     public function export(Request $request)
     {
+        $defaultDate = $this->latestCompletedOpnameDate();
         $filters = [
             'q' => trim((string) $request->input('q', '')),
-            'date_from' => $request->input('date_from'),
-            'date_to' => $request->input('date_to'),
+            'date_from' => $request->input('date_from') ?: $defaultDate,
+            'date_to' => $request->input('date_to') ?: $defaultDate,
         ];
         $filename = 'laporan-stock-opname-'.now()->format('YmdHis').'.xlsx';
 
         return Excel::download(new StockOpnameReportExport($filters), $filename);
+    }
+
+    private function latestCompletedOpnameDate(): ?string
+    {
+        return DB::table('stock_opnames')
+            ->where('status', 'completed')
+            ->whereNotNull('transacted_at')
+            ->selectRaw('DATE(MAX(transacted_at)) as latest_date')
+            ->value('latest_date');
     }
 
     private function applyDateFilter($query, Request $request): void

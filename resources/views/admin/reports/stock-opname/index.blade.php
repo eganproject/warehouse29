@@ -8,8 +8,8 @@
     <div class="card-header border-0 pt-6">
         <div class="card-title">
             <div class="d-flex align-items-center gap-2">
-                <input type="text" class="form-control form-control-solid w-150px" id="filter_date_from" placeholder="Dari" />
-                <input type="text" class="form-control form-control-solid w-150px" id="filter_date_to" placeholder="Sampai" />
+                <input type="text" class="form-control form-control-solid w-150px" id="filter_date_from" placeholder="Dari" value="{{ $latestOpnameDate ?? '' }}" />
+                <input type="text" class="form-control form-control-solid w-150px" id="filter_date_to" placeholder="Sampai" value="{{ $latestOpnameDate ?? '' }}" />
                 <button type="button" class="btn btn-light" id="filter_apply">Filter</button>
                 <button type="button" class="btn btn-light" id="filter_reset">Reset</button>
             </div>
@@ -155,6 +155,7 @@
     const dataUrl = '{{ $dataUrl }}';
     const diffUrl = '{{ route('admin.reports.stock-opname.diff-sku') }}';
     const exportUrl = '{{ route('admin.reports.stock-opname.export') }}';
+    const latestOpnameDate = '{{ $latestOpnameDate ?? '' }}';
 
     document.addEventListener('DOMContentLoaded', () => {
         const tableEl = $('#stock_opname_report_table');
@@ -180,9 +181,11 @@
         if (typeof flatpickr !== 'undefined') {
             if (dateFromEl) {
                 fpFrom = flatpickr(dateFromEl, { dateFormat: 'Y-m-d', allowInput: true });
+                if (latestOpnameDate && !dateFromEl.value) fpFrom.setDate(latestOpnameDate, true);
             }
             if (dateToEl) {
                 fpTo = flatpickr(dateToEl, { dateFormat: 'Y-m-d', allowInput: true });
+                if (latestOpnameDate && !dateToEl.value) fpTo.setDate(latestOpnameDate, true);
             }
         }
 
@@ -271,8 +274,8 @@
         searchInput?.addEventListener('keyup', reloadAll);
         applyBtn?.addEventListener('click', reloadAll);
         resetBtn?.addEventListener('click', () => {
-            if (fpFrom) fpFrom.clear(); else if (dateFromEl) dateFromEl.value = '';
-            if (fpTo) fpTo.clear(); else if (dateToEl) dateToEl.value = '';
+            if (fpFrom && latestOpnameDate) fpFrom.setDate(latestOpnameDate, true); else if (fpFrom) fpFrom.clear(); else if (dateFromEl) dateFromEl.value = latestOpnameDate || '';
+            if (fpTo && latestOpnameDate) fpTo.setDate(latestOpnameDate, true); else if (fpTo) fpTo.clear(); else if (dateToEl) dateToEl.value = latestOpnameDate || '';
             reloadAll();
         });
 
@@ -280,8 +283,8 @@
             const params = new URLSearchParams();
             const q = searchInput?.value?.trim();
             if (q) params.set('q', q);
-            if (dateFromEl?.value) params.set('date_from', dateFromEl.value);
-            if (dateToEl?.value) params.set('date_to', dateToEl.value);
+            if (dateFromEl?.value || latestOpnameDate) params.set('date_from', dateFromEl?.value || latestOpnameDate);
+            if (dateToEl?.value || latestOpnameDate) params.set('date_to', dateToEl?.value || latestOpnameDate);
             const url = params.toString() ? `${exportUrl}?${params.toString()}` : exportUrl;
             window.location.href = url;
         });
