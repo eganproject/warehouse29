@@ -19,10 +19,17 @@
         </div>
         <div class="card-toolbar">
             <div class="d-flex align-items-center gap-2">
+                <select class="form-select form-select-solid w-100px" id="filter_stock_mutation_limit" aria-label="Jumlah data">
+                    <option value="10" selected>10</option>
+                    <option value="20">20</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                </select>
                 <input type="text" class="form-control form-control-solid w-150px" id="filter_date_from" placeholder="Dari" />
                 <input type="text" class="form-control form-control-solid w-150px" id="filter_date_to" placeholder="Sampai" />
                 <button type="button" class="btn btn-light" id="filter_apply">Filter</button>
                 <button type="button" class="btn btn-light" id="filter_reset">Reset</button>
+                <button type="button" class="btn btn-light-primary" id="btn_export_stock_mutations">Export Excel</button>
             </div>
         </div>
     </div>
@@ -168,6 +175,7 @@
 @push('scripts')
 <script>
     const dataUrl = '{{ route('admin.inventory.stock-mutations.data') }}';
+    const exportUrl = '{{ route('admin.inventory.stock-mutations.export') }}';
     const detailUrlTpl = '{{ route('admin.inventory.stock-mutations.show', ':id') }}';
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -175,8 +183,10 @@
         const searchInput = document.querySelector('[data-kt-filter="search"]');
         const dateFromEl = document.getElementById('filter_date_from');
         const dateToEl = document.getElementById('filter_date_to');
+        const limitSelect = document.getElementById('filter_stock_mutation_limit');
         const filterApplyBtn = document.getElementById('filter_apply');
         const filterResetBtn = document.getElementById('filter_reset');
+        const exportBtn = document.getElementById('btn_export_stock_mutations');
         let fpFrom = null;
         let fpTo = null;
 
@@ -199,6 +209,7 @@
             serverSide: true,
             dom: 'rtip',
             order: [[1, 'desc']],
+            pageLength: Number(limitSelect?.value || 10),
             ajax: {
                 url: dataUrl,
                 dataSrc: 'data',
@@ -247,11 +258,27 @@
 
         const reloadTable = () => dt.ajax.reload();
         searchInput?.addEventListener('keyup', reloadTable);
+        limitSelect?.addEventListener('change', () => {
+            dt.page.len(Number(limitSelect.value || 10)).draw();
+        });
         filterApplyBtn?.addEventListener('click', reloadTable);
         filterResetBtn?.addEventListener('click', () => {
             if (fpFrom) fpFrom.clear(); else if (dateFromEl) dateFromEl.value = '';
             if (fpTo) fpTo.clear(); else if (dateToEl) dateToEl.value = '';
+            if (limitSelect) {
+                limitSelect.value = '10';
+                dt.page.len(10).draw();
+            }
             reloadTable();
+        });
+        exportBtn?.addEventListener('click', () => {
+            const params = new URLSearchParams();
+            const q = searchInput?.value?.trim() || '';
+            if (q) params.set('q', q);
+            if (dateFromEl?.value) params.set('date_from', dateFromEl.value);
+            if (dateToEl?.value) params.set('date_to', dateToEl.value);
+            const query = params.toString();
+            window.location.href = query ? `${exportUrl}?${query}` : exportUrl;
         });
 
         const modalEl = document.getElementById('modal_mutation_detail');

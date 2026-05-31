@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Exports\StockMutationsExport;
 use App\Http\Controllers\Controller;
 use App\Models\DamagedGood;
 use App\Models\InboundTransaction;
@@ -12,6 +13,7 @@ use App\Models\StockMutation;
 use App\Models\StockOpname;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Maatwebsite\Excel\Facades\Excel;
 
 class StockMutationController extends Controller
 {
@@ -50,6 +52,10 @@ class StockMutationController extends Controller
 
         $start = (int) $request->input('start', 0);
         $length = (int) $request->input('length', 10);
+        $allowedLengths = [10, 20, 50, 100];
+        if (! in_array($length, $allowedLengths, true)) {
+            $length = 10;
+        }
         if ($length > 0) {
             $query->skip($start)->take($length);
         }
@@ -80,6 +86,16 @@ class StockMutationController extends Controller
             'recordsFiltered' => $recordsFiltered,
             'data' => $data,
         ]);
+    }
+
+    public function export(Request $request)
+    {
+        $search = trim((string) $request->input('q', ''));
+        $dateFrom = $request->input('date_from') ?: null;
+        $dateTo = $request->input('date_to') ?: null;
+        $filename = 'stock-mutations-'.now()->format('YmdHis').'.xlsx';
+
+        return Excel::download(new StockMutationsExport($search, $dateFrom, $dateTo), $filename);
     }
 
     private function applyDateFilter($query, Request $request): void
