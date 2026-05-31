@@ -91,8 +91,9 @@ class StockMutationController extends Controller
     public function export(Request $request)
     {
         $search = trim((string) $request->input('q', ''));
-        $dateFrom = $request->input('date_from') ?: null;
-        $dateTo = $request->input('date_to') ?: null;
+        $today = now()->toDateString();
+        $dateFrom = $request->input('date_from') ?: $today;
+        $dateTo = $request->input('date_to') ?: $today;
         $filename = 'stock-mutations-'.now()->format('YmdHis').'.xlsx';
 
         return Excel::download(new StockMutationsExport($search, $dateFrom, $dateTo), $filename);

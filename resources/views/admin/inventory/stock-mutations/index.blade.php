@@ -25,11 +25,15 @@
                     <option value="50">50</option>
                     <option value="100">100</option>
                 </select>
-                <input type="text" class="form-control form-control-solid w-150px" id="filter_date_from" placeholder="Dari" />
-                <input type="text" class="form-control form-control-solid w-150px" id="filter_date_to" placeholder="Sampai" />
+                <input type="text" class="form-control form-control-solid w-150px" id="filter_date_from" placeholder="Dari" value="{{ now()->toDateString() }}" />
+                <input type="text" class="form-control form-control-solid w-150px" id="filter_date_to" placeholder="Sampai" value="{{ now()->toDateString() }}" />
                 <button type="button" class="btn btn-light" id="filter_apply">Filter</button>
                 <button type="button" class="btn btn-light" id="filter_reset">Reset</button>
-                <button type="button" class="btn btn-light-primary" id="btn_export_stock_mutations">Export Excel</button>
+                <button type="button" class="btn btn-light-primary" id="btn_export_stock_mutations">
+                    <span class="indicator-label">Export Excel</span>
+                    <span class="indicator-progress">Menyiapkan export...
+                    <span class="spinner-border spinner-border-sm align-middle ms-2"></span></span>
+                </button>
             </div>
         </div>
     </div>
@@ -177,6 +181,7 @@
     const dataUrl = '{{ route('admin.inventory.stock-mutations.data') }}';
     const exportUrl = '{{ route('admin.inventory.stock-mutations.export') }}';
     const detailUrlTpl = '{{ route('admin.inventory.stock-mutations.show', ':id') }}';
+    const todayStr = '{{ now()->toDateString() }}';
 
     document.addEventListener('DOMContentLoaded', () => {
         const tableEl = $('#stock_mutations_table');
@@ -198,9 +203,11 @@
         if (typeof flatpickr !== 'undefined') {
             if (dateFromEl) {
                 fpFrom = flatpickr(dateFromEl, { dateFormat: 'Y-m-d', allowInput: true });
+                if (!dateFromEl.value) fpFrom.setDate(todayStr, true);
             }
             if (dateToEl) {
                 fpTo = flatpickr(dateToEl, { dateFormat: 'Y-m-d', allowInput: true });
+                if (!dateToEl.value) fpTo.setDate(todayStr, true);
             }
         }
 
@@ -263,21 +270,30 @@
         });
         filterApplyBtn?.addEventListener('click', reloadTable);
         filterResetBtn?.addEventListener('click', () => {
-            if (fpFrom) fpFrom.clear(); else if (dateFromEl) dateFromEl.value = '';
-            if (fpTo) fpTo.clear(); else if (dateToEl) dateToEl.value = '';
+            if (fpFrom) fpFrom.setDate(todayStr, true); else if (dateFromEl) dateFromEl.value = todayStr;
+            if (fpTo) fpTo.setDate(todayStr, true); else if (dateToEl) dateToEl.value = todayStr;
             if (limitSelect) {
                 limitSelect.value = '10';
                 dt.page.len(10).draw();
             }
             reloadTable();
         });
+        const setExportLoading = (isLoading) => {
+            if (!exportBtn) return;
+            exportBtn.disabled = isLoading;
+            exportBtn.setAttribute('data-kt-indicator', isLoading ? 'on' : 'off');
+        };
+        window.addEventListener('focus', () => setExportLoading(false));
+        window.addEventListener('pageshow', () => setExportLoading(false));
         exportBtn?.addEventListener('click', () => {
             const params = new URLSearchParams();
             const q = searchInput?.value?.trim() || '';
             if (q) params.set('q', q);
-            if (dateFromEl?.value) params.set('date_from', dateFromEl.value);
-            if (dateToEl?.value) params.set('date_to', dateToEl.value);
+            params.set('date_from', dateFromEl?.value || todayStr);
+            params.set('date_to', dateToEl?.value || todayStr);
             const query = params.toString();
+            setExportLoading(true);
+            setTimeout(() => setExportLoading(false), 15000);
             window.location.href = query ? `${exportUrl}?${query}` : exportUrl;
         });
 
