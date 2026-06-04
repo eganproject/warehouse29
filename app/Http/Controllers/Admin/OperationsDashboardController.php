@@ -65,7 +65,7 @@ class OperationsDashboardController extends Controller
             ->whereDate('transacted_at', $selectedDate)
             ->count();
 
-        $couriers = DB::table('kurirs as k')
+        $courierAgg = DB::table('kurirs as k')
             ->leftJoin('resis as r', function ($join) use ($selectedDate) {
                 $join->on('r.kurir_id', '=', 'k.id')
                     ->whereDate('r.tanggal_upload', $selectedDate);
@@ -76,8 +76,11 @@ class OperationsDashboardController extends Controller
             ->selectRaw("COUNT(DISTINCT CASE WHEN r.status = 'canceled' THEN r.id END) as canceled_total")
             ->selectRaw('COUNT(DISTINCT pso.resi_id) as scan_total')
             ->selectRaw('MAX(pso.scanned_at) as last_scan_at')
-            ->groupBy('k.id', 'k.name')
-            ->havingRaw('total_resi + canceled_total + scan_total > 0')
+            ->groupBy('k.id', 'k.name');
+
+        $couriers = DB::query()
+            ->fromSub($courierAgg, 'courier_stats')
+            ->whereRaw('total_resi + canceled_total + scan_total > 0')
             ->orderByRaw('(total_resi - scan_total) desc')
             ->orderByDesc('total_resi')
             ->limit(12)
