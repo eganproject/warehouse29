@@ -11,6 +11,7 @@ class MenuSeeder extends Seeder
     {
         $menuRows = [
             ['name' => 'Dashboard', 'slug' => 'dashboard', 'route' => 'admin.dashboard', 'icon' => 'fa-solid fa-gauge-high', 'parent_slug' => null, 'sort_order' => 0],
+            ['name' => 'Operations Dashboard', 'slug' => 'operations-dashboard', 'route' => 'admin.operations-dashboard.index', 'icon' => 'fa-solid fa-chart-simple', 'parent_slug' => null, 'sort_order' => 1],
             ['name' => 'Master Data', 'slug' => 'master-data', 'route' => null, 'icon' => 'fa-solid fa-database', 'parent_slug' => null, 'sort_order' => 10],
             ['name' => 'Inventory', 'slug' => 'inventory', 'route' => null, 'icon' => 'fa-solid fa-warehouse', 'parent_slug' => null, 'sort_order' => 12],
             ['name' => 'Inbound', 'slug' => 'inbound', 'route' => null, 'icon' => 'fa-solid fa-arrow-down', 'parent_slug' => null, 'sort_order' => 13],
@@ -48,7 +49,10 @@ class MenuSeeder extends Seeder
             ['name' => 'Laporan QC Scan', 'slug' => 'outbound-picker-report', 'route' => 'admin.outbound.picker-reports.index', 'icon' => 'fa-solid fa-file-lines', 'parent_slug' => 'reports', 'sort_order' => 1],
             ['name' => 'Laporan Scan Out', 'slug' => 'outbound-packer-report', 'route' => 'admin.reports.packer-reports.index', 'icon' => 'fa-solid fa-truck-ramp-box', 'parent_slug' => 'reports', 'sort_order' => 1.2],
             ['name' => 'Laporan Packing (Legacy)', 'slug' => 'outbound-packer-packing-report', 'route' => 'admin.reports.packer-packing-reports.index', 'icon' => 'fa-solid fa-box-archive', 'parent_slug' => 'reports', 'sort_order' => 1.15, 'is_active' => false],
+            ['name' => 'Laporan Mutasi Stok', 'slug' => 'report-stock-mutations', 'route' => 'admin.reports.stock-mutations.index', 'icon' => 'fa-solid fa-right-left', 'parent_slug' => 'reports', 'sort_order' => 1.22],
             ['name' => 'Laporan Stok Pengaman', 'slug' => 'report-low-stock', 'route' => 'admin.reports.low-stock.index', 'icon' => 'fa-solid fa-triangle-exclamation', 'parent_slug' => 'reports', 'sort_order' => 1.25],
+            ['name' => 'Laporan Kurir', 'slug' => 'report-couriers', 'route' => 'admin.reports.couriers.index', 'icon' => 'fa-solid fa-truck', 'parent_slug' => 'reports', 'sort_order' => 1.27],
+            ['name' => 'Stock Health Report', 'slug' => 'report-stock-health', 'route' => 'admin.reports.stock-health.index', 'icon' => 'fa-solid fa-heart-pulse', 'parent_slug' => 'reports', 'sort_order' => 1.3],
             ['name' => 'Aktivitas User', 'slug' => 'activity-logs', 'route' => 'admin.reports.activity-logs.index', 'icon' => 'fa-solid fa-clipboard-check', 'parent_slug' => 'reports', 'sort_order' => 2],
             ['name' => 'Laporan Stock Opname', 'slug' => 'report-stock-opname', 'route' => 'admin.reports.stock-opname.index', 'icon' => 'fa-solid fa-clipboard-list', 'parent_slug' => 'reports', 'sort_order' => 3],
         ];
@@ -108,6 +112,7 @@ class MenuSeeder extends Seeder
             'captain' => [
                 'view' => [
                     'dashboard',
+                    'operations-dashboard',
                     'item-stocks',
                     'stock-mutations',
                     'stock-opname',
@@ -126,13 +131,17 @@ class MenuSeeder extends Seeder
                     'outbound-packer-scan-outs',
                     'outbound-picker-report',
                     'outbound-packer-report',
+                    'report-stock-mutations',
                     'report-low-stock',
+                    'report-couriers',
+                    'report-stock-health',
                     'report-stock-opname',
                 ],
             ],
             'admin-resi' => [
                 'view' => [
                     'dashboard',
+                    'operations-dashboard',
                     'item-stocks',
                     'stock-mutations',
                     'resi-import',
@@ -140,15 +149,19 @@ class MenuSeeder extends Seeder
                     'picking-list',
                     'outbound-qc-scan-history',
                     'outbound-packer-scan-outs',
+                    'report-couriers',
                 ],
                 'operate' => ['resi-import'],
             ],
             'admin-retur' => [
                 'view' => [
                     'dashboard',
+                    'operations-dashboard',
                     'item-stocks',
                     'stock-mutations',
+                    'report-stock-mutations',
                     'report-low-stock',
+                    'report-stock-health',
                 ],
                 'operate' => [
                     'inbound-return',
@@ -160,6 +173,7 @@ class MenuSeeder extends Seeder
             'admin-gudang' => [
                 'view' => [
                     'dashboard',
+                    'operations-dashboard',
                     'users',
                     'roles',
                     'item-stocks',
@@ -170,7 +184,10 @@ class MenuSeeder extends Seeder
                     'outbound-packer-scan-outs',
                     'outbound-picker-report',
                     'outbound-packer-report',
+                    'report-stock-mutations',
                     'report-low-stock',
+                    'report-couriers',
+                    'report-stock-health',
                     'activity-logs',
                     'report-stock-opname',
                 ],
@@ -195,6 +212,7 @@ class MenuSeeder extends Seeder
             'kepala-gudang' => [
                 'view' => [
                     'dashboard',
+                    'operations-dashboard',
                     'users',
                     'roles',
                     'divisi',
@@ -210,7 +228,10 @@ class MenuSeeder extends Seeder
                     'outbound-packer-scan-outs',
                     'outbound-picker-report',
                     'outbound-packer-report',
+                    'report-stock-mutations',
                     'report-low-stock',
+                    'report-couriers',
+                    'report-stock-health',
                     'activity-logs',
                     'report-stock-opname',
                 ],

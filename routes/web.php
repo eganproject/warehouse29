@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\OperationsDashboardController;
+use App\Http\Controllers\Admin\AnalyticsReportController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Admin\ItemStockController;
 use App\Http\Controllers\Admin\InboundController;
@@ -115,6 +117,7 @@ require __DIR__.'/auth.php';
 Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as('admin.')->group(function () {
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/dashboard/kurir-detail', [DashboardController::class, 'kurirDetail'])->name('dashboard.kurir-detail');
+    Route::get('/operations-dashboard', [OperationsDashboardController::class, 'index'])->name('operations-dashboard.index');
 
     Route::prefix('masterdata')->as('masterdata.')->group(function () {
         // Users DataTables
@@ -336,6 +339,12 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         Route::get('/packer-packing-reports/search-resi', [PackerPackingReportController::class, 'searchResi'])->name('packer-packing-reports.search-resi');
         Route::get('/low-stock', [LowStockReportController::class, 'index'])->name('low-stock.index');
         Route::get('/low-stock/data', [LowStockReportController::class, 'data'])->name('low-stock.data');
+        Route::get('/stock-mutations', [AnalyticsReportController::class, 'stockMutations'])->name('stock-mutations.index');
+        Route::get('/stock-mutations/data', [AnalyticsReportController::class, 'stockMutationsData'])->name('stock-mutations.data');
+        Route::get('/couriers', [AnalyticsReportController::class, 'couriers'])->name('couriers.index');
+        Route::get('/couriers/data', [AnalyticsReportController::class, 'couriersData'])->name('couriers.data');
+        Route::get('/stock-health', [AnalyticsReportController::class, 'stockHealth'])->name('stock-health.index');
+        Route::get('/stock-health/data', [AnalyticsReportController::class, 'stockHealthData'])->name('stock-health.data');
         Route::get('/stock-opname', [StockOpnameReportController::class, 'index'])->name('stock-opname.index');
         Route::get('/stock-opname/data', [StockOpnameReportController::class, 'data'])->name('stock-opname.data');
         Route::get('/stock-opname/sku-diff', [StockOpnameReportController::class, 'diffSku'])->name('stock-opname.diff-sku');
