@@ -124,6 +124,14 @@
             z-index: 1067 !important;
         }
 
+        .flatpickr-apply-footer {
+            background: #fff;
+            border-top: 1px solid #e4e6ef;
+            padding: 0.5rem;
+            display: flex;
+            justify-content: flex-end;
+        }
+
         @media (max-width: 575.98px) {
             .modal-dialog,
             .modal-dialog.modal-lg,
@@ -272,6 +280,27 @@
 
                 const originalFlatpickr = window.flatpickr;
                 const asFlatpickrHooks = (hook) => Array.isArray(hook) ? hook : (hook ? [hook] : []);
+                const addFlatpickrApplyButton = (instance) => {
+                    const calendar = instance?.calendarContainer;
+                    if (!calendar || calendar.querySelector('.flatpickr-apply-footer')) {
+                        return;
+                    }
+
+                    const footer = document.createElement('div');
+                    footer.className = 'flatpickr-apply-footer';
+
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.className = 'btn btn-sm btn-primary';
+                    button.textContent = 'Apply';
+                    button.addEventListener('click', (event) => {
+                        event.preventDefault();
+                        instance.close();
+                    });
+
+                    footer.appendChild(button);
+                    calendar.appendChild(footer);
+                };
                 const repositionFlatpickr = (instance) => {
                     requestAnimationFrame(() => {
                         if (instance?.isOpen) {
@@ -301,15 +330,31 @@
                         : (selector instanceof Element ? [selector] : Array.from(selector || []));
 
                     const shouldPatch = elements.some((el) => isInsideModal(el));
-                    if (shouldPatch && config && typeof config === 'object') {
+                    if (config && typeof config === 'object') {
+                        const useApplyButton = config.applyButton !== false && !config.inline;
+                        const modalOptions = shouldPatch
+                            ? {
+                                // Gunakan document.body agar kalender diposisikan dari viewport,
+                                // tidak terpengaruh oleh scroll pada elemen .modal itu sendiri.
+                                ...(!config.appendTo ? { appendTo: document.body } : {}),
+                            }
+                            : {};
+
                         config = {
                             ...config,
-                            // Gunakan document.body agar kalender diposisikan dari viewport,
-                            // tidak terpengaruh oleh scroll pada elemen .modal itu sendiri.
-                            ...(!config.appendTo ? { appendTo: document.body } : {}),
+                            ...modalOptions,
+                            ...(useApplyButton ? { closeOnSelect: false } : {}),
                             onReady: [
                                 ...asFlatpickrHooks(config.onReady),
                                 (_selectedDates, _dateStr, instance) => {
+                                    if (useApplyButton) {
+                                        addFlatpickrApplyButton(instance);
+                                    }
+
+                                    if (!shouldPatch) {
+                                        return;
+                                    }
+
                                     bindFlatpickrToModal(instance);
                                     instance.calendarContainer?.addEventListener('mousedown', (event) => event.stopPropagation());
                                     instance.calendarContainer?.addEventListener('click', (event) => event.stopPropagation());
@@ -318,6 +363,10 @@
                             onOpen: [
                                 ...asFlatpickrHooks(config.onOpen),
                                 (_selectedDates, _dateStr, instance) => {
+                                    if (!shouldPatch) {
+                                        return;
+                                    }
+
                                     bindFlatpickrToModal(instance);
                                     repositionFlatpickr(instance);
                                 },
