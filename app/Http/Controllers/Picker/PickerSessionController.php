@@ -69,7 +69,7 @@ class PickerSessionController extends Controller
     public function storeItem(Request $request)
     {
         $validated = $request->validate([
-            'item_id' => ['required', 'integer', 'exists:items,id'],
+            'item_id' => ['required', 'integer', \Illuminate\Validation\Rule::exists('items', 'id')->where('is_active', true)],
             'qty' => ['required', 'integer', 'min:1'],
             'note' => ['nullable', 'string'],
             'request_id' => ['nullable', 'string', 'max:120'],
@@ -345,7 +345,7 @@ class PickerSessionController extends Controller
     public function searchItems(Request $request)
     {
         $search = trim((string) $request->input('q', ''));
-        $query = Item::query();
+        $query = Item::active();
         if ($search !== '') {
             $query->where('sku', 'like', "%{$search}%");
         }
@@ -369,7 +369,7 @@ class PickerSessionController extends Controller
         $code = trim($validated['code']);
         $qty = (int) ($validated['qty'] ?? 1);
 
-        $item = Item::where('sku', $code)->first();
+        $item = Item::active()->where('sku', $code)->first();
         if (!$item) {
             return response()->json([
                 'message' => 'SKU tidak ditemukan pada master item.',
@@ -454,7 +454,7 @@ class PickerSessionController extends Controller
             $deltaQty = $qty;
             $occurredAt = now();
             $pickedDate = $session->started_at?->toDateString() ?? $occurredAt->toDateString();
-            $item = Item::findOrFail($itemId);
+            $item = Item::active()->findOrFail($itemId);
             $sku = $item->sku ?? '';
 
             $this->ensurePickingListCapacity($pickedDate, $sku, $deltaQty);

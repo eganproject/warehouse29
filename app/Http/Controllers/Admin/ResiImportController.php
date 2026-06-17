@@ -538,7 +538,7 @@ class ResiImportController extends Controller
 
     private function getPickedQty(string $date, string $sku): int
     {
-        $itemId = Item::where('sku', $sku)->value('id');
+        $itemId = Item::active()->where('sku', $sku)->value('id');
         if (!$itemId) {
             return 0;
         }

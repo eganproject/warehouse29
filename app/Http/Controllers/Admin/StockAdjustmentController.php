@@ -21,7 +21,7 @@ class StockAdjustmentController extends Controller
 {
     public function index()
     {
-        $items = Item::orderBy('name')->get(['id', 'sku', 'name']);
+        $items = Item::active()->orderBy('name')->get(['id', 'sku', 'name']);
 
         return view('admin.inventory.stock-adjustments.index', [
             'items' => $items,
@@ -384,7 +384,7 @@ class StockAdjustmentController extends Controller
     {
         $validated = $request->validate([
             'items' => ['required', 'array', 'min:1'],
-            'items.*.item_id' => ['required', 'integer', 'exists:items,id'],
+            'items.*.item_id' => ['required', 'integer', \Illuminate\Validation\Rule::exists('items', 'id')->where('is_active', true)],
             'items.*.direction' => ['required', 'string', Rule::in(['in', 'out'])],
             'items.*.qty' => ['required', 'integer', 'min:1'],
             'items.*.note' => ['nullable', 'string'],

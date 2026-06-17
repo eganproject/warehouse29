@@ -103,12 +103,14 @@ class OperationsDashboardController extends Controller
 
         $lowStock = DB::table('items as i')
             ->leftJoin('item_stocks as s', 's.item_id', '=', 'i.id')
+            ->where('i.is_active', true)
             ->where('i.safety_stock', '>', 0)
             ->whereRaw('COALESCE(s.stock, 0) < i.safety_stock')
             ->count();
 
         $outOfStock = DB::table('items as i')
             ->leftJoin('item_stocks as s', 's.item_id', '=', 'i.id')
+            ->where('i.is_active', true)
             ->whereRaw('COALESCE(s.stock, 0) <= 0')
             ->count();
 

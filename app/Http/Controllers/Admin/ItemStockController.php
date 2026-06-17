@@ -20,7 +20,7 @@ class ItemStockController extends Controller
 
     public function show(int $id, Request $request)
     {
-        $item = Item::with(['stock', 'category'])->findOrFail($id);
+        $item = Item::active()->with(['stock', 'category'])->findOrFail($id);
 
         $isBundle = (bool) $item->is_bundle;
         $currentStock = $isBundle
@@ -45,13 +45,13 @@ class ItemStockController extends Controller
 
     public function data(Request $request)
     {
-        $query = Item::with(['stock'])->orderBy('name');
+        $query = Item::active()->with(['stock'])->orderBy('name');
 
         $search = trim((string) $request->input('q', ''));
         $searchMode = $request->input('search_mode') === 'exact' ? 'exact' : 'like';
         $this->applySearch($query, $search, $searchMode);
 
-        $recordsTotal = Item::count();
+        $recordsTotal = Item::active()->count();
         $recordsFiltered = (clone $query)->count();
 
         $start = (int) $request->input('start', 0);

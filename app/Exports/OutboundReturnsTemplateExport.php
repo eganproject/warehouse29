@@ -24,7 +24,7 @@ class OutboundReturnsTemplateExport implements FromArray, WithHeadings, ShouldAu
 
     public function array(): array
     {
-        $samples = Item::orderBy('name')->limit(2)->pluck('sku')->all();
+        $samples = Item::active()->orderBy('name')->limit(2)->pluck('sku')->all();
         $now = now()->format('Y-m-d H:i');
         $defaults = $samples ?: ['SKU-CONTOH-1', 'SKU-CONTOH-2'];
 

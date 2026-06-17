@@ -153,7 +153,7 @@ class QcScanController extends Controller
                     return $this->serializeDailyScanSummary();
                 }
 
-                $item = Item::where('sku', $code)->lockForUpdate()->first();
+                $item = Item::active()->where('sku', $code)->lockForUpdate()->first();
                 if (!$item) {
                     throw ValidationException::withMessages(['code' => 'SKU tidak ditemukan pada master item.']);
                 }
@@ -327,7 +327,7 @@ class QcScanController extends Controller
     public function searchItems(Request $request)
     {
         $search = trim((string) $request->input('q', ''));
-        $query = Item::query();
+        $query = Item::active();
         if ($search !== '') {
             $query->where('sku', 'like', "%{$search}%");
         }
@@ -377,7 +377,7 @@ class QcScanController extends Controller
             throw ValidationException::withMessages(['resi' => 'Resi tidak memiliki detail SKU valid.']);
         }
 
-        $itemIdsBySku = Item::whereIn('sku', array_keys($skuTotals))->pluck('id', 'sku')->all();
+        $itemIdsBySku = Item::active()->whereIn('sku', array_keys($skuTotals))->pluck('id', 'sku')->all();
         QcScanResiItem::where('qc_scan_resi_id', $qcResi->id)
             ->whereNotIn('sku', array_keys($skuTotals))
             ->where('scanned_qty', 0)

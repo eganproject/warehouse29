@@ -56,6 +56,14 @@
                                 @endforeach
                             </select>
                         </div>
+                        <div class="mb-10">
+                            <label class="form-label fs-6 fw-bold">Status:</label>
+                            <select id="filter_item_status" class="form-select form-select-solid fw-bolder" data-placeholder="Select option" data-allow-clear="true">
+                                <option value="">Semua</option>
+                                <option value="active">Aktif</option>
+                                <option value="inactive">Nonaktif</option>
+                            </select>
+                        </div>
                         <div class="d-flex justify-content-end">
                             <button type="button" class="btn btn-light btn-active-light-primary me-2" id="filter_items_reset">Reset</button>
                             <button type="button" class="btn btn-primary" id="filter_items_apply">Apply</button>
@@ -80,6 +88,7 @@
                         <th>SKU</th>
                         <th>Nama</th>
                         <th>Tipe</th>
+                        <th>Status</th>
                         <th>Kategori</th>
                         <th>Alamat</th>
                         <th>Deskripsi</th>
@@ -147,6 +156,14 @@
                         <input type="number" min="0" class="form-control form-control-solid" name="safety_stock" id="item_safety_stock" value="0" />
                         <div class="invalid-feedback" id="error_safety_stock"></div>
                     </div>
+                    <div class="fv-row mb-5">
+                        <div class="form-check form-switch form-check-custom form-check-solid">
+                            <input class="form-check-input" type="checkbox" id="item_is_active" name="is_active" value="1" checked />
+                            <label class="form-check-label fw-bold" for="item_is_active">Item aktif</label>
+                        </div>
+                        <div class="text-muted fs-7 mt-1">Nonaktifkan item jika tidak ingin dipakai sebagai master aktif, tanpa menghapus riwayat transaksi.</div>
+                        <div class="invalid-feedback d-block" id="error_is_active"></div>
+                    </div>
 
                     {{-- Bundle toggle --}}
                     <div class="fv-row mb-5">
@@ -209,10 +226,11 @@
                         <li><strong>category</strong> (opsional, anak kategori; jika kosong akan dimasukkan ke kategori default "Tanpa Kategori")</li>
                         <li><strong>stock</strong> / <strong>stok</strong> / <strong>qty</strong> (opsional, stok awal; akan dicatat sebagai inbound saldo awal)</li>
                         <li><strong>safety_stock</strong> / <strong>stok_pengaman</strong> (opsional, jumlah stok pengaman)</li>
+                        <li><strong>is_active</strong> / <strong>status</strong> / <strong>aktif</strong> (opsional: aktif/nonaktif)</li>
                         <li><strong>address</strong> (opsional)</li>
                         <li><strong>description</strong> (opsional)</li>
                     </ul>
-                    <p class="text-muted small mb-1">Contoh header: <code>sku,name,parent_category,category,stock,safety_stock,address,description</code></p>
+                    <p class="text-muted small mb-1">Contoh header: <code>sku,name,parent_category,category,stock,safety_stock,is_active,address,description</code></p>
                     <p class="text-muted small mb-1">Gunakan format Excel (.xlsx/.xls) dengan header di baris pertama.</p>
                     <p class="text-muted small mb-0">Jika kolom category dikosongkan, item otomatis dimasukkan ke kategori "Tanpa Kategori".</p>
                 </div>
@@ -252,6 +270,7 @@
         const resetBtn       = document.getElementById('filter_items_reset');
         const limitSelect    = document.getElementById('filter_items_limit');
         const categoryFilter = document.getElementById('filter_item_category');
+        const statusFilter   = document.getElementById('filter_item_status');
         const form           = document.getElementById('item_form');
         const modalEl        = document.getElementById('modal_item_form');
         const modal          = modalEl ? new bootstrap.Modal(modalEl) : null;
@@ -262,6 +281,7 @@
         const formAddress    = document.getElementById('item_address');
         const formDescription = document.getElementById('item_description');
         const formSafetyStock = document.getElementById('item_safety_stock');
+        const formIsActive   = document.getElementById('item_is_active');
         const formIsBundle   = document.getElementById('item_is_bundle');
         const bundleSection  = document.getElementById('bundle_components_section');
         const bundleContainer = document.getElementById('bundle_components_container');
@@ -314,7 +334,7 @@
                         url: itemSearchUrl,
                         dataType: 'json',
                         delay: 250,
-                        data: params => ({ q: params.term || '', length: 20, start: 0 }),
+                        data: params => ({ q: params.term || '', status: 'active', length: 20, start: 0 }),
                         processResults: resp => ({
                             results: (resp.data || [])
                                 .filter(i => !i.is_bundle)
@@ -365,7 +385,7 @@
             }
         };
 
-        const errorIds = ['error_sku','error_name','error_category_id','error_address','error_description','error_safety_stock','error_is_bundle','error_components'];
+        const errorIds = ['error_sku','error_name','error_category_id','error_address','error_description','error_safety_stock','error_is_active','error_is_bundle','error_components'];
         const clearErrors = () => {
             errorIds.forEach(id => {
                 const el = document.getElementById(id);
@@ -393,6 +413,8 @@
         if (typeof $ !== 'undefined' && $.fn.select2) {
             $(categoryFilter).select2({ placeholder: 'Semua', allowClear: true, width: '100%' })
                 .on('select2:opening select2:closing select2:close', e => e.stopPropagation());
+            $(statusFilter).select2({ placeholder: 'Semua', allowClear: true, width: '100%' })
+                .on('select2:opening select2:closing select2:close', e => e.stopPropagation());
             $(formCategory).select2({ placeholder: 'Pilih kategori', allowClear: true, width: '100%' });
         }
 
@@ -410,6 +432,7 @@
                 data: params => {
                     params.q = searchInput?.value || '';
                     params.category_id = categoryFilter?.value || '';
+                    params.status = statusFilter?.value || '';
                 },
             },
             columns: [
@@ -419,6 +442,9 @@
                 { data: 'is_bundle', render: v => v
                     ? '<span class="badge badge-light-primary">Bundle</span>'
                     : '<span class="badge badge-light-secondary">Regular</span>' },
+                { data: 'is_active', render: v => v
+                    ? '<span class="badge badge-light-success">Aktif</span>'
+                    : '<span class="badge badge-light-danger">Nonaktif</span>' },
                 { data: 'category' },
                 { data: 'address' },
                 { data: 'description' },
@@ -452,6 +478,7 @@
         searchInput?.addEventListener('keyup', reloadTable);
         applyBtn?.addEventListener('click', reloadTable);
         categoryFilter?.addEventListener('change', reloadTable);
+        statusFilter?.addEventListener('change', reloadTable);
         limitSelect?.addEventListener('change', () => {
             dt.page.len(Number(limitSelect.value || 10)).draw();
         });
@@ -459,6 +486,10 @@
             if (categoryFilter) {
                 categoryFilter.value = '';
                 typeof $ !== 'undefined' && $(categoryFilter).data('select2') && $(categoryFilter).val('').trigger('change.select2');
+            }
+            if (statusFilter) {
+                statusFilter.value = '';
+                typeof $ !== 'undefined' && $(statusFilter).data('select2') && $(statusFilter).val('').trigger('change.select2');
             }
             if (limitSelect) { limitSelect.value = '10'; dt.page.len(10).draw(); }
             reloadTable();
@@ -471,6 +502,7 @@
             form.reset();
             formId.value = '';
             formSafetyStock && (formSafetyStock.value = 0);
+            formIsActive.checked = true;
             formIsBundle.checked = false;
             bundleSection.classList.add('d-none');
             bundleContainer.innerHTML = '';
@@ -496,6 +528,7 @@
                 formAddress && (formAddress.value = json.address || '');
                 formDescription && (formDescription.value = json.description || '');
                 formSafetyStock && (formSafetyStock.value = json.safety_stock ?? 0);
+                formIsActive.checked = !!json.is_active;
                 setCategoryValue(json.category_id || '0');
 
                 // Bundle state
@@ -563,6 +596,7 @@
 
             // Explicitly send is_bundle as 0/1 (checkbox not submitted when unchecked)
             fd.set('is_bundle', formIsBundle.checked ? '1' : '0');
+            fd.set('is_active', formIsActive.checked ? '1' : '0');
 
             try {
                 const res  = await fetch(id ? url : url, {

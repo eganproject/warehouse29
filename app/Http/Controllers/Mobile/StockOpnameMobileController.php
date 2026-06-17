@@ -63,7 +63,7 @@ class StockOpnameMobileController extends Controller
             return response()->json(['items' => []]);
         }
 
-        $query = Item::query()
+        $query = Item::active()
             ->where(function ($query) use ($q) {
                 $query->where('sku', 'like', "%{$q}%")
                     ->orWhere('name', 'like', "%{$q}%");
@@ -103,7 +103,7 @@ class StockOpnameMobileController extends Controller
         }
 
         $validated = $request->validate([
-            'item_id' => ['required', 'integer', 'exists:items,id'],
+            'item_id' => ['required', 'integer', \Illuminate\Validation\Rule::exists('items', 'id')->where('is_active', true)],
             'counted_qty' => ['required', 'integer', 'min:0'],
             'note' => ['nullable', 'string'],
         ]);

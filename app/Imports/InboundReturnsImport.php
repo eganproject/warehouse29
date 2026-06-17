@@ -48,7 +48,7 @@ class InboundReturnsImport implements ToCollection, WithHeadingRow, SkipsEmptyRo
             ->unique()
             ->values();
 
-        $items = Item::whereIn('sku', $skus)->get(['id', 'sku']);
+        $items = Item::active()->whereIn('sku', $skus)->get(['id', 'sku']);
         $skuMap = $items->pluck('id', 'sku')->all();
 
         $missing = [];

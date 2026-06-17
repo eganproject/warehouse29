@@ -54,7 +54,7 @@ class StockAdjustmentsImport implements ToCollection, WithHeadingRow, SkipsEmpty
             ->unique()
             ->values();
 
-        $items = Item::whereIn('sku', $skus)->get(['id', 'sku']);
+        $items = Item::active()->whereIn('sku', $skus)->get(['id', 'sku']);
         $skuMap = $items->pluck('id', 'sku')->all();
 
         $missing = [];

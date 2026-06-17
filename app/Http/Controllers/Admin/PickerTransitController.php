@@ -267,6 +267,7 @@ class PickerTransitController extends Controller
         $transitRows = DB::table('qc_transit_items as pti')
             ->join('items as i', 'i.id', '=', 'pti.item_id')
             ->where('pti.transit_date', $date)
+            ->where('i.is_active', true)
             ->where('pti.remaining_qty', '>', 0)
             ->select([
                 'pti.item_id',

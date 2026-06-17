@@ -24,6 +24,7 @@ class LowStockReportController extends Controller
         $baseQuery = DB::table('items as i')
             ->leftJoin('item_stocks as s', 's.item_id', '=', 'i.id')
             ->leftJoin('categories as c', 'c.id', '=', 'i.category_id')
+            ->where('i.is_active', true)
             ->where('i.safety_stock', '>', 0)
             ->whereRaw('COALESCE(s.stock, 0) < i.safety_stock');
 

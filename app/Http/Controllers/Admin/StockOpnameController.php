@@ -22,6 +22,7 @@ class StockOpnameController extends Controller
     public function index()
     {
         $items = Item::leftJoin('item_stocks', 'item_stocks.item_id', '=', 'items.id')
+            ->where('items.is_active', true)
             ->orderBy('items.name')
             ->get([
                 'items.id',
@@ -265,7 +266,7 @@ class StockOpnameController extends Controller
     {
         $validated = $request->validate([
             'items' => ['required', 'array', 'min:1'],
-            'items.*.item_id' => ['required', 'integer', 'exists:items,id'],
+            'items.*.item_id' => ['required', 'integer', \Illuminate\Validation\Rule::exists('items', 'id')->where('is_active', true)],
             'items.*.counted_qty' => ['required', 'integer', 'min:0'],
             'items.*.note' => ['nullable', 'string'],
             'note' => ['nullable', 'string'],

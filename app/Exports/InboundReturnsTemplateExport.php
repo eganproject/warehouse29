@@ -26,7 +26,7 @@ class InboundReturnsTemplateExport implements FromArray, WithHeadings, ShouldAut
 
     public function array(): array
     {
-        $samples = Item::orderBy('name')->limit(2)->pluck('sku')->all();
+        $samples = Item::active()->orderBy('name')->limit(2)->pluck('sku')->all();
         $now = now()->format('Y-m-d H:i');
 
         $rows = [];

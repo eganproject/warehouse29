@@ -22,6 +22,7 @@ class DamagedAllocationController extends Controller
     {
         $items = Item::query()
             ->leftJoin('damaged_item_stocks', 'damaged_item_stocks.item_id', '=', 'items.id')
+            ->where('items.is_active', true)
             ->whereRaw('COALESCE(damaged_item_stocks.stock, 0) - COALESCE(damaged_item_stocks.reserved_stock, 0) > 0')
             ->orderBy('items.name')
             ->get([
@@ -377,7 +378,7 @@ class DamagedAllocationController extends Controller
             'allocation_type' => ['required', 'string', Rule::in(array_keys($this->allocationTypeLabels()))],
             'ref_no' => ['nullable', 'string', 'max:100'],
             'items' => ['required', 'array', 'min:1'],
-            'items.*.item_id' => ['required', 'integer', 'exists:items,id'],
+            'items.*.item_id' => ['required', 'integer', \Illuminate\Validation\Rule::exists('items', 'id')->where('is_active', true)],
             'items.*.qty' => ['required', 'integer', 'min:1'],
             'items.*.note' => ['nullable', 'string'],
             'note' => ['nullable', 'string'],

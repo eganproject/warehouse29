@@ -41,6 +41,7 @@ class ItemController extends Controller
             'description' => $item->description ?? '',
             'safety_stock' => (int) ($item->safety_stock ?? 0),
             'is_bundle' => (bool) $item->is_bundle,
+            'is_active' => (bool) $item->is_active,
             'components' => $item->bundleComponents->map(fn ($bc) => [
                 'component_item_id' => $bc->component_item_id,
                 'sku' => $bc->componentItem?->sku ?? '',
@@ -73,6 +74,13 @@ class ItemController extends Controller
             }
         }
 
+        $statusFilter = $request->input('status');
+        if ($statusFilter === 'active') {
+            $query->where('is_active', true);
+        } elseif ($statusFilter === 'inactive') {
+            $query->where('is_active', false);
+        }
+
         $recordsTotal = Item::count();
         $recordsFiltered = (clone $query)->count();
 
@@ -93,6 +101,7 @@ class ItemController extends Controller
                 'description' => $i->description ?? '',
                 'safety_stock' => (int) ($i->safety_stock ?? 0),
                 'is_bundle' => (bool) $i->is_bundle,
+                'is_active' => (bool) $i->is_active,
             ];
         });
 
@@ -119,12 +128,14 @@ class ItemController extends Controller
             'description' => ['nullable', 'string'],
             'safety_stock' => ['nullable', 'integer', 'min:0'],
             'is_bundle' => ['nullable', 'boolean'],
+            'is_active' => ['nullable', 'boolean'],
             'components' => ['nullable', 'array'],
-            'components.*.component_item_id' => ['required_with:components', 'integer', 'exists:items,id'],
+            'components.*.component_item_id' => ['required_with:components', 'integer', \Illuminate\Validation\Rule::exists('items', 'id')->where('is_active', true)],
             'components.*.qty' => ['required_with:components', 'integer', 'min:1'],
         ]);
 
         $isBundle = filter_var($request->input('is_bundle', false), FILTER_VALIDATE_BOOLEAN);
+        $isActive = $request->boolean('is_active', true);
         $components = $isBundle ? ($validated['components'] ?? []) : [];
 
         if ($isBundle && empty($components)) {
@@ -139,6 +150,7 @@ class ItemController extends Controller
             $validated['safety_stock'] = max(0, (int) $validated['safety_stock']);
         }
         $validated['is_bundle'] = $isBundle;
+        $validated['is_active'] = $isActive;
         unset($validated['components']);
 
         DB::beginTransaction();
@@ -161,6 +173,7 @@ class ItemController extends Controller
                     'name' => $item->name,
                     'category_id' => $item->category_id,
                     'is_bundle' => $item->is_bundle,
+                    'is_active' => $item->is_active,
                 ]
             ]);
         } catch (ValidationException $e) {
@@ -190,12 +203,14 @@ class ItemController extends Controller
             'description' => ['nullable', 'string'],
             'safety_stock' => ['nullable', 'integer', 'min:0'],
             'is_bundle' => ['nullable', 'boolean'],
+            'is_active' => ['nullable', 'boolean'],
             'components' => ['nullable', 'array'],
-            'components.*.component_item_id' => ['required_with:components', 'integer', 'exists:items,id'],
+            'components.*.component_item_id' => ['required_with:components', 'integer', \Illuminate\Validation\Rule::exists('items', 'id')->where('is_active', true)],
             'components.*.qty' => ['required_with:components', 'integer', 'min:1'],
         ]);
 
         $isBundle = filter_var($request->input('is_bundle', false), FILTER_VALIDATE_BOOLEAN);
+        $isActive = $request->boolean('is_active');
         $components = $isBundle ? ($validated['components'] ?? []) : [];
 
         if ($isBundle && empty($components)) {
@@ -215,6 +230,7 @@ class ItemController extends Controller
             $validated['safety_stock'] = max(0, (int) $validated['safety_stock']);
         }
         $validated['is_bundle'] = $isBundle;
+        $validated['is_active'] = $isActive;
         unset($validated['components']);
 
         DB::beginTransaction();
@@ -241,6 +257,7 @@ class ItemController extends Controller
                     'name' => $item->name,
                     'category_id' => $item->category_id,
                     'is_bundle' => $item->is_bundle,
+                    'is_active' => $item->is_active,
                 ]
             ]);
         } catch (ValidationException $e) {

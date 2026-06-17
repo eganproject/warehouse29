@@ -216,7 +216,8 @@ class PackerScanOutController extends Controller
                     ->values()
                     ->all();
 
-                $items = Item::whereIn(DB::raw('LOWER(sku)'), $skuKeys)
+                $items = Item::active()
+                    ->whereIn(DB::raw('LOWER(sku)'), $skuKeys)
                     ->get(['id', 'sku', 'name'])
                     ->keyBy(fn ($item) => strtolower(trim((string) $item->sku)));
             }

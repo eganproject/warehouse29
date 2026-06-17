@@ -270,7 +270,7 @@ class InboundController extends Controller
 
     private function index(string $type, string $pageTitle, string $routeBase)
     {
-        $items = Item::orderBy('name')->get(['id', 'sku', 'name']);
+        $items = Item::active()->orderBy('name')->get(['id', 'sku', 'name']);
         $baseOptions = $this->typeOptions();
         $typeOptions = ['all' => 'Semua'] + $baseOptions;
         $routeMap = [
@@ -838,7 +838,7 @@ class InboundController extends Controller
         $isReturn = $type === 'return';
         $rules = [
             'items' => ['required', 'array', 'min:1'],
-            'items.*.item_id' => ['required', 'integer', 'exists:items,id'],
+            'items.*.item_id' => ['required', 'integer', \Illuminate\Validation\Rule::exists('items', 'id')->where('is_active', true)],
             'items.*.note' => ['nullable', 'string'],
             'ref_no' => ['nullable', 'string', 'max:100'],
             'note' => ['nullable', 'string'],

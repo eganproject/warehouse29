@@ -233,7 +233,8 @@ class AnalyticsReportController extends Controller
         $base = DB::table('items as i')
             ->leftJoin('item_stocks as s', 's.item_id', '=', 'i.id')
             ->leftJoin('categories as c', 'c.id', '=', 'i.category_id')
-            ->leftJoinSub($movementAgg, 'ma', 'ma.item_id', '=', 'i.id');
+            ->leftJoinSub($movementAgg, 'ma', 'ma.item_id', '=', 'i.id')
+            ->where('i.is_active', true);
 
         $categoryId = $request->input('category_id');
         if ($categoryId !== null && $categoryId !== '') {

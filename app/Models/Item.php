@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 class Item extends Model
@@ -17,12 +18,19 @@ class Item extends Model
         'description',
         'safety_stock',
         'is_bundle',
+        'is_active',
     ];
 
     protected $casts = [
         'safety_stock' => 'integer',
         'is_bundle' => 'boolean',
+        'is_active' => 'boolean',
     ];
+
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->where('is_active', true);
+    }
 
     public function category()
     {

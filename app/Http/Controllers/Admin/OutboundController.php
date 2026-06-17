@@ -355,7 +355,7 @@ class OutboundController extends Controller
 
     private function index(string $type, string $pageTitle, string $routeBase)
     {
-        $items = Item::orderBy('name')->get(['id', 'sku', 'name']);
+        $items = Item::active()->orderBy('name')->get(['id', 'sku', 'name']);
         $baseOptions = $this->typeOptions();
         $typeOptions = ['all' => 'Semua'] + $baseOptions;
         $routeMap = [
@@ -863,7 +863,7 @@ class OutboundController extends Controller
     {
         $validated = $request->validate([
             'items' => ['required', 'array', 'min:1'],
-            'items.*.item_id' => ['required', 'integer', 'exists:items,id'],
+            'items.*.item_id' => ['required', 'integer', \Illuminate\Validation\Rule::exists('items', 'id')->where('is_active', true)],
             'items.*.qty' => ['required', 'integer', 'min:1'],
             'items.*.stock_source' => ['nullable', 'in:regular,damaged'],
             'items.*.note' => ['nullable', 'string'],

@@ -26,7 +26,7 @@ class DamagedGoodsController extends Controller
 {
     public function index()
     {
-        $items = Item::orderBy('name')->get(['id', 'sku', 'name']);
+        $items = Item::active()->orderBy('name')->get(['id', 'sku', 'name']);
 
         return view('admin.inventory.damaged-goods.index', [
             'items' => $items,
@@ -122,6 +122,7 @@ class DamagedGoodsController extends Controller
     {
         $query = Item::query()
             ->join('damaged_item_stocks', 'damaged_item_stocks.item_id', '=', 'items.id')
+            ->where('items.is_active', true)
             ->where('damaged_item_stocks.stock', '>', 0)
             ->orderBy('items.name');
 
@@ -134,6 +135,7 @@ class DamagedGoodsController extends Controller
         }
 
         $recordsTotal = Item::join('damaged_item_stocks', 'damaged_item_stocks.item_id', '=', 'items.id')
+            ->where('items.is_active', true)
             ->where('damaged_item_stocks.stock', '>', 0)->count();
         $recordsFiltered = (clone $query)->count();
 
@@ -580,7 +582,7 @@ class DamagedGoodsController extends Controller
             'source_type' => ['required', 'string', Rule::in(['display', 'inbound_return'])],
             'source_ref' => ['nullable', 'string', 'max:100'],
             'items' => ['required', 'array', 'min:1'],
-            'items.*.item_id' => ['required', 'integer', 'exists:items,id'],
+            'items.*.item_id' => ['required', 'integer', \Illuminate\Validation\Rule::exists('items', 'id')->where('is_active', true)],
             'items.*.qty' => ['required', 'integer', 'min:1'],
             'items.*.note' => ['nullable', 'string'],
             'note' => ['nullable', 'string'],

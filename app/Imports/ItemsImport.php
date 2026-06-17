@@ -33,7 +33,7 @@ class ItemsImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
         $required = ['sku', 'name', 'parent_category', 'category', 'description'];
         if (array_diff($required, $headers)) {
             throw ValidationException::withMessages([
-                'file' => 'Header harus minimal: sku, name, parent_category, category, description (address, stock, safety_stock opsional)',
+                'file' => 'Header harus minimal: sku, name, parent_category, category, description (address, stock, safety_stock, is_active opsional)',
             ]);
         }
 
@@ -46,6 +46,7 @@ class ItemsImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
             $address = isset($row['address']) ? trim((string) ($row['address'] ?? '')) : '';
             $stock = $this->parseStock($row);
             $safetyStock = $this->parseSafetyStock($row);
+            $activeStatus = $this->parseActiveStatus($row);
 
             if ($sku === '' || $name === '') {
                 continue;
@@ -73,6 +74,9 @@ class ItemsImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
             }
             if ($safetyStock !== null) {
                 $payload['safety_stock'] = $safetyStock;
+            }
+            if ($activeStatus !== null) {
+                $payload['is_active'] = $activeStatus;
             }
 
             $item = Item::updateOrCreate(
@@ -141,6 +145,42 @@ class ItemsImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
         }
         $value = is_numeric($raw) ? (int) $raw : (int) preg_replace('/[^0-9\-]/', '', (string) $raw);
         return $value > 0 ? $value : 0;
+    }
+
+    protected function parseActiveStatus($row): ?bool
+    {
+        $raw = null;
+        $hasKey = false;
+        foreach (['is_active', 'active', 'status', 'aktif'] as $key) {
+            if (is_array($row) && array_key_exists($key, $row)) {
+                $raw = $row[$key];
+                $hasKey = true;
+                break;
+            }
+            if ($row instanceof Collection && $row->has($key)) {
+                $raw = $row->get($key);
+                $hasKey = true;
+                break;
+            }
+            if (isset($row[$key])) {
+                $raw = $row[$key];
+                $hasKey = true;
+                break;
+            }
+        }
+        if (!$hasKey || $raw === null || $raw === '') {
+            return null;
+        }
+
+        $normalized = mb_strtolower(trim((string) $raw));
+        if (in_array($normalized, ['1', 'true', 'yes', 'y', 'aktif', 'active'], true)) {
+            return true;
+        }
+        if (in_array($normalized, ['0', 'false', 'no', 'n', 'tidak aktif', 'nonaktif', 'inactive'], true)) {
+            return false;
+        }
+
+        return null;
     }
 
     protected function findOrCreateCategory(string $name, int $parentId = 0): ?Category

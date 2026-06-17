@@ -17,7 +17,7 @@ class ItemStocksExport implements FromCollection, WithHeadings, WithMapping, Sho
 
     public function collection(): Collection
     {
-        $query = Item::with('stock')->orderBy('name');
+        $query = Item::active()->with('stock')->orderBy('name');
         $search = trim($this->search);
         $this->applySearch($query, $search, $this->searchMode === 'exact' ? 'exact' : 'like');
 

@@ -176,7 +176,7 @@ class PickingListController extends Controller
                 ]);
             }
 
-            $item = Item::where('sku', $sku)->first();
+            $item = Item::active()->where('sku', $sku)->first();
             if (!$item) {
                 throw ValidationException::withMessages([
                     'sku' => 'SKU tidak ditemukan.',
@@ -517,7 +517,7 @@ class PickingListController extends Controller
 
     private function getPickedQty(string $date, string $sku): int
     {
-        $itemId = Item::where('sku', $sku)->value('id');
+        $itemId = Item::active()->where('sku', $sku)->value('id');
         if (!$itemId) {
             return 0;
         }
