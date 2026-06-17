@@ -118,13 +118,22 @@
             <span class="card-label fw-bolder fs-3">History Mutasi Stok</span>
         </div>
         <div class="card-toolbar">
-            <form method="GET" class="d-flex align-items-center gap-2">
-                <input type="hidden" name="per_page" value="{{ request('per_page', 20) }}" />
+            <form method="GET" class="d-flex flex-wrap align-items-center gap-2">
+                <input type="text" name="date_from" id="filter_date_from" class="form-control form-control-solid form-control-sm w-150px" placeholder="Dari" value="{{ $dateFrom ?? request('date_from') }}" autocomplete="off" />
+                <input type="text" name="date_to" id="filter_date_to" class="form-control form-control-solid form-control-sm w-150px" placeholder="Sampai" value="{{ $dateTo ?? request('date_to') }}" autocomplete="off" />
+                <select name="source" class="form-select form-select-solid form-select-sm w-200px">
+                    <option value="">Semua Sumber</option>
+                    @foreach($sourceOptions ?? [] as $value => $label)
+                        <option value="{{ $value }}" {{ ($source ?? request('source')) === $value ? 'selected' : '' }}>{{ $label }}</option>
+                    @endforeach
+                </select>
                 <select name="per_page" class="form-select form-select-solid form-select-sm w-auto" onchange="this.form.submit()">
                     @foreach([10, 20, 50, 100] as $n)
                         <option value="{{ $n }}" {{ request('per_page', 20) == $n ? 'selected' : '' }}>{{ $n }} per halaman</option>
                     @endforeach
                 </select>
+                <button type="submit" class="btn btn-sm btn-light-primary">Filter</button>
+                <a href="{{ route('admin.inventory.item-stocks.show', $item->id) }}" class="btn btn-sm btn-light">Reset</a>
             </form>
         </div>
     </div>
@@ -136,12 +145,24 @@
                 'adjustment' => 'Penyesuaian',
                 'opname' => 'Stock Opname',
                 'damaged' => 'Barang Rusak',
+                'damaged_allocation' => 'Alokasi Barang Rusak',
+                'inbound_return' => 'Retur Inbound',
+                'picking_exception' => 'Exception Picking',
+                'qc' => 'Picker Mobile',
+                'qc_resi' => 'QC Scan Resi',
             ];
             $subtypeLabels = [
                 'receipt' => 'Penerimaan',
                 'return' => 'Retur',
+                'return_good' => 'Stok Bagus',
                 'manual' => 'Manual',
                 'picker' => 'QC Scan',
+                'mobile' => 'Mobile',
+                'scan' => 'Scan',
+                'scan_bundle' => 'Scan Bundle',
+                'approval' => 'Approval',
+                'display' => 'Display',
+                'inbound_return' => 'Retur Inbound',
             ];
         @endphp
         <div class="table-responsive">
@@ -223,3 +244,15 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        if (typeof flatpickr === 'undefined') return;
+        const fromEl = document.getElementById('filter_date_from');
+        const toEl = document.getElementById('filter_date_to');
+        if (fromEl) flatpickr(fromEl, { dateFormat: 'Y-m-d', allowInput: true });
+        if (toEl) flatpickr(toEl, { dateFormat: 'Y-m-d', allowInput: true });
+    });
+</script>
+@endpush

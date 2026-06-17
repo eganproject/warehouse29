@@ -28,8 +28,38 @@ class ItemStockController extends Controller
             : ($item->stock?->stock ?? 0);
 
         $mutationQuery = StockMutation::with('creator')
-            ->where('item_id', $id)
-            ->orderByDesc('occurred_at')
+            ->where('item_id', $id);
+
+        $dateFrom = trim((string) $request->input('date_from', ''));
+        $dateTo = trim((string) $request->input('date_to', ''));
+        if ($dateFrom !== '') {
+            try {
+                $mutationQuery->where('occurred_at', '>=', Carbon::parse($dateFrom)->startOfDay());
+            } catch (\Throwable) {
+                $dateFrom = '';
+            }
+        }
+        if ($dateTo !== '') {
+            try {
+                $mutationQuery->where('occurred_at', '<=', Carbon::parse($dateTo)->endOfDay());
+            } catch (\Throwable) {
+                $dateTo = '';
+            }
+        }
+
+        $source = trim((string) $request->input('source', ''));
+        $sourceOptions = $this->mutationSourceOptions();
+        if ($source !== '' && isset($sourceOptions[$source])) {
+            [$sourceType, $sourceSubtype] = array_pad(explode(':', $source, 2), 2, '');
+            $mutationQuery->where('source_type', $sourceType);
+            if ($sourceSubtype !== '') {
+                $mutationQuery->where('source_subtype', $sourceSubtype);
+            }
+        } else {
+            $source = '';
+        }
+
+        $mutationQuery->orderByDesc('occurred_at')
             ->orderByDesc('id');
 
         $perPage = (int) $request->input('per_page', 20);
@@ -40,6 +70,10 @@ class ItemStockController extends Controller
             'currentStock' => $currentStock,
             'isBundle' => $isBundle,
             'mutations' => $mutations,
+            'dateFrom' => $dateFrom,
+            'dateTo' => $dateTo,
+            'source' => $source,
+            'sourceOptions' => $sourceOptions,
         ]);
     }
 
@@ -130,5 +164,28 @@ class ItemStockController extends Controller
         $terms = preg_split('/[\s,;]+/', $search, -1, PREG_SPLIT_NO_EMPTY);
 
         return array_values(array_unique(array_map('trim', $terms ?: [])));
+    }
+
+    private function mutationSourceOptions(): array
+    {
+        return [
+            'inbound' => 'Inbound - Semua',
+            'inbound:receipt' => 'Penerimaan Barang',
+            'inbound:return' => 'Retur Inbound',
+            'inbound:return_good' => 'Retur Inbound - Stok Bagus',
+            'inbound:opening' => 'Saldo Awal Import',
+            'inbound_return' => 'Retur Inbound - Stok Rusak',
+            'outbound' => 'Outbound - Semua',
+            'outbound:manual' => 'Outbound Manual',
+            'outbound:picker' => 'Outbound QC Scan',
+            'outbound:return' => 'Retur Outbound',
+            'adjustment' => 'Penyesuaian Stok',
+            'opname' => 'Stock Opname',
+            'damaged' => 'Barang Rusak',
+            'damaged_allocation' => 'Alokasi Barang Rusak',
+            'picking_exception' => 'Retur Exception Picking',
+            'qc' => 'Picker Mobile',
+            'qc_resi' => 'QC Scan Resi',
+        ];
     }
 }
