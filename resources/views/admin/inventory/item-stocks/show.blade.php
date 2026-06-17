@@ -121,7 +121,7 @@
             <form method="GET" class="d-flex flex-wrap align-items-center gap-2">
                 <input type="text" name="date_from" id="filter_date_from" class="form-control form-control-solid form-control-sm w-150px" placeholder="Dari" value="{{ $dateFrom ?? request('date_from') }}" autocomplete="off" />
                 <input type="text" name="date_to" id="filter_date_to" class="form-control form-control-solid form-control-sm w-150px" placeholder="Sampai" value="{{ $dateTo ?? request('date_to') }}" autocomplete="off" />
-                <select name="source" class="form-select form-select-solid form-select-sm w-200px">
+                <select name="source" id="filter_source" class="form-select form-select-solid form-select-sm w-200px" data-placeholder="Semua Sumber">
                     <option value="">Semua Sumber</option>
                     @foreach($sourceOptions ?? [] as $value => $label)
                         <option value="{{ $value }}" {{ ($source ?? request('source')) === $value ? 'selected' : '' }}>{{ $label }}</option>
@@ -253,6 +253,15 @@
         const toEl = document.getElementById('filter_date_to');
         if (fromEl) flatpickr(fromEl, { dateFormat: 'Y-m-d', allowInput: true });
         if (toEl) flatpickr(toEl, { dateFormat: 'Y-m-d', allowInput: true });
+
+        const sourceEl = document.getElementById('filter_source');
+        if (sourceEl && typeof $ !== 'undefined' && $.fn.select2) {
+            $(sourceEl).select2({
+                placeholder: 'Semua Sumber',
+                allowClear: true,
+                width: '200px',
+            });
+        }
     });
 </script>
 @endpush
