@@ -48,6 +48,7 @@
     /* ---------- Date filter ---------- */
     .dash-filter {
         display: flex;
+        flex-wrap: wrap;
         align-items: center;
         gap: 8px;
         background: #f8fafc;
@@ -70,14 +71,14 @@
         border: 1px solid #e2e8f0;
         border-radius: 8px;
         height: 34px;
-        max-width: 140px;
+        width: 140px;
         font-size: 13px;
     }
 
     /* ---------- Stat cards ---------- */
     .stats-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
         gap: 16px;
     }
     .stat-card {
@@ -151,6 +152,13 @@
     .dash-tabs {
         border-bottom: 1px solid #e2e8f0;
         gap: 8px;
+        display: flex;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+        padding-bottom: 1px;
+        scrollbar-width: thin;
+        -webkit-overflow-scrolling: touch;
     }
     .dash-tabs .nav-link {
         border: 0;
@@ -158,6 +166,7 @@
         color: #64748b;
         font-weight: 800;
         padding: 12px 16px;
+        white-space: nowrap;
     }
     .dash-tabs .nav-link.active {
         color: var(--dash-blue);
@@ -171,6 +180,7 @@
     }
     .dash-table-head {
         display: flex;
+        flex-wrap: wrap;
         align-items: center;
         justify-content: space-between;
         gap: 12px;
@@ -200,6 +210,15 @@
     .dash-mini-table td {
         vertical-align: middle;
         font-size: 12.5px;
+    }
+    .dash-mini-table th,
+    .dash-mini-table td {
+        white-space: nowrap;
+    }
+    .dash-mini-table th:nth-child(2),
+    .dash-mini-table td:nth-child(2) {
+        white-space: normal;
+        min-width: 180px;
     }
     .dash-item-name {
         font-weight: 800;
@@ -469,6 +488,111 @@
         outline: none;
         border-color: var(--dash-blue);
         box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    }
+
+    @media (max-width: 767px) {
+        .dash-section-head {
+            gap: 12px;
+        }
+        .dash-section-head > div,
+        .dash-filter {
+            width: 100%;
+        }
+        .dash-filter {
+            align-items: stretch;
+            padding: 10px;
+        }
+        .dash-filter-label {
+            width: 100%;
+        }
+        .dash-filter input {
+            flex: 1 1 160px;
+            width: auto;
+            max-width: none;
+        }
+        .dash-filter .btn {
+            flex: 1 1 auto;
+        }
+        .stats-grid {
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
+        .stat-card {
+            align-items: flex-start;
+            padding: 15px;
+            border-radius: 12px;
+        }
+        .stat-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            font-size: 18px;
+        }
+        .stat-value {
+            font-size: 26px;
+        }
+        .stat-value-row {
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .dash-tabs {
+            margin-left: -4px;
+            margin-right: -4px;
+        }
+        .dash-tabs .nav-link {
+            padding: 10px 12px;
+            font-size: 12.5px;
+        }
+        .dash-table-head {
+            padding: 14px;
+        }
+        .dash-table-head .btn {
+            width: 100%;
+        }
+        .filter-card-grid {
+            grid-template-columns: 1fr;
+        }
+        .modal-search {
+            max-width: none;
+            width: 100%;
+        }
+        .kurir-ratio {
+            flex-wrap: wrap;
+        }
+        .ratio-resi,
+        .ratio-scan {
+            font-size: 26px;
+        }
+    }
+
+    @media (min-width: 768px) and (max-width: 1199px) {
+        .stats-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @media (max-width: 420px) {
+        .stat-card {
+            gap: 12px;
+        }
+        .stat-icon {
+            width: 40px;
+            height: 40px;
+        }
+        .stat-value {
+            font-size: 23px;
+        }
+        .stat-percent {
+            font-size: 11px;
+            padding: 2px 7px;
+        }
+        .dash-section-title {
+            font-size: 15px;
+        }
+        .dash-section-sub,
+        .dash-legend {
+            font-size: 11.5px;
+        }
     }
 
     /* ---------- Modal table ---------- */
