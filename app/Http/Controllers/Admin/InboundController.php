@@ -364,6 +364,11 @@ class InboundController extends Controller
             });
         }
 
+        $status = trim((string) $request->input('status', ''));
+        if (in_array($status, ['pending', 'approved', 'finalized'], true)) {
+            $query->where('inbound_transactions.status', $status);
+        }
+
         $this->applyDateFilter($query, $request);
 
         $recordsTotalQuery = InboundTransaction::query();

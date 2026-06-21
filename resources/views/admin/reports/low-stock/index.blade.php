@@ -117,6 +117,7 @@
     const dataUrl = '{{ $dataUrl }}';
 
     document.addEventListener('DOMContentLoaded', () => {
+        const initialParams = new URLSearchParams(window.location.search);
         const tableEl = $('#low_stock_table');
         const searchInput = document.getElementById('report_search');
         const categoryFilter = document.getElementById('filter_category');
@@ -130,6 +131,21 @@
         if (!tableEl.length || !$.fn.DataTable) {
             console.error('DataTables unavailable');
             return;
+        }
+
+        if (searchInput && initialParams.has('q')) {
+            searchInput.value = initialParams.get('q') || '';
+        }
+        if (categoryFilter && initialParams.has('category_id')) {
+            categoryFilter.value = initialParams.get('category_id') || '';
+        }
+        if (statusFilter && initialParams.has('status')) {
+            const status = initialParams.get('status') || '';
+            statusFilter.value = ['out', 'low'].includes(status) ? status : '';
+        }
+        if (limitFilter && initialParams.has('limit')) {
+            const limit = initialParams.get('limit') || '10';
+            limitFilter.value = ['10', '25', '50', '100'].includes(limit) ? limit : '10';
         }
 
         if (typeof $ !== 'undefined' && $.fn.select2) {
@@ -147,9 +163,9 @@
                 url: dataUrl,
                 dataSrc: function (json) {
                     const summary = json?.summary || {};
-                    if (summaryTotalEl) summaryTotalEl.textContent = summary.total_low ?? 0;
-                    if (summaryOutEl) summaryOutEl.textContent = summary.out_of_stock ?? 0;
-                    if (summaryGapEl) summaryGapEl.textContent = summary.total_gap ?? 0;
+                    if (summaryTotalEl) summaryTotalEl.textContent = Number(summary.total_low ?? 0).toLocaleString('id-ID');
+                    if (summaryOutEl) summaryOutEl.textContent = Number(summary.out_of_stock ?? 0).toLocaleString('id-ID');
+                    if (summaryGapEl) summaryGapEl.textContent = Number(summary.total_gap ?? 0).toLocaleString('id-ID');
                     return json.data || [];
                 },
                 data: function (params) {
@@ -180,12 +196,20 @@
         });
 
         const reloadTable = () => dt.ajax.reload();
+        const bindSelectReload = (el) => {
+            if (!el) return;
+            if (typeof $ !== 'undefined' && $(el).data('select2')) {
+                $(el).on('change', reloadTable);
+            } else {
+                el.addEventListener('change', reloadTable);
+            }
+        };
 
         searchInput?.addEventListener('keyup', (e) => {
             if (e.key === 'Enter') reloadTable();
         });
-        categoryFilter?.addEventListener('change', reloadTable);
-        statusFilter?.addEventListener('change', reloadTable);
+        bindSelectReload(categoryFilter);
+        bindSelectReload(statusFilter);
         limitFilter?.addEventListener('change', () => {
             const val = Number(limitFilter.value || 10);
             dt.page.len(val).draw();
@@ -195,13 +219,13 @@
             if (categoryFilter) {
                 categoryFilter.value = '';
                 if (typeof $ !== 'undefined' && $(categoryFilter).data('select2')) {
-                    $(categoryFilter).val('').trigger('change.select2');
+                    $(categoryFilter).val('').trigger('change');
                 }
             }
             if (statusFilter) {
                 statusFilter.value = '';
                 if (typeof $ !== 'undefined' && $(statusFilter).data('select2')) {
-                    $(statusFilter).val('').trigger('change.select2');
+                    $(statusFilter).val('').trigger('change');
                 }
             }
             if (limitFilter) {

@@ -177,6 +177,7 @@
         border-radius: 16px;
         background: #fff;
         overflow: hidden;
+        box-shadow: 0 8px 22px rgba(15, 23, 42, 0.035);
     }
     .dash-table-head {
         display: flex;
@@ -186,6 +187,7 @@
         gap: 12px;
         padding: 16px 18px;
         border-bottom: 1px solid #eef2f7;
+        background: linear-gradient(180deg, #ffffff, #f8fafc);
     }
     .dash-table-title {
         font-size: 14px;
@@ -234,6 +236,87 @@
         text-align: center;
         color: #94a3b8;
         font-size: 13px;
+    }
+    .dash-panel {
+        border: 1px solid #e9edf3;
+        border-radius: 16px;
+        background: #fff;
+        padding: 18px;
+        box-shadow: 0 8px 22px rgba(15, 23, 42, 0.035);
+    }
+    .dash-panel .dash-section-head {
+        margin-bottom: 16px;
+    }
+    .dash-panel .stats-grid {
+        gap: 14px;
+    }
+    .dash-panel .stat-card {
+        min-height: 136px;
+        box-shadow: none;
+    }
+    .dash-panel .stat-card:hover {
+        transform: none;
+        box-shadow: 0 10px 20px rgba(15, 23, 42, 0.055);
+    }
+    .dash-kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+        padding: 16px;
+    }
+    .dash-kpi {
+        border: 1px solid #eef2f7;
+        border-radius: 14px;
+        padding: 14px;
+        background: #f8fafc;
+    }
+    .dash-kpi-label {
+        font-size: 11px;
+        font-weight: 800;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+    .dash-kpi-value {
+        margin-top: 6px;
+        font-size: 25px;
+        line-height: 1;
+        font-weight: 850;
+        color: #0f172a;
+        letter-spacing: -0.02em;
+    }
+    .dash-kpi-meta {
+        margin-top: 5px;
+        font-size: 11px;
+        color: #94a3b8;
+    }
+    .dash-kpi--green {
+        background: rgba(5, 150, 105, 0.07);
+        border-color: rgba(5, 150, 105, 0.14);
+    }
+    .dash-kpi--red {
+        background: rgba(220, 38, 38, 0.06);
+        border-color: rgba(220, 38, 38, 0.13);
+    }
+    .dash-kpi--amber {
+        background: rgba(217, 119, 6, 0.07);
+        border-color: rgba(217, 119, 6, 0.14);
+    }
+    .dash-kpi--blue {
+        background: rgba(37, 99, 235, 0.07);
+        border-color: rgba(37, 99, 235, 0.14);
+    }
+    .dash-rank {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        border-radius: 9px;
+        background: #eff6ff;
+        color: var(--dash-blue);
+        font-size: 12px;
+        font-weight: 850;
     }
 
     .stat-value-row {
@@ -548,6 +631,17 @@
         }
         .dash-table-head .btn {
             width: 100%;
+        }
+        .dash-panel {
+            padding: 14px;
+            border-radius: 14px;
+        }
+        .dash-panel .stat-card {
+            min-height: auto;
+        }
+        .dash-kpi-grid {
+            grid-template-columns: 1fr;
+            padding: 14px;
         }
         .filter-card-grid {
             grid-template-columns: 1fr;
@@ -883,8 +977,7 @@
                 $healthyPercent = $totalSku > 0 ? round($healthyStock / $totalSku * 100) : 0;
             @endphp
 
-            <div class="card mb-6">
-                <div class="card-body">
+            <div class="dash-panel mb-6">
                     <div class="dash-section-head mb-5">
                         <div>
                             <div class="dash-section-title"><i class="fa-solid fa-warehouse"></i> Kesehatan Stok</div>
@@ -929,7 +1022,6 @@
                             </div>
                         </div>
                     </div>
-                </div>
             </div>
 
             <div class="row g-6">
@@ -1022,8 +1114,7 @@
                 $pendingTotal = array_sum($pendingApprovals ?? []);
             @endphp
 
-            <div class="card mb-6">
-                <div class="card-body">
+            <div class="dash-panel mb-6">
                     <div class="dash-section-head mb-5">
                         <div>
                             <div class="dash-section-title"><i class="fa-solid fa-right-left"></i> Aktivitas Inventory</div>
@@ -1065,7 +1156,6 @@
                             </div>
                         </div>
                     </div>
-                </div>
             </div>
 
             <div class="row g-6">
@@ -1083,6 +1173,7 @@
                                 <table class="table dash-mini-table table-row-dashed align-middle">
                                     <thead>
                                         <tr>
+                                            <th width="44">#</th>
                                             <th>SKU</th>
                                             <th>Nama</th>
                                             <th class="text-end">Qty Keluar</th>
@@ -1092,6 +1183,7 @@
                                     <tbody>
                                         @foreach($topOutgoingItems as $item)
                                             <tr>
+                                                <td><span class="dash-rank">{{ $loop->iteration }}</span></td>
                                                 <td class="fw-bold mono">{{ $item->sku ?? '-' }}</td>
                                                 <td><div class="dash-item-name">{{ $item->name ?? '-' }}</div></td>
                                                 <td class="text-end fw-bold text-danger">{{ number_format((int) ($item->total_qty ?? 0)) }}</td>
@@ -1114,27 +1206,27 @@
                                 <div class="dash-table-sub">Dokumen yang belum disetujui</div>
                             </div>
                         </div>
-                        <div class="table-responsive">
-                            <table class="table dash-mini-table table-row-dashed align-middle">
-                                <tbody>
-                                    <tr>
-                                        <td class="fw-bold">Inbound</td>
-                                        <td class="text-end">{{ number_format((int) ($pendingApprovals['inbound'] ?? 0)) }}</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="fw-bold">Outbound</td>
-                                        <td class="text-end">{{ number_format((int) ($pendingApprovals['outbound'] ?? 0)) }}</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="fw-bold">Stock Adjustment</td>
-                                        <td class="text-end">{{ number_format((int) ($pendingApprovals['adjustment'] ?? 0)) }}</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="fw-bold">Damaged Goods</td>
-                                        <td class="text-end">{{ number_format((int) ($pendingApprovals['damaged_goods'] ?? 0)) }}</td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                        <div class="dash-kpi-grid">
+                            <div class="dash-kpi dash-kpi--green">
+                                <div class="dash-kpi-label">Inbound</div>
+                                <div class="dash-kpi-value">{{ number_format((int) ($pendingApprovals['inbound'] ?? 0)) }}</div>
+                                <div class="dash-kpi-meta">menunggu approve</div>
+                            </div>
+                            <div class="dash-kpi dash-kpi--red">
+                                <div class="dash-kpi-label">Outbound</div>
+                                <div class="dash-kpi-value">{{ number_format((int) ($pendingApprovals['outbound'] ?? 0)) }}</div>
+                                <div class="dash-kpi-meta">menunggu approve</div>
+                            </div>
+                            <div class="dash-kpi dash-kpi--blue">
+                                <div class="dash-kpi-label">Adjustment</div>
+                                <div class="dash-kpi-value">{{ number_format((int) ($pendingApprovals['adjustment'] ?? 0)) }}</div>
+                                <div class="dash-kpi-meta">penyesuaian stok</div>
+                            </div>
+                            <div class="dash-kpi dash-kpi--amber">
+                                <div class="dash-kpi-label">Damaged Goods</div>
+                                <div class="dash-kpi-value">{{ number_format((int) ($pendingApprovals['damaged_goods'] ?? 0)) }}</div>
+                                <div class="dash-kpi-meta">barang rusak</div>
+                            </div>
                         </div>
                     </div>
                 </div>

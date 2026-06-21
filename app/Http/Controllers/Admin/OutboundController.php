@@ -456,6 +456,11 @@ class OutboundController extends Controller
             });
         }
 
+        $status = trim((string) $request->input('status', ''));
+        if (in_array($status, ['pending', 'approved', 'finalized'], true)) {
+            $query->where('outbound_transactions.status', $status);
+        }
+
         $this->applyDateFilter($query, $request);
 
         $recordsTotalQuery = OutboundTransaction::query();
