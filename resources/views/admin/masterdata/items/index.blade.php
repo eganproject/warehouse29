@@ -1,7 +1,7 @@
 @extends('layouts.admin')
 
-@section('title', 'Items')
-@section('page_title', 'Items')
+@section('title', $pageTitle ?? 'Items')
+@section('page_title', $pageTitle ?? 'Items')
 
 @php
     use App\Support\Permission as Perm;
@@ -32,6 +32,15 @@
                     <option value="50">50</option>
                     <option value="100">100</option>
                 </select>
+                @if(($defaultStatus ?? '') === 'inactive')
+                    <a href="{{ route('admin.masterdata.items.index') }}" class="btn btn-light-primary me-3">
+                        Semua Item
+                    </a>
+                @else
+                    <a href="{{ route('admin.masterdata.items.inactive') }}" class="btn btn-light-danger me-3">
+                        Item Nonaktif
+                    </a>
+                @endif
                 <button type="button" class="btn btn-light-primary me-3" data-kt-menu-trigger="click" data-kt-menu-placement="bottom-end">
                     <span class="svg-icon svg-icon-2">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -262,6 +271,7 @@
     const itemSearchUrl = '{{ route('admin.masterdata.items.data') }}';
     const canUpdate  = {{ $canUpdate ? 'true' : 'false' }};
     const canDelete  = {{ $canDelete ? 'true' : 'false' }};
+    const defaultStatus = '{{ $defaultStatus ?? '' }}';
 
     document.addEventListener('DOMContentLoaded', () => {
         const tableEl        = $('#items_table');
@@ -418,6 +428,13 @@
             $(formCategory).select2({ placeholder: 'Pilih kategori', allowClear: true, width: '100%' });
         }
 
+        if (statusFilter && defaultStatus) {
+            statusFilter.value = defaultStatus;
+            if (typeof $ !== 'undefined' && $(statusFilter).data('select2')) {
+                $(statusFilter).val(defaultStatus).trigger('change.select2');
+            }
+        }
+
         const refreshMenus = () => window.KTMenu?.createInstances();
 
         const dt = tableEl.DataTable({
@@ -488,8 +505,8 @@
                 typeof $ !== 'undefined' && $(categoryFilter).data('select2') && $(categoryFilter).val('').trigger('change.select2');
             }
             if (statusFilter) {
-                statusFilter.value = '';
-                typeof $ !== 'undefined' && $(statusFilter).data('select2') && $(statusFilter).val('').trigger('change.select2');
+                statusFilter.value = defaultStatus || '';
+                typeof $ !== 'undefined' && $(statusFilter).data('select2') && $(statusFilter).val(defaultStatus || '').trigger('change.select2');
             }
             if (limitSelect) { limitSelect.value = '10'; dt.page.len(10).draw(); }
             reloadTable();

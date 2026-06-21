@@ -25,8 +25,12 @@ class ItemController extends Controller
 
     public function index()
     {
-        $categories = Category::orderBy('name')->get(['id', 'name']);
-        return view('admin.masterdata.items.index', compact('categories'));
+        return $this->itemListView('Items');
+    }
+
+    public function inactive()
+    {
+        return $this->itemListView('Item Nonaktif', 'inactive');
     }
 
     public function show(Item $item)
@@ -535,5 +539,16 @@ class ItemController extends Controller
         );
         $this->defaultCategoryId = $default->id;
         return $this->defaultCategoryId;
+    }
+
+    private function itemListView(string $pageTitle, string $defaultStatus = '')
+    {
+        $categories = Category::orderBy('name')->get(['id', 'name']);
+
+        return view('admin.masterdata.items.index', [
+            'categories' => $categories,
+            'pageTitle' => $pageTitle,
+            'defaultStatus' => $defaultStatus,
+        ]);
     }
 }
