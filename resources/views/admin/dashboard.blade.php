@@ -144,7 +144,78 @@
     }
     .stat-card--blue  { --accent: var(--dash-blue);  --accent-soft: rgba(37, 99, 235, 0.1); }
     .stat-card--green { --accent: var(--dash-green); --accent-soft: rgba(5, 150, 105, 0.1); }
+    .stat-card--amber { --accent: var(--dash-amber); --accent-soft: rgba(217, 119, 6, 0.12); }
     .stat-card--red   { --accent: var(--dash-red);   --accent-soft: rgba(220, 38, 38, 0.1); }
+
+    /* ---------- Dashboard tabs and lists ---------- */
+    .dash-tabs {
+        border-bottom: 1px solid #e2e8f0;
+        gap: 8px;
+    }
+    .dash-tabs .nav-link {
+        border: 0;
+        border-radius: 12px 12px 0 0;
+        color: #64748b;
+        font-weight: 800;
+        padding: 12px 16px;
+    }
+    .dash-tabs .nav-link.active {
+        color: var(--dash-blue);
+        background: #eff6ff;
+    }
+    .dash-table-card {
+        border: 1px solid #e9edf3;
+        border-radius: 16px;
+        background: #fff;
+        overflow: hidden;
+    }
+    .dash-table-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 16px 18px;
+        border-bottom: 1px solid #eef2f7;
+    }
+    .dash-table-title {
+        font-size: 14px;
+        font-weight: 800;
+        color: #0f172a;
+    }
+    .dash-table-sub {
+        font-size: 11.5px;
+        color: #94a3b8;
+        margin-top: 2px;
+    }
+    .dash-mini-table {
+        margin: 0;
+    }
+    .dash-mini-table th {
+        font-size: 10.5px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #94a3b8;
+        background: #f8fafc;
+    }
+    .dash-mini-table td {
+        vertical-align: middle;
+        font-size: 12.5px;
+    }
+    .dash-item-name {
+        font-weight: 800;
+        color: #0f172a;
+    }
+    .dash-item-meta {
+        font-size: 11px;
+        color: #94a3b8;
+        margin-top: 2px;
+    }
+    .dash-empty {
+        padding: 28px 18px;
+        text-align: center;
+        color: #94a3b8;
+        font-size: 13px;
+    }
 
     .stat-value-row {
         display: flex;
@@ -465,6 +536,26 @@
 </style>
 
 <div class="dash-wrap">
+    <ul class="nav nav-tabs dash-tabs mb-6" id="dashboard_tabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="tab-resi" data-bs-toggle="tab" data-bs-target="#pane-resi" type="button" role="tab" aria-controls="pane-resi" aria-selected="true">
+                <i class="fa-solid fa-truck-fast me-2"></i>Operasional Resi
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-stock" data-bs-toggle="tab" data-bs-target="#pane-stock" type="button" role="tab" aria-controls="pane-stock" aria-selected="false">
+                <i class="fa-solid fa-boxes-stacked me-2"></i>Stok
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-inventory" data-bs-toggle="tab" data-bs-target="#pane-inventory" type="button" role="tab" aria-controls="pane-inventory" aria-selected="false">
+                <i class="fa-solid fa-chart-line me-2"></i>Aktivitas Inventory
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="dashboard_tab_content">
+        <div class="tab-pane fade show active" id="pane-resi" role="tabpanel" aria-labelledby="tab-resi">
     {{-- ============ Ringkasan Resi ============ --}}
     <div class="card mb-6">
         <div class="card-body">
@@ -489,9 +580,12 @@
             @php
                 $totalResiVal = (int) ($totalResi ?? 0);
                 $totalScanVal = (int) ($totalScanOut ?? 0);
+                $totalQcVal = (int) ($totalQcScan ?? 0);
+                $totalQcCompletedVal = (int) ($totalQcCompleted ?? 0);
                 $totalCancelVal = (int) ($totalResiCanceled ?? 0);
                 $grandTotal = $totalResiVal + $totalCancelVal;
                 $activePercent = $grandTotal > 0 ? round($totalResiVal / $grandTotal * 100) : 0;
+                $qcPercent = $totalResiVal > 0 ? min(100, round($totalQcVal / $totalResiVal * 100)) : 0;
                 $scanPercent = $totalResiVal > 0 ? min(100, round($totalScanVal / $totalResiVal * 100)) : 0;
                 $cancelPercent = $grandTotal > 0 ? round($totalCancelVal / $grandTotal * 100) : 0;
             @endphp
@@ -514,6 +608,26 @@
                         </div>
                         <div class="stat-progress-text">{{ $activePercent }}% dari {{ number_format($grandTotal) }} total resi</div>
                         <div class="stat-meta"><i class="fa-regular fa-clock"></i> Update {{ $totalResiUpdated ?? '-' }}</div>
+                    </div>
+                </div>
+                <div class="stat-card stat-card--amber">
+                    <div class="stat-icon"><i class="fa-solid fa-clipboard-check"></i></div>
+                    <div class="stat-body">
+                        <div class="stat-label">
+                            Total QC Scan
+                            <span class="info-tip" data-bs-toggle="tooltip" data-bs-placement="top" title="Jumlah resi aktif pada tanggal upload ini yang sudah masuk proses QC scan.">
+                                <i class="fa-solid fa-info"></i>
+                            </span>
+                        </div>
+                        <div class="stat-value-row">
+                            <span class="stat-value">{{ number_format($totalQcVal) }}</span>
+                            <span class="stat-percent">{{ $qcPercent }}%</span>
+                        </div>
+                        <div class="stat-progress">
+                            <div class="stat-progress-bar" style="width: {{ $qcPercent }}%"></div>
+                        </div>
+                        <div class="stat-progress-text">{{ $qcPercent }}% resi aktif sudah QC scan &middot; {{ number_format($totalQcCompletedVal) }} completed</div>
+                        <div class="stat-meta"><i class="fa-regular fa-clock"></i> Update {{ $totalQcUpdated ?? '-' }}</div>
                     </div>
                 </div>
                 <div class="stat-card stat-card--green">
@@ -629,6 +743,278 @@
                     Belum ada data kurir.
                 </div>
             @endif
+        </div>
+    </div>
+        </div>
+
+        <div class="tab-pane fade" id="pane-stock" role="tabpanel" aria-labelledby="tab-stock">
+            @php
+                $summary = $inventorySummary ?? null;
+                $totalSku = (int) ($summary->total_sku ?? 0);
+                $totalStock = (int) ($summary->total_stock ?? 0);
+                $outStock = (int) ($summary->out_of_stock ?? 0);
+                $lowStock = (int) ($summary->low_stock ?? 0);
+                $noSafetyStock = (int) ($summary->no_safety_stock ?? 0);
+                $healthyStock = max(0, $totalSku - $outStock - $lowStock);
+                $healthyPercent = $totalSku > 0 ? round($healthyStock / $totalSku * 100) : 0;
+            @endphp
+
+            <div class="card mb-6">
+                <div class="card-body">
+                    <div class="dash-section-head mb-5">
+                        <div>
+                            <div class="dash-section-title"><i class="fa-solid fa-warehouse"></i> Kesehatan Stok</div>
+                            <div class="dash-section-sub">Ringkasan stok aktif saat ini dan daftar SKU yang perlu perhatian</div>
+                        </div>
+                    </div>
+
+                    <div class="stats-grid">
+                        <div class="stat-card stat-card--blue">
+                            <div class="stat-icon"><i class="fa-solid fa-cubes"></i></div>
+                            <div class="stat-body">
+                                <div class="stat-label">Total SKU Aktif</div>
+                                <div class="stat-value">{{ number_format($totalSku) }}</div>
+                                <div class="stat-meta">{{ number_format($totalStock) }} total stok tersedia</div>
+                            </div>
+                        </div>
+                        <div class="stat-card stat-card--red">
+                            <div class="stat-icon"><i class="fa-solid fa-circle-exclamation"></i></div>
+                            <div class="stat-body">
+                                <div class="stat-label">Stok Habis</div>
+                                <div class="stat-value text-danger">{{ number_format($outStock) }}</div>
+                                <div class="stat-meta">SKU dengan stok 0 atau minus</div>
+                            </div>
+                        </div>
+                        <div class="stat-card stat-card--amber">
+                            <div class="stat-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                            <div class="stat-body">
+                                <div class="stat-label">Stok Menipis</div>
+                                <div class="stat-value">{{ number_format($lowStock) }}</div>
+                                <div class="stat-meta">Di bawah safety stock</div>
+                            </div>
+                        </div>
+                        <div class="stat-card stat-card--green">
+                            <div class="stat-icon"><i class="fa-solid fa-shield-heart"></i></div>
+                            <div class="stat-body">
+                                <div class="stat-label">Stok Aman</div>
+                                <div class="stat-value">{{ number_format($healthyStock) }}</div>
+                                <div class="stat-progress">
+                                    <div class="stat-progress-bar" style="width: {{ $healthyPercent }}%"></div>
+                                </div>
+                                <div class="stat-progress-text">{{ $healthyPercent }}% dari SKU aktif &middot; {{ number_format($noSafetyStock) }} tanpa safety stock</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-6">
+                <div class="col-xl-6">
+                    <div class="dash-table-card h-100">
+                        <div class="dash-table-head">
+                            <div>
+                                <div class="dash-table-title">Stok Habis</div>
+                                <div class="dash-table-sub">Maksimal 8 SKU pertama yang perlu restock</div>
+                            </div>
+                            <a href="{{ route('admin.reports.low-stock.index', ['status' => 'out']) }}" class="btn btn-sm btn-light-primary">Lihat laporan</a>
+                        </div>
+                        @if(isset($outOfStockItems) && $outOfStockItems->count())
+                            <div class="table-responsive">
+                                <table class="table dash-mini-table table-row-dashed align-middle">
+                                    <thead>
+                                        <tr>
+                                            <th>SKU</th>
+                                            <th>Nama</th>
+                                            <th class="text-end">Safety</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach($outOfStockItems as $item)
+                                            <tr>
+                                                <td class="fw-bold mono">{{ $item->sku ?? '-' }}</td>
+                                                <td>
+                                                    <div class="dash-item-name">{{ $item->name ?? '-' }}</div>
+                                                    <div class="dash-item-meta">{{ $item->address ?? '-' }}</div>
+                                                </td>
+                                                <td class="text-end fw-bold">{{ number_format((int) ($item->safety_stock ?? 0)) }}</td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @else
+                            <div class="dash-empty">Tidak ada SKU yang stoknya habis.</div>
+                        @endif
+                    </div>
+                </div>
+                <div class="col-xl-6">
+                    <div class="dash-table-card h-100">
+                        <div class="dash-table-head">
+                            <div>
+                                <div class="dash-table-title">Stok Menipis</div>
+                                <div class="dash-table-sub">Diurutkan dari gap safety stock terbesar</div>
+                            </div>
+                            <a href="{{ route('admin.reports.low-stock.index', ['status' => 'low']) }}" class="btn btn-sm btn-light-warning">Lihat laporan</a>
+                        </div>
+                        @if(isset($lowStockItems) && $lowStockItems->count())
+                            <div class="table-responsive">
+                                <table class="table dash-mini-table table-row-dashed align-middle">
+                                    <thead>
+                                        <tr>
+                                            <th>SKU</th>
+                                            <th>Nama</th>
+                                            <th class="text-end">Stok / Safety</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach($lowStockItems as $item)
+                                            <tr>
+                                                <td class="fw-bold mono">{{ $item->sku ?? '-' }}</td>
+                                                <td>
+                                                    <div class="dash-item-name">{{ $item->name ?? '-' }}</div>
+                                                    <div class="dash-item-meta">Kurang {{ number_format((int) ($item->gap ?? 0)) }} pcs &middot; {{ $item->address ?? '-' }}</div>
+                                                </td>
+                                                <td class="text-end fw-bold">{{ number_format((int) ($item->stock ?? 0)) }} / {{ number_format((int) ($item->safety_stock ?? 0)) }}</td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @else
+                            <div class="dash-empty">Tidak ada SKU yang berada di bawah safety stock.</div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="pane-inventory" role="tabpanel" aria-labelledby="tab-inventory">
+            @php
+                $movement = $todayMovement ?? null;
+                $stockIn = (int) ($movement->stock_in ?? 0);
+                $stockOut = (int) ($movement->stock_out ?? 0);
+                $skuIn = (int) ($movement->sku_in ?? 0);
+                $skuOut = (int) ($movement->sku_out ?? 0);
+                $pendingTotal = array_sum($pendingApprovals ?? []);
+            @endphp
+
+            <div class="card mb-6">
+                <div class="card-body">
+                    <div class="dash-section-head mb-5">
+                        <div>
+                            <div class="dash-section-title"><i class="fa-solid fa-right-left"></i> Aktivitas Inventory</div>
+                            <div class="dash-section-sub">Pergerakan stok pada {{ $today ?? '-' }} dan approval yang masih pending</div>
+                        </div>
+                    </div>
+
+                    <div class="stats-grid">
+                        <div class="stat-card stat-card--green">
+                            <div class="stat-icon"><i class="fa-solid fa-arrow-down"></i></div>
+                            <div class="stat-body">
+                                <div class="stat-label">Stok Masuk Hari Ini</div>
+                                <div class="stat-value">{{ number_format($stockIn) }}</div>
+                                <div class="stat-meta">{{ number_format($skuIn) }} SKU bergerak masuk</div>
+                            </div>
+                        </div>
+                        <div class="stat-card stat-card--red">
+                            <div class="stat-icon"><i class="fa-solid fa-arrow-up"></i></div>
+                            <div class="stat-body">
+                                <div class="stat-label">Stok Keluar Hari Ini</div>
+                                <div class="stat-value text-danger">{{ number_format($stockOut) }}</div>
+                                <div class="stat-meta">{{ number_format($skuOut) }} SKU bergerak keluar</div>
+                            </div>
+                        </div>
+                        <div class="stat-card stat-card--blue">
+                            <div class="stat-icon"><i class="fa-solid fa-scale-balanced"></i></div>
+                            <div class="stat-body">
+                                <div class="stat-label">Net Movement</div>
+                                <div class="stat-value">{{ number_format($stockIn - $stockOut) }}</div>
+                                <div class="stat-meta">Masuk dikurangi keluar</div>
+                            </div>
+                        </div>
+                        <div class="stat-card stat-card--amber">
+                            <div class="stat-icon"><i class="fa-solid fa-hourglass-half"></i></div>
+                            <div class="stat-body">
+                                <div class="stat-label">Approval Pending</div>
+                                <div class="stat-value">{{ number_format($pendingTotal) }}</div>
+                                <div class="stat-meta">Inbound, outbound, adjustment, dan damaged goods</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-6">
+                <div class="col-xl-7">
+                    <div class="dash-table-card h-100">
+                        <div class="dash-table-head">
+                            <div>
+                                <div class="dash-table-title">Stok Paling Sering Keluar</div>
+                                <div class="dash-table-sub">Akumulasi 30 hari sampai tanggal filter</div>
+                            </div>
+                            <a href="{{ route('admin.reports.stock-mutations.index') }}" class="btn btn-sm btn-light-primary">Lihat mutasi</a>
+                        </div>
+                        @if(isset($topOutgoingItems) && $topOutgoingItems->count())
+                            <div class="table-responsive">
+                                <table class="table dash-mini-table table-row-dashed align-middle">
+                                    <thead>
+                                        <tr>
+                                            <th>SKU</th>
+                                            <th>Nama</th>
+                                            <th class="text-end">Qty Keluar</th>
+                                            <th class="text-end">Mutasi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach($topOutgoingItems as $item)
+                                            <tr>
+                                                <td class="fw-bold mono">{{ $item->sku ?? '-' }}</td>
+                                                <td><div class="dash-item-name">{{ $item->name ?? '-' }}</div></td>
+                                                <td class="text-end fw-bold text-danger">{{ number_format((int) ($item->total_qty ?? 0)) }}</td>
+                                                <td class="text-end">{{ number_format((int) ($item->mutation_count ?? 0)) }}</td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @else
+                            <div class="dash-empty">Belum ada stok keluar dalam 30 hari terakhir.</div>
+                        @endif
+                    </div>
+                </div>
+                <div class="col-xl-5">
+                    <div class="dash-table-card h-100">
+                        <div class="dash-table-head">
+                            <div>
+                                <div class="dash-table-title">Approval Pending</div>
+                                <div class="dash-table-sub">Dokumen yang belum disetujui</div>
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table dash-mini-table table-row-dashed align-middle">
+                                <tbody>
+                                    <tr>
+                                        <td class="fw-bold">Inbound</td>
+                                        <td class="text-end">{{ number_format((int) ($pendingApprovals['inbound'] ?? 0)) }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="fw-bold">Outbound</td>
+                                        <td class="text-end">{{ number_format((int) ($pendingApprovals['outbound'] ?? 0)) }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="fw-bold">Stock Adjustment</td>
+                                        <td class="text-end">{{ number_format((int) ($pendingApprovals['adjustment'] ?? 0)) }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="fw-bold">Damaged Goods</td>
+                                        <td class="text-end">{{ number_format((int) ($pendingApprovals['damaged_goods'] ?? 0)) }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>

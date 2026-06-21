@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Kurir;
 use App\Models\PackerScanOut;
+use App\Models\QcScanResi;
 use App\Models\Resi;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -40,8 +41,98 @@ class DashboardController extends Controller
         $totalScanUpdatedAt = PackerScanOut::query()
             ->whereIn('resi_id', (clone $resiBase)->select('id'))
             ->max('scanned_at');
+        $totalQcScan = QcScanResi::query()
+            ->whereIn('resi_id', (clone $resiBase)->select('id'))
+            ->count();
+        $totalQcCompleted = QcScanResi::query()
+            ->whereIn('resi_id', (clone $resiBase)->select('id'))
+            ->where('status', 'completed')
+            ->count();
+        $totalQcUpdatedAt = QcScanResi::query()
+            ->whereIn('resi_id', (clone $resiBase)->select('id'))
+            ->selectRaw('MAX(COALESCE(completed_at, scanned_at)) as latest_at')
+            ->value('latest_at');
         $totalResiUpdated = $totalResiUpdatedAt ? Carbon::parse($totalResiUpdatedAt)->format('H:i') : '-';
         $totalScanUpdated = $totalScanUpdatedAt ? Carbon::parse($totalScanUpdatedAt)->format('H:i') : '-';
+        $totalQcUpdated = $totalQcUpdatedAt ? Carbon::parse($totalQcUpdatedAt)->format('H:i') : '-';
+
+        $selectedStart = Carbon::parse($selectedDate)->startOfDay();
+        $selectedEnd = Carbon::parse($selectedDate)->endOfDay();
+        $movementStart = Carbon::parse($selectedDate)->subDays(29)->startOfDay();
+
+        $inventorySummary = DB::table('items as i')
+            ->leftJoin('item_stocks as s', 's.item_id', '=', 'i.id')
+            ->where('i.is_active', true)
+            ->selectRaw('COUNT(*) as total_sku')
+            ->selectRaw('COALESCE(SUM(COALESCE(s.stock, 0)), 0) as total_stock')
+            ->selectRaw('COUNT(CASE WHEN COALESCE(s.stock, 0) <= 0 THEN 1 END) as out_of_stock')
+            ->selectRaw('COUNT(CASE WHEN i.safety_stock > 0 AND COALESCE(s.stock, 0) > 0 AND COALESCE(s.stock, 0) < i.safety_stock THEN 1 END) as low_stock')
+            ->selectRaw('COUNT(CASE WHEN i.safety_stock <= 0 THEN 1 END) as no_safety_stock')
+            ->first();
+
+        $todayMovement = DB::table('stock_mutations')
+            ->whereBetween('occurred_at', [$selectedStart, $selectedEnd])
+            ->selectRaw("COALESCE(SUM(CASE WHEN direction = 'in' THEN qty ELSE 0 END), 0) as stock_in")
+            ->selectRaw("COALESCE(SUM(CASE WHEN direction = 'out' THEN qty ELSE 0 END), 0) as stock_out")
+            ->selectRaw("COUNT(DISTINCT CASE WHEN direction = 'in' THEN item_id END) as sku_in")
+            ->selectRaw("COUNT(DISTINCT CASE WHEN direction = 'out' THEN item_id END) as sku_out")
+            ->first();
+
+        $topOutgoingItems = DB::table('stock_mutations as sm')
+            ->join('items as i', 'i.id', '=', 'sm.item_id')
+            ->where('sm.direction', 'out')
+            ->whereBetween('sm.occurred_at', [$movementStart, $selectedEnd])
+            ->groupBy('i.id', 'i.sku', 'i.name')
+            ->select([
+                'i.sku',
+                'i.name',
+                DB::raw('COALESCE(SUM(sm.qty), 0) as total_qty'),
+                DB::raw('COUNT(*) as mutation_count'),
+            ])
+            ->orderByDesc('total_qty')
+            ->limit(5)
+            ->get();
+
+        $outOfStockItems = DB::table('items as i')
+            ->leftJoin('item_stocks as s', 's.item_id', '=', 'i.id')
+            ->where('i.is_active', true)
+            ->whereRaw('COALESCE(s.stock, 0) <= 0')
+            ->select([
+                'i.sku',
+                'i.name',
+                'i.address',
+                'i.safety_stock',
+                DB::raw('COALESCE(s.stock, 0) as stock'),
+            ])
+            ->orderBy('i.sku')
+            ->limit(8)
+            ->get();
+
+        $lowStockItems = DB::table('items as i')
+            ->leftJoin('item_stocks as s', 's.item_id', '=', 'i.id')
+            ->where('i.is_active', true)
+            ->where('i.safety_stock', '>', 0)
+            ->whereRaw('COALESCE(s.stock, 0) > 0')
+            ->whereRaw('COALESCE(s.stock, 0) < i.safety_stock')
+            ->select([
+                'i.sku',
+                'i.name',
+                'i.address',
+                'i.safety_stock',
+                DB::raw('COALESCE(s.stock, 0) as stock'),
+                DB::raw('(i.safety_stock - COALESCE(s.stock, 0)) as gap'),
+            ])
+            ->orderByDesc('gap')
+            ->orderBy('i.sku')
+            ->limit(8)
+            ->get();
+
+        $pendingApprovals = [
+            'inbound' => DB::table('inbound_transactions')->where('status', 'pending')->count(),
+            'outbound' => DB::table('outbound_transactions')->where('status', 'pending')->count(),
+            'adjustment' => DB::table('stock_adjustments')->where('status', 'pending')->count(),
+            'damaged_goods' => DB::table('damaged_goods')->where('status', 'pending')->count(),
+        ];
 
         $resiCounts = Resi::select('kurir_id', DB::raw('count(*) as total'))
             ->whereDate('tanggal_upload', $selectedDate)
@@ -114,8 +205,17 @@ class DashboardController extends Controller
             'totalResi' => $totalResiActive,
             'totalResiCanceled' => $totalResiCanceled,
             'totalScanOut' => $totalScanOut,
+            'totalQcScan' => $totalQcScan,
+            'totalQcCompleted' => $totalQcCompleted,
             'totalResiUpdated' => $totalResiUpdated,
             'totalScanUpdated' => $totalScanUpdated,
+            'totalQcUpdated' => $totalQcUpdated,
+            'inventorySummary' => $inventorySummary,
+            'todayMovement' => $todayMovement,
+            'topOutgoingItems' => $topOutgoingItems,
+            'outOfStockItems' => $outOfStockItems,
+            'lowStockItems' => $lowStockItems,
+            'pendingApprovals' => $pendingApprovals,
             'kurirs' => $kurirs,
         ]);
     }
