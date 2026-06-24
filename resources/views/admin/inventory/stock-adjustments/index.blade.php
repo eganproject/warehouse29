@@ -7,6 +7,7 @@
     use App\Support\Permission as Perm;
     $canCreate = Perm::can(auth()->user(), 'admin.inventory.stock-adjustments.index', 'create');
     $canUpdate = Perm::can(auth()->user(), 'admin.inventory.stock-adjustments.index', 'update');
+    $canApprove = Perm::can(auth()->user(), 'admin.inventory.stock-adjustments.index', 'approve');
     $canDelete = Perm::can(auth()->user(), 'admin.inventory.stock-adjustments.index', 'delete');
     $canImport = $canCreate && !empty($importUrl ?? null);
 @endphp
@@ -161,6 +162,7 @@
     const csrfToken = '{{ csrf_token() }}';
     const importUrl = '{{ $importUrl ?? '' }}';
     const canUpdate = {{ $canUpdate ? 'true' : 'false' }};
+    const canApprove = {{ $canApprove ? 'true' : 'false' }};
     const canDelete = {{ $canDelete ? 'true' : 'false' }};
     const itemOptionsHtml = `@foreach($items as $item)<option value="{{ $item->id }}">{{ $item->sku }} - {{ $item->name }}</option>@endforeach`;
 
@@ -398,7 +400,7 @@
                 { data: 'id', orderable: false, searchable: false, className: 'text-end', render: (data, type, row) => {
                     const isApproved = row?.status === 'approved';
                     const detailItem = `<div class="menu-item px-3"><a href="${detailUrlTpl.replace(':id', data)}" class="menu-link px-3">Detail</a></div>`;
-                    const approveItem = (!isApproved && canUpdate)
+                    const approveItem = (!isApproved && canApprove)
                         ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 text-success btn-approve" data-id="${data}">Approve</a></div>`
                         : '';
                     const editItem = (!isApproved && canUpdate) ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 btn-edit" data-id="${data}">Edit</a></div>` : '';

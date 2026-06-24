@@ -7,6 +7,7 @@ use App\Models\Menu;
 use App\Models\Role;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class PermissionController extends Controller
 {
@@ -32,7 +33,9 @@ class PermissionController extends Controller
         $canView   = collect($request->input('can_view', []));
         $canCreate = collect($request->input('can_create', []));
         $canUpdate = collect($request->input('can_update', []));
+        $canApprove = collect($request->input('can_approve', []));
         $canDelete = collect($request->input('can_delete', []));
+        $hasApproveColumn = Schema::hasColumn('permission_menu', 'can_approve');
 
         $menuIds = Menu::pluck('id');
 
@@ -45,10 +48,13 @@ class PermissionController extends Controller
                     'can_update' => $canUpdate->has($mid),
                     'can_delete' => $canDelete->has($mid),
                 ];
+                if ($hasApproveColumn) {
+                    $flags['can_approve'] = $canApprove->has($mid);
+                }
 
                 $exists = DB::table('permission_menu')->where(['role_id' => $role->id, 'menu_id' => $mid])->exists();
 
-                if ($flags['can_view'] || $flags['can_create'] || $flags['can_update'] || $flags['can_delete']) {
+                if ($flags['can_view'] || $flags['can_create'] || $flags['can_update'] || ($flags['can_approve'] ?? false) || $flags['can_delete']) {
                     DB::table('permission_menu')->updateOrInsert(
                         ['role_id' => $role->id, 'menu_id' => $mid],
                         array_merge($flags, ['updated_at' => now(), 'created_at' => now()])
@@ -68,4 +74,3 @@ class PermissionController extends Controller
         return redirect()->route('admin.masterdata.permissions.edit', $role->id)->with('success', 'Permission berhasil disimpan');
     }
 }
-

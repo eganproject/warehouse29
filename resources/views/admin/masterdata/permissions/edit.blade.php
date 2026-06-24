@@ -29,6 +29,7 @@
                                     <th class="text-center">Lihat</th>
                                     <th class="text-center">Tambah</th>
                                     <th class="text-center">Ubah</th>
+                                    <th class="text-center">Approve</th>
                                     <th class="text-center">Hapus</th>
                                 </tr>
                             </thead>
@@ -42,6 +43,7 @@
                                         <td class="text-center"><input type="checkbox" name="can_view[{{ $parent->id }}]" @checked($p?->can_view)></td>
                                         <td class="text-center"><input type="checkbox" name="can_create[{{ $parent->id }}]" @checked($p?->can_create)></td>
                                         <td class="text-center"><input type="checkbox" name="can_update[{{ $parent->id }}]" @checked($p?->can_update)></td>
+                                        <td class="text-center"><input type="checkbox" name="can_approve[{{ $parent->id }}]" @checked($p->can_approve ?? false)></td>
                                         <td class="text-center"><input type="checkbox" name="can_delete[{{ $parent->id }}]" @checked($p?->can_delete)></td>
                                     </tr>
                                     @foreach($parent->children()->orderBy('sort_order')->orderBy('name')->get() as $child)
@@ -51,6 +53,7 @@
                                             <td class="text-center"><input type="checkbox" name="can_view[{{ $child->id }}]" @checked($c?->can_view)></td>
                                             <td class="text-center"><input type="checkbox" name="can_create[{{ $child->id }}]" @checked($c?->can_create)></td>
                                             <td class="text-center"><input type="checkbox" name="can_update[{{ $child->id }}]" @checked($c?->can_update)></td>
+                                            <td class="text-center"><input type="checkbox" name="can_approve[{{ $child->id }}]" @checked($c->can_approve ?? false)></td>
                                             <td class="text-center"><input type="checkbox" name="can_delete[{{ $child->id }}]" @checked($c?->can_delete)></td>
                                         </tr>
                                     @endforeach

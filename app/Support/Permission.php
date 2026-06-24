@@ -18,7 +18,8 @@ class Permission
     public static function actionFromRoute(string $routeName): string
     {
         if (preg_match('/\.(create|store|import)$/', $routeName)) return 'create';
-        if (preg_match('/\.(edit|update|approve)$/', $routeName)) return 'update';
+        if (preg_match('/\.(approve)$/', $routeName)) return 'approve';
+        if (preg_match('/\.(edit|update)$/', $routeName)) return 'update';
         if (preg_match('/\.(destroy)$/', $routeName)) return 'delete';
         // index, show, data, others default to view
         return 'view';
@@ -50,6 +51,7 @@ class Permission
 
         $col = match ($action) {
             'create' => 'can_create',
+            'approve' => Schema::hasColumn('permission_menu', 'can_approve') ? 'can_approve' : 'can_update',
             'update' => 'can_update',
             'delete' => 'can_delete',
             default => 'can_view',

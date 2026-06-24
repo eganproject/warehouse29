@@ -7,6 +7,7 @@
     use App\Support\Permission as Perm;
     $canCreate = Perm::can(auth()->user(), 'admin.inventory.stock-opname.index', 'create');
     $canUpdate = Perm::can(auth()->user(), 'admin.inventory.stock-opname.index', 'update');
+    $canApprove = Perm::can(auth()->user(), 'admin.inventory.stock-opname.index', 'approve');
     $canDelete = Perm::can(auth()->user(), 'admin.inventory.stock-opname.index', 'delete');
 @endphp
 
@@ -113,6 +114,7 @@
     const deleteUrlTpl = '{{ route('admin.inventory.stock-opname.destroy', ':id') }}';
     const csrfToken = '{{ csrf_token() }}';
     const canUpdate = {{ $canUpdate ? 'true' : 'false' }};
+    const canApprove = {{ $canApprove ? 'true' : 'false' }};
     const canDelete = {{ $canDelete ? 'true' : 'false' }};
     const itemOptionsHtml = `@foreach($items as $item)<option value="{{ $item->id }}" data-stock="{{ $item->stock }}">{{ $item->sku }} - {{ $item->name }}</option>@endforeach`;
 
@@ -346,7 +348,7 @@
                 { data: 'id', orderable:false, searchable:false, className:'text-end', render: (data, type, row) => {
                     const detailItem = `<div class="menu-item px-3"><a href="${detailUrlTpl.replace(':id', data)}" class="menu-link px-3">Detail</a></div>`;
                     const isCompleted = row?.status === 'completed';
-                    const approveItem = (!isCompleted && canUpdate)
+                    const approveItem = (!isCompleted && canApprove)
                         ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 text-success btn-approve" data-id="${data}">Selesaikan</a></div>`
                         : '';
                     const delItem = (!isCompleted && canDelete)
