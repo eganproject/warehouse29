@@ -293,8 +293,10 @@
         };
 
         const refreshIndexes = () => {
-            Array.from(body.querySelectorAll('tr')).forEach((row, index) => {
+            Array.from(body.querySelectorAll('.return-item-card')).forEach((row, index) => {
                 row.dataset.index = index;
+                const label = row.querySelector('.return-item-index');
+                if (label) label.textContent = index + 1;
                 row.querySelectorAll('[data-name]').forEach((input) => {
                     input.name = `items[${index}][${input.dataset.name}]`;
                 });
@@ -311,6 +313,7 @@
         };
 
         const syncRow = (row, changed) => {
+            if (!row) return;
             const qtyResi = numberValue(row.querySelector('[data-name="qty_resi"]')?.value);
             const receivedEl = row.querySelector('[data-name="qty_received"]');
             const goodEl = row.querySelector('[data-name="qty_good"]');
@@ -335,55 +338,97 @@
             }
 
             diffEl.value = Math.max(qtyResi - received, 0);
+            updateRowSummary(row);
+        };
+
+        const updateRowSummary = (row) => {
+            const qtyResi = numberValue(row.querySelector('[data-name="qty_resi"]')?.value);
+            const received = numberValue(row.querySelector('[data-name="qty_received"]')?.value);
+            const diff = numberValue(row.querySelector('[data-name="qty_difference"]')?.value);
+            const good = numberValue(row.querySelector('[data-name="qty_good"]')?.value);
+            const damaged = numberValue(row.querySelector('[data-name="qty_damaged"]')?.value);
+            const summary = row.querySelector('.return-item-summary');
+            if (!summary) return;
+
+            row.classList.toggle('is-difference', diff > 0 || damaged > 0);
+            summary.innerHTML = `
+                <span class="badge badge-light-info">Resi: ${qtyResi.toLocaleString('id-ID')}</span>
+                <span class="badge badge-light-primary">Diterima: ${received.toLocaleString('id-ID')}</span>
+                <span class="badge ${diff > 0 ? 'badge-light-warning' : 'badge-light-success'}">Selisih: ${diff.toLocaleString('id-ID')}</span>
+                <span class="badge badge-light-success">Bagus: ${good.toLocaleString('id-ID')}</span>
+                <span class="badge ${damaged > 0 ? 'badge-light-danger' : 'badge-light-secondary'}">Rusak: ${damaged.toLocaleString('id-ID')}</span>
+            `;
         };
 
         const addRow = (data = {}) => {
-            const row = document.createElement('tr');
+            const row = document.createElement('div');
+            row.className = 'return-item-card';
             row.innerHTML = `
-                <td>
-                    <select class="form-select form-select-solid item-select" data-name="item_id" data-placeholder="Pilih item" required>
-                        ${itemSelectHtml(data.item_id)}
-                    </select>
-                    ${data.item_found === false ? '<div class="text-danger fs-8 mt-1">SKU resi belum ada di master item.</div>' : ''}
-                    <div class="invalid-feedback d-block" data-error-for="item_id"></div>
-                </td>
-                <td>
-                    <input type="number" min="1" class="form-control form-control-solid" data-name="qty_resi" value="${esc(data.qty_resi || 1)}" required>
-                    <div class="invalid-feedback d-block" data-error-for="qty_resi"></div>
-                </td>
-                <td>
-                    <input type="number" min="1" class="form-control form-control-solid" data-name="qty_received" value="${esc(data.qty_received ?? data.qty_resi ?? 1)}" required>
-                    <div class="invalid-feedback d-block" data-error-for="qty_received"></div>
-                </td>
-                <td>
-                    <input type="number" min="0" class="form-control form-control-solid" data-name="qty_difference" value="${esc(data.qty_difference || 0)}" readonly>
-                </td>
-                <td>
-                    <input type="number" min="0" class="form-control form-control-solid" data-name="qty_good" value="${esc(data.qty_good ?? data.qty_received ?? data.qty_resi ?? 1)}" required>
-                    <div class="invalid-feedback d-block" data-error-for="qty_good"></div>
-                </td>
-                <td>
-                    <input type="number" min="0" class="form-control form-control-solid" data-name="qty_damaged" value="${esc(data.qty_damaged || 0)}" required>
-                    <div class="invalid-feedback d-block" data-error-for="qty_damaged"></div>
-                </td>
-                <td>
-                    <select class="form-select form-select-solid reason-select" data-name="return_reason_id" data-placeholder="Pilih penyebab">
-                        ${reasonSelectHtml(data.return_reason_id)}
-                    </select>
-                    <div class="invalid-feedback d-block" data-error-for="return_reason_id"></div>
-                </td>
-                <td>
-                    <input type="text" class="form-control form-control-solid" data-name="return_reason_note" value="${esc(data.return_reason_note || '')}">
-                    <div class="invalid-feedback d-block" data-error-for="return_reason_note"></div>
-                </td>
-                <td>
-                    <input type="text" class="form-control form-control-solid" data-name="note" value="${esc(data.note || '')}">
-                </td>
-                <td class="text-end">
-                    <button type="button" class="btn btn-icon btn-light-danger btn-remove-row">
+                <div class="return-item-head">
+                    <div class="d-flex align-items-start gap-3 flex-grow-1">
+                        <span class="return-item-index">1</span>
+                        <div class="flex-grow-1">
+                            <div class="fw-bold text-gray-800">Item Retur</div>
+                            <div class="text-muted fs-8">Pilih item, cek jumlah resi, lalu isi kondisi barang yang diterima.</div>
+                            ${data.item_found === false ? '<div class="text-danger fs-8 mt-1">SKU resi belum ada di master item. Pilih item master yang sesuai.</div>' : ''}
+                            <div class="return-item-summary"></div>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-icon btn-light-danger btn-remove-row" title="Hapus item">
                         <i class="fas fa-trash"></i>
                     </button>
-                </td>
+                </div>
+                <div class="return-item-grid">
+                    <div class="return-item-field-main">
+                        <label class="required fs-7 fw-bold form-label">Item</label>
+                        <select class="form-select form-select-solid item-select" data-name="item_id" data-placeholder="Pilih item" required>
+                            ${itemSelectHtml(data.item_id)}
+                        </select>
+                        <div class="invalid-feedback d-block" data-error-for="item_id"></div>
+                    </div>
+                    <div class="return-qty-field">
+                        <label class="required fs-7 fw-bold form-label">Qty Resi</label>
+                        <input type="number" min="1" class="form-control form-control-solid text-end" data-name="qty_resi" value="${esc(data.qty_resi || 1)}" required>
+                        <div class="invalid-feedback d-block" data-error-for="qty_resi"></div>
+                    </div>
+                    <div class="return-qty-field">
+                        <label class="required fs-7 fw-bold form-label">Diterima</label>
+                        <input type="number" min="1" class="form-control form-control-solid text-end" data-name="qty_received" value="${esc(data.qty_received ?? data.qty_resi ?? 1)}" required>
+                        <div class="invalid-feedback d-block" data-error-for="qty_received"></div>
+                    </div>
+                    <div class="return-qty-field">
+                        <label class="fs-7 fw-bold form-label">Selisih</label>
+                        <input type="number" min="0" class="form-control form-control-solid text-end return-diff-input" data-name="qty_difference" value="${esc(data.qty_difference || 0)}" readonly>
+                    </div>
+                    <div class="return-qty-field">
+                        <label class="required fs-7 fw-bold form-label">Bagus</label>
+                        <input type="number" min="0" class="form-control form-control-solid text-end" data-name="qty_good" value="${esc(data.qty_good ?? data.qty_received ?? data.qty_resi ?? 1)}" required>
+                        <div class="invalid-feedback d-block" data-error-for="qty_good"></div>
+                    </div>
+                    <div class="return-qty-field">
+                        <label class="required fs-7 fw-bold form-label">Rusak</label>
+                        <input type="number" min="0" class="form-control form-control-solid text-end return-damaged-input" data-name="qty_damaged" value="${esc(data.qty_damaged || 0)}" required>
+                        <div class="invalid-feedback d-block" data-error-for="qty_damaged"></div>
+                    </div>
+                </div>
+                <div class="return-item-reason-grid">
+                    <div>
+                        <label class="fs-7 fw-bold form-label">Penyebab Retur</label>
+                        <select class="form-select form-select-solid reason-select" data-name="return_reason_id" data-placeholder="Pilih penyebab">
+                            ${reasonSelectHtml(data.return_reason_id)}
+                        </select>
+                        <div class="invalid-feedback d-block" data-error-for="return_reason_id"></div>
+                    </div>
+                    <div>
+                        <label class="fs-7 fw-bold form-label">Catatan Penyebab</label>
+                        <input type="text" class="form-control form-control-solid" data-name="return_reason_note" value="${esc(data.return_reason_note || '')}" placeholder="Contoh: tombol hilang, box penyok">
+                        <div class="invalid-feedback d-block" data-error-for="return_reason_note"></div>
+                    </div>
+                    <div>
+                        <label class="fs-7 fw-bold form-label">Catatan Item</label>
+                        <input type="text" class="form-control form-control-solid" data-name="note" value="${esc(data.note || '')}" placeholder="Catatan internal item">
+                    </div>
+                </div>
             `;
             body.appendChild(row);
             refreshIndexes();
@@ -486,14 +531,22 @@
         body.addEventListener('click', (event) => {
             const btn = event.target.closest('.btn-remove-row');
             if (!btn) return;
-            btn.closest('tr')?.remove();
+            const cards = body.querySelectorAll('.return-item-card');
+            if (cards.length <= 1) {
+                if (window.Swal) Swal.fire('Info', 'Minimal 1 item retur diperlukan.', 'info');
+                return;
+            }
+            if (window.jQuery && jQuery.fn.select2) {
+                jQuery(btn.closest('.return-item-card')).find('select.select2-hidden-accessible').select2('destroy');
+            }
+            btn.closest('.return-item-card')?.remove();
             refreshIndexes();
         });
 
         body.addEventListener('input', (event) => {
             const target = event.target;
             if (!target.matches('[data-name="qty_resi"], [data-name="qty_received"], [data-name="qty_good"], [data-name="qty_damaged"]')) return;
-            syncRow(target.closest('tr'), target.dataset.name);
+            syncRow(target.closest('.return-item-card'), target.dataset.name);
         });
 
         form.addEventListener('submit', async (event) => {
@@ -502,7 +555,7 @@
             if (!resiNoInput.value && scanInput.value.trim()) {
                 resiNoInput.value = scanInput.value.trim();
             }
-            if (!body.querySelector('tr')) {
+            if (!body.querySelector('.return-item-card')) {
                 document.getElementById('error_items').textContent = 'Minimal 1 item diperlukan.';
                 return;
             }
