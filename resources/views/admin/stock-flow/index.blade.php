@@ -882,53 +882,32 @@
                 });
             });
         };
-        const parseReturnItemLabel = (label) => {
-            const raw = String(label || '').trim();
-            const match = raw.match(/^(.*?)\s+\(resi\s+(\d+),\s+terima\s+(\d+),\s+selisih\s+(\d+),\s+bagus\s+(\d+),\s+rusak\s+(\d+)\)$/i);
-            if (!match) {
-                return {
-                    name: raw || '-',
-                    qty_resi: '-',
-                    qty_received: '-',
-                    qty_difference: '-',
-                    qty_good: '-',
-                    qty_damaged: '-',
-                };
-            }
-            return {
-                name: match[1],
-                qty_resi: Number(match[2]).toLocaleString('id-ID'),
-                qty_received: Number(match[3]).toLocaleString('id-ID'),
-                qty_difference: Number(match[4]).toLocaleString('id-ID'),
-                qty_good: Number(match[5]).toLocaleString('id-ID'),
-                qty_damaged: Number(match[6]).toLocaleString('id-ID'),
-            };
-        };
         const openReturnItemsModal = (rowData) => {
             const modalEl = document.getElementById('modal_return_items');
             const modalBody = document.getElementById('return_items_modal_body');
             const modalTitle = document.getElementById('return_items_title');
             if (!modalEl || !modalBody) return;
 
-            const items = String(rowData?.item || '')
-                .split(',')
-                .map((part) => parseReturnItemLabel(part))
-                .filter((item) => item.name && item.name !== '-');
+            const items = Array.isArray(rowData?.return_items) ? rowData.return_items : [];
 
             modalTitle.textContent = `Daftar Item Retur ${rowData?.code || ''}`.trim();
             modalBody.innerHTML = items.length
                 ? items.map((item, index) => `
                     <tr>
                         <td>${index + 1}</td>
-                        <td class="fw-semibold">${esc(item.name)}</td>
-                        <td class="text-end">${esc(item.qty_resi)}</td>
-                        <td class="text-end">${esc(item.qty_received)}</td>
-                        <td class="text-end">
-                            <span class="badge ${Number(String(item.qty_difference).replace(/\D/g, '') || 0) > 0 ? 'badge-light-warning text-warning' : 'badge-light-success text-success'}">${esc(item.qty_difference)}</span>
+                        <td>
+                            <div class="fw-semibold">${esc(item.sku || '-')}</div>
+                            <div class="text-muted fs-8">${esc(item.name || '-')}</div>
+                            ${item.return_reason ? `<div class="badge badge-light-info mt-1">${esc(item.return_reason)}</div>` : ''}
                         </td>
-                        <td class="text-end">${esc(item.qty_good)}</td>
+                        <td class="text-end">${Number(item.qty_resi || 0).toLocaleString('id-ID')}</td>
+                        <td class="text-end">${Number(item.qty_received || 0).toLocaleString('id-ID')}</td>
                         <td class="text-end">
-                            <span class="badge ${Number(String(item.qty_damaged).replace(/\D/g, '') || 0) > 0 ? 'badge-light-danger text-danger' : 'badge-light-secondary'}">${esc(item.qty_damaged)}</span>
+                            <span class="badge ${Number(item.qty_difference || 0) > 0 ? 'badge-light-warning text-warning' : 'badge-light-success text-success'}">${Number(item.qty_difference || 0).toLocaleString('id-ID')}</span>
+                        </td>
+                        <td class="text-end">${Number(item.qty_good || 0).toLocaleString('id-ID')}</td>
+                        <td class="text-end">
+                            <span class="badge ${Number(item.qty_damaged || 0) > 0 ? 'badge-light-danger text-danger' : 'badge-light-secondary'}">${Number(item.qty_damaged || 0).toLocaleString('id-ID')}</span>
                         </td>
                     </tr>
                 `).join('')
@@ -974,9 +953,14 @@
                 { data: 'submit_by' },
                 { data: 'item', className: 'return-list-items', render: (data, type, row) => {
                     if (!isInboundReturnFlow || row?.type !== 'return') return esc(data || '-');
-                    const parts = String(data || '-').split(',').map((part) => part.trim()).filter(Boolean);
-                    const visible = parts.slice(0, 3).map((part) => `<div>${esc(part)}</div>`).join('');
-                    const more = parts.length > 3 ? `<button type="button" class="btn btn-sm btn-light-primary mt-2 btn-show-return-items" data-id="${row?.id || ''}">+${parts.length - 3} item lainnya</button>` : '';
+                    const items = Array.isArray(row?.return_items) ? row.return_items : [];
+                    const visible = items.slice(0, 3).map((item) => `
+                        <div>
+                            <span class="fw-semibold">${esc(item.sku || '-')}</span>
+                            <span class="text-muted fs-8">terima ${Number(item.qty_received || 0).toLocaleString('id-ID')}, selisih ${Number(item.qty_difference || 0).toLocaleString('id-ID')}</span>
+                        </div>
+                    `).join('');
+                    const more = items.length > 3 ? `<button type="button" class="btn btn-sm btn-light-primary mt-2 btn-show-return-items" data-id="${row?.id || ''}">+${items.length - 3} item lainnya</button>` : '';
                     return visible + more;
                 } },
                 { data: 'qty', className: 'return-list-qty-cell', render: (data, type, row) => {

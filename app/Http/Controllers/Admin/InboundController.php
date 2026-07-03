@@ -541,6 +541,19 @@ class InboundController extends Controller
             })->filter()->values();
             $itemLabel = $labels->implode(', ');
             $totalQty = (int) $items->sum(fn ($it) => (int) ($it->qty_received ?? $it->qty ?? 0));
+            $returnItems = $items->map(function ($it) {
+                return [
+                    'sku' => $it->item?->sku ?? '-',
+                    'name' => $it->item?->name ?? '-',
+                    'qty_resi' => (int) ($it->qty_resi ?? $it->qty_received ?? $it->qty ?? 0),
+                    'qty_received' => (int) ($it->qty_received ?? $it->qty ?? 0),
+                    'qty_difference' => (int) ($it->qty_difference ?? 0),
+                    'qty_good' => (int) ($it->qty_good ?? 0),
+                    'qty_damaged' => (int) ($it->qty_damaged ?? 0),
+                    'return_reason' => $it->returnReason?->name ?? null,
+                    'note' => $it->note ?? null,
+                ];
+            })->values();
             return [
                 'id' => $row->id,
                 'code' => $row->code,
@@ -548,6 +561,7 @@ class InboundController extends Controller
                 'submit_by' => $row->creator?->name ?? '-',
                 'return_resi' => $row->return_resi_no ?: ($row->resi?->no_resi ?: $row->resi?->id_pesanan),
                 'item' => $itemLabel ?: '-',
+                'return_items' => $returnItems,
                 'qty' => $totalQty,
                 'qty_resi' => (int) $items->sum(fn ($it) => (int) ($it->qty_resi ?? $it->qty_received ?? $it->qty ?? 0)),
                 'qty_difference' => (int) $items->sum(fn ($it) => (int) ($it->qty_difference ?? 0)),
