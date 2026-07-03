@@ -46,37 +46,255 @@
     $defaultType = $typeDefault ?? '';
     $canCreateDefault = $permMap[$defaultType]['create'] ?? false;
     $canImport = !empty($importUrl ?? null) && $canCreateDefault;
+    $isInboundReturnList = ($typeDefault ?? '') === 'return' && isset($routeMap['receipt']);
 @endphp
 
+@if($isInboundReturnList)
+@push('styles')
+<style>
+    .return-list-card .card-header {
+        align-items: stretch;
+        gap: 1rem;
+    }
+
+    .return-list-toolbar {
+        display: flex;
+        align-items: center;
+        gap: .75rem;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        width: 100%;
+    }
+
+    .return-list-filters {
+        display: grid;
+        grid-template-columns: minmax(220px, 1fr) 150px 150px 150px auto auto;
+        gap: .5rem;
+        align-items: center;
+        flex: 1 1 760px;
+    }
+
+    .return-list-actions {
+        display: flex;
+        gap: .5rem;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+
+    .return-list-actions .me-3 {
+        margin-right: 0 !important;
+    }
+
+    .return-list-period {
+        border: 1px solid #e4e6ef;
+        border-radius: 8px;
+        background: #f8fafc;
+        padding: .85rem 1rem;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .return-list-period .period-chip {
+        border-radius: 6px;
+        background: #eef2ff;
+        color: #3730a3;
+        padding: .35rem .6rem;
+        font-weight: 700;
+        font-size: .78rem;
+    }
+
+    .return-list-code {
+        min-width: 190px;
+    }
+
+    .return-list-code .code-main,
+    .return-list-resi {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    }
+
+    .return-list-items {
+        max-width: 420px;
+        line-height: 1.55;
+    }
+
+    .return-list-qty {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .35rem;
+        min-width: 132px;
+    }
+
+    .return-list-note {
+        max-width: 260px;
+        white-space: normal;
+        color: #64748b;
+    }
+
+    .return-flow-list .badge {
+        border-radius: 6px;
+    }
+
+    .return-flow-list th:nth-child(1),
+    .return-flow-list td:nth-child(1),
+    .return-flow-list th:nth-child(4),
+    .return-flow-list td:nth-child(4),
+    .return-flow-list th:nth-child(6),
+    .return-flow-list td:nth-child(6),
+    .return-flow-list th:nth-child(7),
+    .return-flow-list td:nth-child(7) {
+        display: none;
+    }
+
+    @media (min-width: 992px) {
+        .return-list-card .card-title {
+            flex: 0 0 280px;
+        }
+    }
+
+    @media (max-width: 1199.98px) {
+        .return-list-filters {
+            grid-template-columns: minmax(220px, 1fr) repeat(3, minmax(130px, .45fr));
+        }
+
+        .return-list-filters .return-filter-button {
+            min-width: 110px;
+        }
+    }
+
+    @media (max-width: 767.98px) {
+        .return-list-card .card-header {
+            display: block;
+        }
+
+        .return-list-card .card-title {
+            margin-bottom: 1rem;
+        }
+
+        .return-list-toolbar,
+        .return-list-actions {
+            justify-content: stretch;
+        }
+
+        .return-list-filters {
+            grid-template-columns: 1fr 1fr;
+            flex-basis: 100%;
+            width: 100%;
+        }
+
+        .return-list-filters .return-search,
+        .return-list-filters .return-status {
+            grid-column: 1 / -1;
+        }
+
+        .return-list-actions > *,
+        .return-list-filters .btn {
+            flex: 1 1 auto;
+        }
+
+        .return-flow-list table,
+        .return-flow-list tbody,
+        .return-flow-list tr,
+        .return-flow-list td {
+            display: block;
+            width: 100% !important;
+        }
+
+        .return-flow-list thead {
+            display: none;
+        }
+
+        .return-flow-list tr {
+            border: 1px solid #e4e6ef;
+            border-radius: 8px;
+            padding: .8rem;
+            margin-bottom: 1rem;
+            background: #fff;
+        }
+
+        .return-flow-list td {
+            border: 0 !important;
+            padding: .4rem 0 !important;
+        }
+
+        .return-flow-list td::before {
+            content: attr(data-label);
+            display: block;
+            font-size: .72rem;
+            text-transform: uppercase;
+            color: #94a3b8;
+            font-weight: 800;
+            margin-bottom: .15rem;
+        }
+
+        .return-flow-list td:last-child {
+            text-align: left !important;
+            padding-top: .75rem !important;
+        }
+
+        .return-list-items,
+        .return-list-note {
+            max-width: none;
+        }
+    }
+
+    @media (max-width: 479.98px) {
+        .return-list-filters {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+@endpush
+@endif
+
 @section('content')
-<div class="card">
+<div class="card {{ $isInboundReturnList ? 'return-list-card' : '' }}">
     <div class="card-header border-0 pt-6">
         <div class="card-title">
-            <div class="d-flex align-items-center position-relative my-1">
-                <span class="svg-icon svg-icon-1 position-absolute ms-6">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
-                        <rect opacity="0.5" x="17.0365" y="15.1223" width="8.15546" height="2" rx="1" transform="rotate(45 17.0365 15.1223)" fill="black" />
-                        <path d="M11 19C6.55556 19 3 15.4444 3 11C3 6.55556 6.55556 3 11 3C15.4444 3 19 6.55556 19 11C19 15.4444 15.4444 19 11 19ZM11 5C7.53333 5 5 7.53333 5 11C5 14.4667 7.53333 17 11 17C14.4667 17 17 14.4667 17 11C17 7.53333 14.4667 5 11 5Z" fill="black" />
-                    </svg>
-                </span>
-                <input type="text" class="form-control form-control-solid w-250px ps-14" placeholder="Search" data-kt-filter="search" />
-            </div>
+            @if($isInboundReturnList)
+                <div>
+                    <h3 class="fw-bolder mb-1">Retur Inbound</h3>
+                    <div class="text-muted fs-7">Pantau resi, qty diterima, selisih, dan status finalisasi.</div>
+                </div>
+            @else
+                <div class="d-flex align-items-center position-relative my-1">
+                    <span class="svg-icon svg-icon-1 position-absolute ms-6">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                            <rect opacity="0.5" x="17.0365" y="15.1223" width="8.15546" height="2" rx="1" transform="rotate(45 17.0365 15.1223)" fill="black" />
+                            <path d="M11 19C6.55556 19 3 15.4444 3 11C3 6.55556 6.55556 3 11 3C15.4444 3 19 6.55556 19 11C19 15.4444 15.4444 19 11 19ZM11 5C7.53333 5 5 7.53333 5 11C5 14.4667 7.53333 17 11 17C14.4667 17 17 14.4667 17 11C17 7.53333 14.4667 5 11 5Z" fill="black" />
+                        </svg>
+                    </span>
+                    <input type="text" class="form-control form-control-solid w-250px ps-14" placeholder="Search" data-kt-filter="search" />
+                </div>
+            @endif
         </div>
-        <div class="card-toolbar">
-            <div class="d-flex align-items-center gap-2 me-4 flex-wrap">
-                <select class="form-select form-select-solid w-150px" id="filter_status" aria-label="Filter status">
+        <div class="card-toolbar {{ $isInboundReturnList ? 'return-list-toolbar' : '' }}">
+            <div class="{{ $isInboundReturnList ? 'return-list-filters' : 'd-flex align-items-center gap-2 me-4 flex-wrap' }}">
+                @if($isInboundReturnList)
+                    <div class="d-flex align-items-center position-relative return-search">
+                        <span class="svg-icon svg-icon-1 position-absolute ms-6">
+                            <i class="fas fa-search text-gray-500"></i>
+                        </span>
+                        <input type="text" class="form-control form-control-solid ps-14" placeholder="Cari kode, resi, SKU, catatan" data-kt-filter="search" />
+                    </div>
+                @endif
+                <select class="form-select form-select-solid {{ $isInboundReturnList ? 'return-status' : 'w-150px' }}" id="filter_status" aria-label="Filter status">
                     <option value="">Semua Status</option>
                     <option value="pending">Menunggu</option>
-                    <option value="approved">Disetujui</option>
+                    <option value="approved">{{ $isInboundReturnList ? 'Gudang Retur' : 'Disetujui' }}</option>
                     @if(($typeDefault ?? '') === 'return' && isset($routeMap['receipt']))
                         <option value="finalized">Finalisasi</option>
                     @endif
                 </select>
-                <input type="text" class="form-control form-control-solid w-150px" id="filter_date_from" placeholder="Dari" />
-                <input type="text" class="form-control form-control-solid w-150px" id="filter_date_to" placeholder="Sampai" />
-                <button type="button" class="btn btn-light" id="filter_apply">Filter</button>
-                <button type="button" class="btn btn-light" id="filter_reset">Reset</button>
+                <input type="text" class="form-control form-control-solid {{ $isInboundReturnList ? '' : 'w-150px' }}" id="filter_date_from" placeholder="Dari" />
+                <input type="text" class="form-control form-control-solid {{ $isInboundReturnList ? '' : 'w-150px' }}" id="filter_date_to" placeholder="Sampai" />
+                <button type="button" class="btn btn-light return-filter-button" id="filter_apply">Filter</button>
+                <button type="button" class="btn btn-light return-filter-button" id="filter_reset">Reset</button>
             </div>
+            <div class="{{ $isInboundReturnList ? 'return-list-actions' : '' }}">
             @if($canImport)
                 <button type="button" class="btn btn-light-primary me-3" id="btn_import_flow" data-bs-toggle="modal" data-bs-target="#modal_import_flow">
                     Import Excel
@@ -98,10 +316,20 @@
                     </button>
                 @endif
             @endif
+            </div>
         </div>
     </div>
     <div class="card-body py-6">
-        <div class="table-responsive">
+        @if($isInboundReturnList)
+            <div class="return-list-period">
+                <div>
+                    <div class="fw-bold text-gray-800">Daftar retur inbound</div>
+                    <div class="text-muted fs-7">Filter default menampilkan 7 hari terakhir. Gunakan pencarian untuk kode retur, resi, SKU, atau catatan.</div>
+                </div>
+                <span class="period-chip" id="return_period_chip">7 hari terakhir</span>
+            </div>
+        @endif
+        <div class="table-responsive {{ $isInboundReturnList ? 'return-flow-list' : '' }}">
             <table class="table align-middle table-row-dashed fs-6 gy-5" id="stock_flow_table">
                 <thead>
                     <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
@@ -275,6 +503,10 @@
             return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
         };
 
+        const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (m) => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+        }[m]));
+
         const getJakartaNow = () => {
             const jkt = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Jakarta' }));
             return formatDateTime(jkt);
@@ -419,6 +651,16 @@
                 if (fpTo) fpTo.setDate(defaultDateTo, true, 'Y-m-d');
                 else dateToEl.value = defaultDateTo;
             }
+            updateReturnPeriodChip();
+        };
+
+        const updateReturnPeriodChip = () => {
+            if (!isInboundReturnFlow) return;
+            const chip = document.getElementById('return_period_chip');
+            if (!chip) return;
+            const from = dateFromEl?.value || '-';
+            const to = dateToEl?.value || '-';
+            chip.textContent = `${from} s/d ${to}`;
         };
 
         applyDefaultReturnDates();
@@ -598,6 +840,15 @@
         }
 
         const refreshMenus = () => { if (window.KTMenu) KTMenu.createInstances(); };
+        const applyReturnMobileLabels = () => {
+            if (!isInboundReturnFlow) return;
+            const labels = ['ID', 'Kode', 'Resi', 'Jenis', 'Status', 'Tanggal', 'Submit By', 'Item', 'Qty', 'Selisih', 'Catatan', 'Aksi'];
+            tableEl.find('tbody tr').each(function() {
+                $(this).find('td').each(function(index) {
+                    this.setAttribute('data-label', labels[index] || '');
+                });
+            });
+        };
 
         const dt = tableEl.DataTable({
             processing: true,
@@ -616,16 +867,44 @@
             },
             columns: [
                 { data: 'id' },
-                { data: 'code' },
-                { data: 'return_resi', render: (data) => data || '-' },
+                { data: 'code', className: 'return-list-code', render: (data, type, row) => {
+                    if (!isInboundReturnFlow || row?.type !== 'return') return esc(data || '-');
+                    return `
+                        <div class="code-main fw-bold text-gray-900">${esc(data || '-')}</div>
+                        <div class="text-muted fs-8">${esc(row?.transacted_at || '-')}</div>
+                        <div class="text-muted fs-8">Submit: ${esc(row?.submit_by || '-')}</div>
+                    `;
+                } },
+                { data: 'return_resi', className: 'return-list-resi', render: (data, type, row) => {
+                    if (!isInboundReturnFlow || row?.type !== 'return') return data || '-';
+                    return data
+                        ? `<span class="badge badge-light-primary fw-bold">${esc(data)}</span>`
+                        : '<span class="text-muted">Tanpa resi</span>';
+                } },
                 { data: 'type', render: (data) => typeLabelMap?.[data] || data || '-' },
                 { data: 'status', orderable:false, searchable:false, render: (data, type, row) => statusLabel(data, row) },
                 { data: 'transacted_at' },
                 { data: 'submit_by' },
-                { data: 'item' },
-                { data: 'qty', render: (data, type, row) => {
+                { data: 'item', className: 'return-list-items', render: (data, type, row) => {
+                    if (!isInboundReturnFlow || row?.type !== 'return') return esc(data || '-');
+                    const parts = String(data || '-').split(',').map((part) => part.trim()).filter(Boolean);
+                    const visible = parts.slice(0, 3).map((part) => `<div>${esc(part)}</div>`).join('');
+                    const more = parts.length > 3 ? `<div class="text-muted fs-8">+${parts.length - 3} item lainnya</div>` : '';
+                    return visible + more;
+                } },
+                { data: 'qty', className: 'return-list-qty-cell', render: (data, type, row) => {
                     const qty = Number(data || 0).toLocaleString('id-ID');
                     const returnQty = Number(row?.return_warehouse_qty || 0);
+                    if (isInboundReturnFlow && row?.type === 'return') {
+                        const qtyResi = Number(row?.qty_resi || 0).toLocaleString('id-ID');
+                        return `
+                            <div class="return-list-qty">
+                                <span class="badge badge-light-info">Resi ${qtyResi}</span>
+                                <span class="badge badge-light-primary">Terima ${qty}</span>
+                                ${returnQty > 0 ? `<span class="badge badge-light-warning">Gudang retur ${returnQty.toLocaleString('id-ID')}</span>` : ''}
+                            </div>
+                        `;
+                    }
                     if (returnQty > 0) {
                         return `${qty}<div class="text-primary fs-8 fw-bold">Gudang retur: ${returnQty.toLocaleString('id-ID')}</div>`;
                     }
@@ -633,9 +912,11 @@
                 } },
                 { data: 'qty_difference', render: (data, type, row) => {
                     if (!isInboundReturnFlow || row?.type !== 'return') return '-';
-                    return Number(data || 0).toLocaleString('id-ID');
+                    const diff = Number(data || 0);
+                    const badge = diff > 0 ? 'badge-light-warning text-warning' : 'badge-light-success text-success';
+                    return `<span class="badge ${badge}">${diff.toLocaleString('id-ID')}</span>`;
                 } },
-                { data: 'note' },
+                { data: 'note', className: 'return-list-note', render: (data) => esc(data || '-') },
                 { data: 'id', orderable:false, searchable:false, className:'text-end', render: (data, type, row)=>{
                     const rowType = row?.type || defaultTypeFilter;
                     const perms = permMap?.[rowType] || {};
@@ -682,12 +963,19 @@
             ]
         });
         refreshMenus();
-        dt.on('draw', refreshMenus);
+        applyReturnMobileLabels();
+        dt.on('draw', () => {
+            refreshMenus();
+            applyReturnMobileLabels();
+        });
 
         const reloadTable = () => dt.ajax.reload();
         searchInput?.addEventListener('keyup', reloadTable);
         statusFilter?.addEventListener('change', reloadTable);
-        filterApplyBtn?.addEventListener('click', reloadTable);
+        filterApplyBtn?.addEventListener('click', () => {
+            updateReturnPeriodChip();
+            reloadTable();
+        });
         filterResetBtn?.addEventListener('click', () => {
             if (statusFilter) statusFilter.value = '';
             if (isInboundReturnFlow) {
@@ -696,6 +984,7 @@
                 if (fpFrom) fpFrom.clear(); else if (dateFromEl) dateFromEl.value = '';
                 if (fpTo) fpTo.clear(); else if (dateToEl) dateToEl.value = '';
             }
+            updateReturnPeriodChip();
             reloadTable();
         });
 
