@@ -82,10 +82,21 @@
                     Import Excel
                 </button>
             @endif
-            @if($canCreateDefault)
-                <button type="button" class="btn btn-primary" id="btn_open_create_flow" data-bs-toggle="modal" data-bs-target="#modal_stock_flow">
-                    Tambah
+            @if(!empty($exportUrl ?? null) && ($typeDefault ?? '') === 'return' && isset($routeMap['receipt']))
+                <button type="button" class="btn btn-light-success me-3" id="btn_export_flow">
+                    Export Excel
                 </button>
+            @endif
+            @if($canCreateDefault)
+                @if(($typeDefault ?? '') === 'return' && isset($routeMap['receipt']))
+                    <a href="{{ route('admin.inbound.returns.create') }}" class="btn btn-primary" id="btn_open_create_flow">
+                        Tambah
+                    </a>
+                @else
+                    <button type="button" class="btn btn-primary" id="btn_open_create_flow" data-bs-toggle="modal" data-bs-target="#modal_stock_flow">
+                        Tambah
+                    </button>
+                @endif
             @endif
         </div>
     </div>
@@ -96,12 +107,14 @@
                     <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
                         <th>ID</th>
                         <th>Kode</th>
+                        <th>Resi</th>
                         <th>Jenis</th>
                         <th>Status</th>
                         <th>Tanggal</th>
                         <th>Submit By</th>
                         <th>Item</th>
                         <th>Qty</th>
+                        <th>Selisih</th>
                         <th>Catatan</th>
                         <th class="text-end">Aksi</th>
                     </tr>
@@ -181,11 +194,11 @@
                     <div class="mb-6">
                         <div class="text-muted fs-7">
                             @if(($typeDefault ?? '') === 'return' && isset($routeMap['receipt']))
-                                Header minimal: <strong>sku</strong>, <strong>qty_diterima</strong>, <strong>qty_bagus</strong>, <strong>qty_rusak</strong>.<br>
+                                Header minimal: <strong>sku</strong>, <strong>qty_resi</strong>, <strong>qty_diterima</strong>, <strong>qty_bagus</strong>, <strong>qty_rusak</strong>.<br>
                             @else
                                 Header minimal: <strong>sku</strong>, <strong>qty</strong>.<br>
                             @endif
-                            Opsional: <strong>ref_no</strong>, <strong>note</strong>, <strong>item_note</strong>, <strong>transacted_at</strong>.
+                            Opsional: <strong>no_resi</strong>, <strong>id_pesanan</strong>, <strong>return_reason</strong>, <strong>return_reason_note</strong>, <strong>ref_no</strong>, <strong>note</strong>, <strong>item_note</strong>, <strong>transacted_at</strong>.
                         </div>
                         @if(!empty($templateUrl ?? null))
                             <a href="{{ $templateUrl }}" class="btn btn-sm btn-light-success mt-3">Download Template Excel</a>
@@ -217,6 +230,7 @@
     const detailUrlTpl = '{{ $detailUrlTpl }}';
     const approveUrlTpl = '{{ $approveUrlTpl ?? '' }}';
     const importUrl = '{{ $importUrl ?? '' }}';
+    const exportUrl = '{{ $exportUrl ?? '' }}';
     const routeMap = @json($routeMap ?? []);
     const typeLabelMap = @json($typeOptions ?? []);
     const csrfToken = '{{ csrf_token() }}';
@@ -226,6 +240,8 @@
     const canCreateDefault = {{ $canCreateDefault ? 'true' : 'false' }};
     const isInboundReturnFlow = defaultTypeFilter === 'return' && !!routeMap?.receipt;
     const isOutboundReturnFlow = defaultTypeFilter === 'return' && !!routeMap?.picker;
+    const defaultDateFrom = '{{ $defaultDateFrom ?? '' }}';
+    const defaultDateTo = '{{ $defaultDateTo ?? '' }}';
 
     document.addEventListener('DOMContentLoaded', () => {
         const tableEl = $('#stock_flow_table');
@@ -249,6 +265,7 @@
         const importInput = document.getElementById('import_flow_file');
         const importError = document.getElementById('error_import_flow_file');
         const importSubmit = document.getElementById('btn_import_flow_submit');
+        const exportBtn = document.getElementById('btn_export_flow');
         let fpFrom = null;
         let fpTo = null;
         let fpTransacted = null;
@@ -391,6 +408,20 @@
                 fpTransacted = flatpickrWithApply(transactedAtEl, { enableTime: true, dateFormat: 'Y-m-d H:i', allowInput: true });
             }
         }
+
+        const applyDefaultReturnDates = () => {
+            if (!isInboundReturnFlow) return;
+            if (dateFromEl && defaultDateFrom) {
+                if (fpFrom) fpFrom.setDate(defaultDateFrom, true, 'Y-m-d');
+                else dateFromEl.value = defaultDateFrom;
+            }
+            if (dateToEl && defaultDateTo) {
+                if (fpTo) fpTo.setDate(defaultDateTo, true, 'Y-m-d');
+                else dateToEl.value = defaultDateTo;
+            }
+        };
+
+        applyDefaultReturnDates();
 
         const renumberRows = () => {
             const rows = itemsContainer.querySelectorAll('.flow-item-row');
@@ -586,6 +617,7 @@
             columns: [
                 { data: 'id' },
                 { data: 'code' },
+                { data: 'return_resi', render: (data) => data || '-' },
                 { data: 'type', render: (data) => typeLabelMap?.[data] || data || '-' },
                 { data: 'status', orderable:false, searchable:false, render: (data, type, row) => statusLabel(data, row) },
                 { data: 'transacted_at' },
@@ -598,6 +630,10 @@
                         return `${qty}<div class="text-primary fs-8 fw-bold">Gudang retur: ${returnQty.toLocaleString('id-ID')}</div>`;
                     }
                     return qty;
+                } },
+                { data: 'qty_difference', render: (data, type, row) => {
+                    if (!isInboundReturnFlow || row?.type !== 'return') return '-';
+                    return Number(data || 0).toLocaleString('id-ID');
                 } },
                 { data: 'note' },
                 { data: 'id', orderable:false, searchable:false, className:'text-end', render: (data, type, row)=>{
@@ -618,7 +654,9 @@
                         !isApproved || (isInboundReturnFlow && rowType === 'return')
                     );
                     const editItem = canEdit
-                        ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 btn-edit" data-id="${data}" data-type="${rowType}">Edit</a></div>`
+                        ? (isInboundReturnFlow && rowType === 'return'
+                            ? `<div class="menu-item px-3"><a href="${resolveRoute(rowType, 'edit').replace(':id', data)}" class="menu-link px-3">Edit</a></div>`
+                            : `<div class="menu-item px-3"><a href="#" class="menu-link px-3 btn-edit" data-id="${data}" data-type="${rowType}">Edit</a></div>`)
                         : '';
                     const delItem = (!isApproved && !isFinalized && perms.delete)
                         ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 text-danger btn-delete" data-id="${data}" data-type="${rowType}">Hapus</a></div>`
@@ -652,9 +690,25 @@
         filterApplyBtn?.addEventListener('click', reloadTable);
         filterResetBtn?.addEventListener('click', () => {
             if (statusFilter) statusFilter.value = '';
-            if (fpFrom) fpFrom.clear(); else if (dateFromEl) dateFromEl.value = '';
-            if (fpTo) fpTo.clear(); else if (dateToEl) dateToEl.value = '';
+            if (isInboundReturnFlow) {
+                applyDefaultReturnDates();
+            } else {
+                if (fpFrom) fpFrom.clear(); else if (dateFromEl) dateFromEl.value = '';
+                if (fpTo) fpTo.clear(); else if (dateToEl) dateToEl.value = '';
+            }
             reloadTable();
+        });
+
+        exportBtn?.addEventListener('click', () => {
+            if (!exportUrl) return;
+            const params = new URLSearchParams();
+            const q = searchInput?.value || '';
+            if (q) params.set('q', q);
+            if (statusFilter?.value) params.set('status', statusFilter.value);
+            if (dateFromEl?.value) params.set('date_from', dateFromEl.value);
+            if (dateToEl?.value) params.set('date_to', dateToEl.value);
+            const sep = exportUrl.includes('?') ? '&' : '?';
+            window.location.href = `${exportUrl}${params.toString() ? sep + params.toString() : ''}`;
         });
 
         importBtn?.addEventListener('click', () => {

@@ -3,6 +3,8 @@
 namespace App\Imports;
 
 use App\Models\Item;
+use App\Models\Resi;
+use App\Models\ReturnReason;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 use Maatwebsite\Excel\Concerns\SkipsEmptyRows;
@@ -11,7 +13,7 @@ use Maatwebsite\Excel\Concerns\WithHeadingRow;
 
 class InboundReturnsImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
 {
-    /** @var array<string,array{ref_no:?string,note:?string,transacted_at:?string,items:array<int,array{item_id:int,qty:int,qty_received:int,qty_good:int,qty_damaged:int,note:?string}>}> */
+    /** @var array<string,array{ref_no:?string,resi_id:?int,return_resi_no:?string,note:?string,transacted_at:?string,items:array<int,array{item_id:int,qty:int,qty_resi:int,qty_received:int,qty_difference:int,qty_good:int,qty_damaged:int,return_reason_id:?int,return_reason_note:?string,note:?string}>}> */
     public array $groups = [];
 
     public function collection(Collection $rows)
@@ -26,9 +28,10 @@ class InboundReturnsImport implements ToCollection, WithHeadingRow, SkipsEmptyRo
         $headers = array_keys($first?->toArray() ?? []);
         if (!in_array('sku', $headers, true)) {
             throw ValidationException::withMessages([
-                'file' => 'Header wajib: sku, qty_diterima, qty_bagus, qty_rusak (opsional: ref_no, note, item_note, transacted_at)',
+                'file' => 'Header wajib: sku, qty_diterima, qty_bagus, qty_rusak (opsional: no_resi, id_pesanan, qty_resi, return_reason, ref_no, note, item_note, transacted_at)',
             ]);
         }
+        $qtyResiKey = $this->detectFirstKey($headers, ['qty_resi', 'qty_order', 'qty_pesanan']);
         $receivedKey = $this->detectFirstKey($headers, ['qty_diterima', 'qty_received', 'diterima', 'received', 'qty']);
         if ($receivedKey === null) {
             throw ValidationException::withMessages([
@@ -50,6 +53,14 @@ class InboundReturnsImport implements ToCollection, WithHeadingRow, SkipsEmptyRo
 
         $items = Item::active()->whereIn('sku', $skus)->get(['id', 'sku']);
         $skuMap = $items->pluck('id', 'sku')->all();
+        $reasonMap = ReturnReason::active()
+            ->get(['id', 'code', 'name'])
+            ->flatMap(function ($reason) {
+                return [
+                    strtolower($reason->code) => $reason->id,
+                    strtolower($reason->name) => $reason->id,
+                ];
+            })->all();
 
         $missing = [];
         $errors = [];
@@ -64,12 +75,18 @@ class InboundReturnsImport implements ToCollection, WithHeadingRow, SkipsEmptyRo
                 $missing[$sku] = true;
                 continue;
             }
+            $qtyResi = $qtyResiKey ? $this->parseQty($row, $qtyResiKey) : 0;
             $receivedQty = $this->parseQty($row, $receivedKey);
             $goodQty = $this->parseQty($row, $goodKey);
             $damagedQty = $this->parseQty($row, $damagedKey);
+            $qtyResi = $qtyResi > 0 ? $qtyResi : $receivedQty;
 
             if ($receivedQty <= 0) {
                 $errors[] = "Baris {$rowIndex}: qty diterima tidak valid untuk SKU {$sku}";
+                continue;
+            }
+            if ($qtyResi <= 0 || $receivedQty > $qtyResi) {
+                $errors[] = "Baris {$rowIndex}: qty diterima tidak boleh lebih besar dari qty resi untuk SKU {$sku}";
                 continue;
             }
             if ($goodQty + $damagedQty !== $receivedQty) {
@@ -78,14 +95,29 @@ class InboundReturnsImport implements ToCollection, WithHeadingRow, SkipsEmptyRo
             }
 
             $ref = trim((string) ($row['ref_no'] ?? ''));
+            $noResi = trim((string) ($row['no_resi'] ?? ''));
+            $idPesanan = trim((string) ($row['id_pesanan'] ?? ''));
             $note = trim((string) ($row['note'] ?? ''));
             $itemNote = trim((string) ($row['item_note'] ?? $row['note_item'] ?? ''));
+            $reasonRaw = trim((string) ($row['return_reason'] ?? $row['penyebab'] ?? ''));
+            $reasonNote = trim((string) ($row['return_reason_note'] ?? $row['catatan_penyebab'] ?? ''));
             $transactedAt = trim((string) ($row['transacted_at'] ?? $row['tanggal'] ?? ''));
+            $resi = null;
+            if ($noResi !== '' || $idPesanan !== '') {
+                $resi = Resi::query()
+                    ->when($noResi !== '', fn ($query) => $query->where('no_resi', $noResi))
+                    ->when($noResi === '' && $idPesanan !== '', fn ($query) => $query->where('id_pesanan', $idPesanan))
+                    ->first(['id', 'no_resi', 'id_pesanan']);
+            }
+            $returnResiNo = $noResi !== '' ? $noResi : ($idPesanan !== '' ? $idPesanan : null);
+            $reasonId = $reasonRaw !== '' ? ($reasonMap[strtolower($reasonRaw)] ?? null) : null;
 
-            $groupKey = $ref !== '' ? $ref : '__default__';
+            $groupKey = $returnResiNo ?: ($ref !== '' ? $ref : '__default__');
             if (!isset($this->groups[$groupKey])) {
                 $this->groups[$groupKey] = [
                     'ref_no' => $ref !== '' ? $ref : null,
+                    'resi_id' => $resi?->id,
+                    'return_resi_no' => $returnResiNo,
                     'note' => $note !== '' ? $note : null,
                     'transacted_at' => $transactedAt !== '' ? $transactedAt : null,
                     'items' => [],
@@ -97,6 +129,9 @@ class InboundReturnsImport implements ToCollection, WithHeadingRow, SkipsEmptyRo
                 if ($this->groups[$groupKey]['transacted_at'] === null && $transactedAt !== '') {
                     $this->groups[$groupKey]['transacted_at'] = $transactedAt;
                 }
+                if ($this->groups[$groupKey]['resi_id'] === null && $resi) {
+                    $this->groups[$groupKey]['resi_id'] = $resi->id;
+                }
             }
 
             $itemId = (int) $skuMap[$sku];
@@ -104,16 +139,31 @@ class InboundReturnsImport implements ToCollection, WithHeadingRow, SkipsEmptyRo
                 $this->groups[$groupKey]['items'][$itemId] = [
                     'item_id' => $itemId,
                     'qty' => $receivedQty,
+                    'qty_resi' => $qtyResi,
                     'qty_received' => $receivedQty,
+                    'qty_difference' => max($qtyResi - $receivedQty, 0),
                     'qty_good' => $goodQty,
                     'qty_damaged' => $damagedQty,
+                    'return_reason_id' => $reasonId,
+                    'return_reason_note' => $reasonNote !== '' ? $reasonNote : null,
                     'note' => $itemNote !== '' ? $itemNote : null,
                 ];
             } else {
                 $this->groups[$groupKey]['items'][$itemId]['qty'] += $receivedQty;
+                $this->groups[$groupKey]['items'][$itemId]['qty_resi'] += $qtyResi;
                 $this->groups[$groupKey]['items'][$itemId]['qty_received'] += $receivedQty;
+                $this->groups[$groupKey]['items'][$itemId]['qty_difference'] = max(
+                    $this->groups[$groupKey]['items'][$itemId]['qty_resi'] - $this->groups[$groupKey]['items'][$itemId]['qty_received'],
+                    0
+                );
                 $this->groups[$groupKey]['items'][$itemId]['qty_good'] += $goodQty;
                 $this->groups[$groupKey]['items'][$itemId]['qty_damaged'] += $damagedQty;
+                if ($reasonId && empty($this->groups[$groupKey]['items'][$itemId]['return_reason_id'])) {
+                    $this->groups[$groupKey]['items'][$itemId]['return_reason_id'] = $reasonId;
+                }
+                if ($reasonNote !== '' && empty($this->groups[$groupKey]['items'][$itemId]['return_reason_note'])) {
+                    $this->groups[$groupKey]['items'][$itemId]['return_reason_note'] = $reasonNote;
+                }
                 if ($itemNote !== '' && empty($this->groups[$groupKey]['items'][$itemId]['note'])) {
                     $this->groups[$groupKey]['items'][$itemId]['note'] = $itemNote;
                 }

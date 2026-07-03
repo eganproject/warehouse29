@@ -13,10 +13,15 @@ class InboundReturnsTemplateExport implements FromArray, WithHeadings, ShouldAut
     public function headings(): array
     {
         return [
+            'no_resi',
+            'id_pesanan',
             'sku',
+            'qty_resi',
             'qty_diterima',
             'qty_bagus',
             'qty_rusak',
+            'return_reason',
+            'return_reason_note',
             'ref_no',
             'note',
             'item_note',
@@ -33,9 +38,9 @@ class InboundReturnsTemplateExport implements FromArray, WithHeadings, ShouldAut
         $defaults = $samples ?: ['SKU-CONTOH-1', 'SKU-CONTOH-2'];
 
         // Baris 1: ada barang bagus dan rusak
-        $rows[] = [$defaults[0], 10, 7, 3, 'RET-001', 'Retur dari customer', 'Sebagian kemasan rusak', $now];
+        $rows[] = ['JX123456789', 'ORD-001', $defaults[0], 10, 8, 6, 2, 'Barang rusak', 'Kemasan rusak', 'RET-001', 'Retur dari customer', 'Sebagian kemasan rusak', $now];
         // Baris 2: semua barang bagus, ref_no sama agar tergabung dalam 1 transaksi
-        $rows[] = [$defaults[1] ?? $defaults[0], 5, 5, 0, 'RET-001', '', '', $now];
+        $rows[] = ['JX123456789', 'ORD-001', $defaults[1] ?? $defaults[0], 5, 5, 5, 0, 'Customer batal', '', 'RET-001', '', '', $now];
 
         return $rows;
     }

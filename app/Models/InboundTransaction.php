@@ -13,6 +13,8 @@ class InboundTransaction extends Model
         'code',
         'type',
         'ref_no',
+        'resi_id',
+        'return_resi_no',
         'transacted_at',
         'note',
         'status',
@@ -32,6 +34,11 @@ class InboundTransaction extends Model
     public function items()
     {
         return $this->hasMany(InboundItem::class, 'inbound_transaction_id');
+    }
+
+    public function resi()
+    {
+        return $this->belongsTo(Resi::class, 'resi_id');
     }
 
     public function creator()

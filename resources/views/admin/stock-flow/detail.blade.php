@@ -214,6 +214,12 @@
                 <div class="fw-bold text-gray-600">Ref No</div>
                 <div>{{ $transaction->ref_no ?? '-' }}</div>
             </div>
+            @if($isInboundReturn)
+                <div class="col-md-3">
+                    <div class="fw-bold text-gray-600">Resi</div>
+                    <div>{{ $transaction->return_resi_no ?: ($transaction->resi?->no_resi ?: $transaction->resi?->id_pesanan) ?: '-' }}</div>
+                </div>
+            @endif
             <div class="col-md-3">
                 <div class="fw-bold text-gray-600">Status</div>
                 <div>
@@ -267,9 +273,12 @@
                     <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
                         <th>Item</th>
                         @if($isInboundReturn)
+                            <th>Qty Resi</th>
                             <th>Qty Diterima</th>
+                            <th>Selisih</th>
                             <th>Qty Bagus</th>
                             <th>Qty Rusak</th>
+                            <th>Penyebab</th>
                         @else
                             <th>Qty</th>
                         @endif
@@ -284,9 +293,17 @@
                         <tr>
                             <td>{{ $row->item?->sku }} - {{ $row->item?->name }}</td>
                             @if($isInboundReturn)
+                                <td>{{ $row->qty_resi ?: ($row->qty_received ?: $row->qty) }}</td>
                                 <td>{{ $row->qty_received ?: $row->qty }}</td>
+                                <td>{{ $row->qty_difference ?? 0 }}</td>
                                 <td>{{ $row->qty_good ?? 0 }}</td>
                                 <td>{{ $row->qty_damaged ?? 0 }}</td>
+                                <td>
+                                    {{ $row->returnReason?->name ?? '-' }}
+                                    @if($row->return_reason_note)
+                                        <div class="text-muted fs-8">{{ $row->return_reason_note }}</div>
+                                    @endif
+                                </td>
                             @else
                                 <td>{{ $row->qty }}</td>
                             @endif

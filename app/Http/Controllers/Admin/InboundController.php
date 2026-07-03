@@ -8,7 +8,10 @@ use App\Models\InboundTransaction;
 use App\Models\Item;
 use App\Models\DamagedGood;
 use App\Models\DamagedGoodItem;
+use App\Models\Resi;
+use App\Models\ReturnReason;
 use App\Models\StockMutation;
+use App\Exports\InboundReturnsExport;
 use App\Exports\InboundReturnsTemplateExport;
 use App\Imports\InboundReceiptsImport;
 use App\Imports\InboundReturnsImport;
@@ -18,6 +21,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Maatwebsite\Excel\Facades\Excel;
 
@@ -31,6 +35,76 @@ class InboundController extends Controller
     public function returns()
     {
         return $this->index('return', 'Inbound - Retur', 'returns');
+    }
+
+    public function returnsCreate()
+    {
+        return $this->returnForm('create');
+    }
+
+    public function returnsEdit(int $id)
+    {
+        $tx = InboundTransaction::with(['items.item', 'items.returnReason', 'resi.kurir'])
+            ->where('type', 'return')
+            ->findOrFail($id);
+
+        if (($tx->status ?? 'pending') === 'finalized') {
+            return redirect()
+                ->route('admin.inbound.returns.detail', $tx->id)
+                ->withErrors(['return' => 'Retur yang sudah finalisasi tidak bisa diubah.']);
+        }
+
+        return $this->returnForm('edit', $tx);
+    }
+
+    public function returnsLookupResi(Request $request)
+    {
+        $validated = $request->validate([
+            'code' => ['required', 'string', 'max:100'],
+        ]);
+
+        $code = trim($validated['code']);
+        $resi = Resi::query()
+            ->with(['details', 'kurir'])
+            ->where('no_resi', $code)
+            ->orWhere('id_pesanan', $code)
+            ->first();
+
+        if (!$resi) {
+            return response()->json([
+                'found' => false,
+                'message' => 'Resi tidak ditemukan. Silakan input item retur manual.',
+                'scanned_code' => $code,
+            ]);
+        }
+
+        $skus = $resi->details->pluck('sku')->filter()->unique()->values();
+        $itemMap = Item::active()
+            ->whereIn('sku', $skus)
+            ->get(['id', 'sku', 'name'])
+            ->keyBy('sku');
+
+        return response()->json([
+            'found' => true,
+            'resi' => [
+                'id' => $resi->id,
+                'id_pesanan' => $resi->id_pesanan,
+                'no_resi' => $resi->no_resi,
+                'kurir' => $resi->kurir?->name,
+                'tanggal_pesanan' => $resi->tanggal_pesanan?->format('Y-m-d'),
+                'tanggal_upload' => $resi->tanggal_upload?->format('Y-m-d'),
+            ],
+            'items' => $resi->details->map(function ($detail) use ($itemMap) {
+                $item = $itemMap->get($detail->sku);
+                return [
+                    'item_id' => $item?->id,
+                    'sku' => $detail->sku,
+                    'name' => $item?->name,
+                    'qty_resi' => (int) $detail->qty,
+                    'item_found' => (bool) $item,
+                ];
+            })->values(),
+        ]);
     }
 
     public function receiptsData(Request $request)
@@ -116,6 +190,26 @@ class InboundController extends Controller
         );
     }
 
+    public function returnsExport(Request $request)
+    {
+        $dateTo = $request->input('date_to') ?: now()->toDateString();
+        $dateFrom = $request->input('date_from') ?: now()->subDays(6)->toDateString();
+        $filters = [
+            'q' => trim((string) $request->input('q', '')),
+            'status' => trim((string) $request->input('status', '')),
+            'date_from' => $dateFrom,
+            'date_to' => $dateTo,
+        ];
+
+        $filename = sprintf(
+            'retur-inbound-%s-sd-%s.xlsx',
+            Carbon::parse($dateFrom)->format('Ymd'),
+            Carbon::parse($dateTo)->format('Ymd')
+        );
+
+        return Excel::download(new InboundReturnsExport($filters), $filename);
+    }
+
     public function returnsImport(Request $request)
     {
         $request->validate([
@@ -150,6 +244,8 @@ class InboundController extends Controller
                     'code' => $this->generateCode('INB-RET'),
                     'type' => 'return',
                     'ref_no' => $group['ref_no'] ?? null,
+                    'resi_id' => $group['resi_id'] ?? null,
+                    'return_resi_no' => $group['return_resi_no'] ?? null,
                     'note' => $group['note'] ?? null,
                     'transacted_at' => $transactedAt,
                     'created_by' => auth()->id(),
@@ -164,9 +260,13 @@ class InboundController extends Controller
                         'inbound_transaction_id' => $tx->id,
                         'item_id' => $row['item_id'],
                         'qty' => $row['qty_received'] ?? $row['qty'],
+                        'qty_resi' => $row['qty_resi'] ?? ($row['qty_received'] ?? $row['qty']),
                         'qty_received' => $row['qty_received'] ?? $row['qty'],
+                        'qty_difference' => $row['qty_difference'] ?? max(($row['qty_resi'] ?? ($row['qty_received'] ?? $row['qty'])) - ($row['qty_received'] ?? $row['qty']), 0),
                         'qty_good' => $row['qty_good'] ?? 0,
                         'qty_damaged' => $row['qty_damaged'] ?? ($row['qty_received'] ?? $row['qty']),
+                        'return_reason_id' => $row['return_reason_id'] ?? null,
+                        'return_reason_note' => $row['return_reason_note'] ?? null,
                         'note' => $row['note'] ?? null,
                     ]);
                     $createdItems++;
@@ -284,7 +384,9 @@ class InboundController extends Controller
             ],
             'return' => [
                 'store' => route('admin.inbound.returns.store'),
+                'create' => route('admin.inbound.returns.create'),
                 'show' => route('admin.inbound.returns.show', ':id'),
+                'edit' => route('admin.inbound.returns.edit', ':id'),
                 'update' => route('admin.inbound.returns.update', ':id'),
                 'delete' => route('admin.inbound.returns.destroy', ':id'),
                 'detail' => route('admin.inbound.returns.detail', ':id'),
@@ -319,6 +421,30 @@ class InboundController extends Controller
                 'return' => route('admin.inbound.returns.template'),
                 default => null,
             },
+            'exportUrl' => match ($type) {
+                'return' => route('admin.inbound.returns.export'),
+                default => null,
+            },
+            'defaultDateFrom' => $type === 'return' ? now()->subDays(6)->toDateString() : null,
+            'defaultDateTo' => $type === 'return' ? now()->toDateString() : null,
+        ]);
+    }
+
+    private function returnForm(string $mode, ?InboundTransaction $transaction = null)
+    {
+        $items = Item::active()->orderBy('name')->get(['id', 'sku', 'name']);
+        $returnReasons = ReturnReason::active()->orderBy('name')->get(['id', 'name']);
+
+        return view('admin.inbound.returns.form', [
+            'mode' => $mode,
+            'pageTitle' => $mode === 'edit' ? 'Edit Retur Inbound' : 'Tambah Retur Inbound',
+            'transaction' => $transaction,
+            'items' => $items,
+            'returnReasons' => $returnReasons,
+            'lookupUrl' => route('admin.inbound.returns.lookup-resi'),
+            'storeUrl' => route('admin.inbound.returns.store'),
+            'updateUrl' => $transaction ? route('admin.inbound.returns.update', $transaction->id) : null,
+            'backUrl' => route('admin.inbound.returns.index'),
         ]);
     }
 
@@ -336,13 +462,15 @@ class InboundController extends Controller
         }
 
         $query = InboundTransaction::query()
-            ->with(['items.item', 'creator'])
+            ->with(['items.item', 'items.returnReason', 'creator', 'resi'])
             ->select([
                 'inbound_transactions.id',
                 'inbound_transactions.code',
                 'inbound_transactions.transacted_at',
                 'inbound_transactions.type',
                 'inbound_transactions.ref_no',
+                'inbound_transactions.resi_id',
+                'inbound_transactions.return_resi_no',
                 'inbound_transactions.note',
                 'inbound_transactions.status',
                 'inbound_transactions.created_by',
@@ -357,6 +485,11 @@ class InboundController extends Controller
             $query->where(function ($q) use ($search) {
                 $q->where('inbound_transactions.code', 'like', "%{$search}%")
                     ->orWhere('inbound_transactions.ref_no', 'like', "%{$search}%")
+                    ->orWhere('inbound_transactions.return_resi_no', 'like', "%{$search}%")
+                    ->orWhereHas('resi', function ($resiQ) use ($search) {
+                        $resiQ->where('no_resi', 'like', "%{$search}%")
+                            ->orWhere('id_pesanan', 'like', "%{$search}%");
+                    })
                     ->orWhereHas('items.item', function ($itemQ) use ($search) {
                         $itemQ->where('sku', 'like', "%{$search}%")
                             ->orWhere('name', 'like', "%{$search}%");
@@ -369,7 +502,7 @@ class InboundController extends Controller
             $query->where('inbound_transactions.status', $status);
         }
 
-        $this->applyDateFilter($query, $request);
+        $this->applyDateFilter($query, $request, $type === 'return');
 
         $recordsTotalQuery = InboundTransaction::query();
         if ($baseType) {
@@ -394,9 +527,11 @@ class InboundController extends Controller
                 }
                 if (($row->type ?? '') === 'return') {
                     return sprintf(
-                        '%s (terima %d, bagus %d, rusak %d)',
+                        '%s (resi %d, terima %d, selisih %d, bagus %d, rusak %d)',
                         $sku,
+                        (int) ($it->qty_resi ?? $it->qty_received ?? $it->qty ?? 0),
                         (int) ($it->qty_received ?? $it->qty ?? 0),
+                        (int) ($it->qty_difference ?? 0),
                         (int) ($it->qty_good ?? 0),
                         (int) ($it->qty_damaged ?? 0)
                     );
@@ -411,8 +546,11 @@ class InboundController extends Controller
                 'code' => $row->code,
                 'transacted_at' => $ts,
                 'submit_by' => $row->creator?->name ?? '-',
+                'return_resi' => $row->return_resi_no ?: ($row->resi?->no_resi ?: $row->resi?->id_pesanan),
                 'item' => $itemLabel ?: '-',
                 'qty' => $totalQty,
+                'qty_resi' => (int) $items->sum(fn ($it) => (int) ($it->qty_resi ?? $it->qty_received ?? $it->qty ?? 0)),
+                'qty_difference' => (int) $items->sum(fn ($it) => (int) ($it->qty_difference ?? 0)),
                 'note' => $row->note ?? '',
                 'type' => $row->type,
                 'status' => $row->status ?? 'pending',
@@ -432,7 +570,7 @@ class InboundController extends Controller
 
     private function show(string $type, int $id)
     {
-        $tx = InboundTransaction::with('items')
+        $tx = InboundTransaction::with(['items.returnReason', 'resi'])
             ->where('type', $type)
             ->findOrFail($id);
 
@@ -440,6 +578,8 @@ class InboundController extends Controller
             'id' => $tx->id,
             'code' => $tx->code,
             'ref_no' => $tx->ref_no,
+            'resi_id' => $tx->resi_id,
+            'return_resi_no' => $tx->return_resi_no,
             'note' => $tx->note,
             'status' => $tx->status ?? 'pending',
             'finalized_at' => $tx->finalized_at?->format('Y-m-d H:i'),
@@ -448,9 +588,13 @@ class InboundController extends Controller
                 return [
                     'item_id' => $item->item_id,
                     'qty' => $item->qty,
+                    'qty_resi' => $item->qty_resi ?? $item->qty_received ?? $item->qty,
                     'qty_received' => $item->qty_received ?: $item->qty,
+                    'qty_difference' => $item->qty_difference ?? 0,
                     'qty_good' => $item->qty_good ?? 0,
                     'qty_damaged' => $item->qty_damaged ?? 0,
+                    'return_reason_id' => $item->return_reason_id,
+                    'return_reason_note' => $item->return_reason_note ?? '',
                     'note' => $item->note ?? '',
                 ];
             })->values(),
@@ -459,7 +603,7 @@ class InboundController extends Controller
 
     private function detail(string $type, string $pageTitle, string $routeBase, int $id)
     {
-        $tx = InboundTransaction::with(['items.item', 'creator', 'approver', 'finalizer'])
+        $tx = InboundTransaction::with(['items.item', 'items.returnReason', 'creator', 'approver', 'finalizer', 'resi.kurir'])
             ->where('type', $type)
             ->findOrFail($id);
 
@@ -495,6 +639,8 @@ class InboundController extends Controller
                 'code' => $code,
                 'type' => $type,
                 'ref_no' => $validated['ref_no'] ?? null,
+                'resi_id' => $validated['resi_id'] ?? null,
+                'return_resi_no' => $validated['return_resi_no'] ?? null,
                 'note' => $validated['note'] ?? null,
                 'transacted_at' => $transactedAt,
                 'created_by' => auth()->id(),
@@ -508,9 +654,13 @@ class InboundController extends Controller
                     'inbound_transaction_id' => $tx->id,
                     'item_id' => $row['item_id'],
                     'qty' => $row['qty'],
+                    'qty_resi' => $row['qty_resi'] ?? $row['qty'],
                     'qty_received' => $row['qty_received'] ?? $row['qty'],
+                    'qty_difference' => $row['qty_difference'] ?? 0,
                     'qty_good' => $row['qty_good'] ?? $row['qty'],
                     'qty_damaged' => $row['qty_damaged'] ?? 0,
+                    'return_reason_id' => $row['return_reason_id'] ?? null,
+                    'return_reason_note' => $row['return_reason_note'] ?? null,
                     'note' => $row['note'] ?? null,
                 ]);
 
@@ -555,6 +705,8 @@ class InboundController extends Controller
 
             $tx->update([
                 'ref_no' => $validated['ref_no'] ?? null,
+                'resi_id' => $validated['resi_id'] ?? null,
+                'return_resi_no' => $validated['return_resi_no'] ?? null,
                 'note' => $validated['note'] ?? null,
                 'transacted_at' => $validated['transacted_at'] ?? $tx->transacted_at,
             ]);
@@ -564,9 +716,13 @@ class InboundController extends Controller
                     'inbound_transaction_id' => $tx->id,
                     'item_id' => $row['item_id'],
                     'qty' => $row['qty'],
+                    'qty_resi' => $row['qty_resi'] ?? $row['qty'],
                     'qty_received' => $row['qty_received'] ?? $row['qty'],
+                    'qty_difference' => $row['qty_difference'] ?? 0,
                     'qty_good' => $row['qty_good'] ?? $row['qty'],
                     'qty_damaged' => $row['qty_damaged'] ?? 0,
+                    'return_reason_id' => $row['return_reason_id'] ?? null,
+                    'return_reason_note' => $row['return_reason_note'] ?? null,
                     'note' => $row['note'] ?? null,
                 ]);
 
@@ -742,9 +898,16 @@ class InboundController extends Controller
     {
         $tx->loadMissing('items.item');
         foreach ($tx->items as $row) {
+            $qtyResi = (int) ($row->qty_resi ?? $row->qty_received ?? $row->qty ?? 0);
             $received = (int) ($row->qty_received ?? $row->qty ?? 0);
             $good = (int) ($row->qty_good ?? 0);
             $damaged = (int) ($row->qty_damaged ?? 0);
+            if ($qtyResi > 0 && $received > $qtyResi) {
+                $sku = $row->item?->sku ?? 'item '.$row->item_id;
+                throw ValidationException::withMessages([
+                    'items' => "Qty diterima tidak boleh lebih besar dari qty resi untuk {$sku}.",
+                ]);
+            }
             if ($received <= 0 || $good + $damaged !== $received) {
                 $sku = $row->item?->sku ?? 'item '.$row->item_id;
                 throw ValidationException::withMessages([
@@ -772,6 +935,7 @@ class InboundController extends Controller
                     'code' => $this->generateCode('DMG-RET'),
                     'source_type' => 'inbound_return',
                     'source_ref' => $tx->code,
+                    'inbound_transaction_id' => $tx->id,
                     'transacted_at' => $tx->transacted_at ?? now(),
                     'note' => 'Otomatis dari inbound retur '.$tx->code,
                     'created_by' => auth()->id(),
@@ -843,16 +1007,21 @@ class InboundController extends Controller
         $isReturn = $type === 'return';
         $rules = [
             'items' => ['required', 'array', 'min:1'],
-            'items.*.item_id' => ['required', 'integer', \Illuminate\Validation\Rule::exists('items', 'id')->where('is_active', true)],
+            'items.*.item_id' => ['required', 'integer', Rule::exists('items', 'id')->where('is_active', true)],
             'items.*.note' => ['nullable', 'string'],
             'ref_no' => ['nullable', 'string', 'max:100'],
             'note' => ['nullable', 'string'],
             'transacted_at' => ['required', 'date'],
         ];
         if ($isReturn) {
+            $rules['resi_id'] = ['nullable', 'integer', 'exists:resis,id'];
+            $rules['return_resi_no'] = ['nullable', 'string', 'max:100'];
+            $rules['items.*.qty_resi'] = ['nullable', 'integer', 'min:1'];
             $rules['items.*.qty_received'] = ['required', 'integer', 'min:1'];
             $rules['items.*.qty_good'] = ['required', 'integer', 'min:0'];
             $rules['items.*.qty_damaged'] = ['required', 'integer', 'min:0'];
+            $rules['items.*.return_reason_id'] = ['nullable', 'integer', 'exists:return_reasons,id'];
+            $rules['items.*.return_reason_note'] = ['nullable', 'string'];
         } else {
             $rules['items.*.qty'] = ['required', 'integer', 'min:1'];
         }
@@ -864,14 +1033,19 @@ class InboundController extends Controller
             ->map(function ($row) use ($isReturn) {
                 if ($isReturn) {
                     $received = (int) ($row['qty_received'] ?? 0);
+                    $qtyResi = (int) ($row['qty_resi'] ?? $received);
                     $good = (int) ($row['qty_good'] ?? 0);
                     $damaged = (int) ($row['qty_damaged'] ?? 0);
                     return [
                         'item_id' => (int) $row['item_id'],
                         'qty' => $received,
+                        'qty_resi' => $qtyResi,
                         'qty_received' => $received,
+                        'qty_difference' => max($qtyResi - $received, 0),
                         'qty_good' => $good,
                         'qty_damaged' => $damaged,
+                        'return_reason_id' => !empty($row['return_reason_id']) ? (int) $row['return_reason_id'] : null,
+                        'return_reason_note' => $row['return_reason_note'] ?? null,
                         'note' => $row['note'] ?? null,
                     ];
                 }
@@ -880,7 +1054,9 @@ class InboundController extends Controller
                 return [
                     'item_id' => (int) $row['item_id'],
                     'qty' => $qty,
+                    'qty_resi' => $qty,
                     'qty_received' => $qty,
+                    'qty_difference' => 0,
                     'qty_good' => $qty,
                     'qty_damaged' => 0,
                     'note' => $row['note'] ?? null,
@@ -895,8 +1071,14 @@ class InboundController extends Controller
 
         if ($isReturn) {
             foreach ($items as $idx => $row) {
+                if ((int) $row['qty_resi'] <= 0) {
+                    throw ValidationException::withMessages(["items.{$idx}.qty_resi" => 'Qty resi wajib lebih dari 0']);
+                }
                 if ((int) $row['qty_received'] <= 0) {
                     throw ValidationException::withMessages(["items.{$idx}.qty_received" => 'Qty diterima wajib lebih dari 0']);
+                }
+                if ((int) $row['qty_received'] > (int) $row['qty_resi']) {
+                    throw ValidationException::withMessages(["items.{$idx}.qty_received" => 'Qty diterima tidak boleh lebih besar dari qty resi']);
                 }
                 if ((int) $row['qty_good'] + (int) $row['qty_damaged'] !== (int) $row['qty_received']) {
                     throw ValidationException::withMessages(["items.{$idx}.qty_received" => 'Qty bagus + qty rusak harus sama dengan qty diterima']);
@@ -913,16 +1095,23 @@ class InboundController extends Controller
 
         $normalized = $items->groupBy('item_id')->map(function ($rows, $itemId) {
             $qty = $rows->sum('qty');
+            $qtyResi = $rows->sum('qty_resi');
             $qtyReceived = $rows->sum('qty_received');
             $qtyGood = $rows->sum('qty_good');
             $qtyDamaged = $rows->sum('qty_damaged');
             $note = $rows->pluck('note')->first(fn ($n) => $n !== null && $n !== '') ?? null;
+            $reasonId = $rows->pluck('return_reason_id')->first(fn ($n) => $n !== null && $n !== '') ?? null;
+            $reasonNote = $rows->pluck('return_reason_note')->first(fn ($n) => $n !== null && $n !== '') ?? null;
             return [
                 'item_id' => (int) $itemId,
                 'qty' => $qty,
+                'qty_resi' => $qtyResi,
                 'qty_received' => $qtyReceived,
+                'qty_difference' => max($qtyResi - $qtyReceived, 0),
                 'qty_good' => $qtyGood,
                 'qty_damaged' => $qtyDamaged,
+                'return_reason_id' => $reasonId,
+                'return_reason_note' => $reasonNote,
                 'note' => $note,
             ];
         })->values()->all();
@@ -932,6 +1121,11 @@ class InboundController extends Controller
             $validated['transacted_at'] = Carbon::parse($validated['transacted_at']);
         } else {
             $validated['transacted_at'] = null;
+        }
+
+        if ($isReturn && empty($validated['return_resi_no']) && !empty($validated['resi_id'])) {
+            $resi = Resi::find($validated['resi_id']);
+            $validated['return_resi_no'] = $resi?->no_resi ?: $resi?->id_pesanan;
         }
 
         return $validated;
@@ -946,10 +1140,10 @@ class InboundController extends Controller
         ];
     }
 
-    private function applyDateFilter($query, Request $request): void
+    private function applyDateFilter($query, Request $request, bool $defaultLastSevenDays = false): void
     {
-        $dateFrom = $request->input('date_from');
-        $dateTo = $request->input('date_to');
+        $dateFrom = $request->input('date_from') ?: ($defaultLastSevenDays ? now()->subDays(6)->toDateString() : null);
+        $dateTo = $request->input('date_to') ?: ($defaultLastSevenDays ? now()->toDateString() : null);
 
         try {
             if ($dateFrom) {
