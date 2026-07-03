@@ -55,6 +55,7 @@ class InboundReturnsExport implements FromCollection, WithHeadings, WithMapping,
             'Kode Retur',
             'Tanggal',
             'Status',
+            'Ref No',
             'No Resi',
             'ID Pesanan',
             'Kurir',
@@ -82,6 +83,7 @@ class InboundReturnsExport implements FromCollection, WithHeadings, WithMapping,
             $tx?->code ?? '-',
             $tx?->transacted_at ? Carbon::parse($tx->transacted_at)->format('Y-m-d H:i') : '-',
             $this->statusLabel($tx?->status ?? 'pending'),
+            $tx?->ref_no ?? '-',
             $tx?->return_resi_no ?: ($resi?->no_resi ?: '-'),
             $resi?->id_pesanan ?? '-',
             $resi?->kurir?->name ?? '-',
@@ -111,32 +113,33 @@ class InboundReturnsExport implements FromCollection, WithHeadings, WithMapping,
             'A' => 24,
             'B' => 18,
             'C' => 16,
-            'D' => 22,
-            'E' => 20,
-            'F' => 18,
+            'D' => 18,
+            'E' => 22,
+            'F' => 20,
             'G' => 18,
-            'H' => 34,
-            'I' => 12,
-            'J' => 14,
-            'K' => 12,
+            'H' => 18,
+            'I' => 34,
+            'J' => 12,
+            'K' => 14,
             'L' => 12,
             'M' => 12,
-            'N' => 24,
-            'O' => 32,
-            'P' => 30,
-            'Q' => 34,
-            'R' => 20,
+            'N' => 12,
+            'O' => 24,
+            'P' => 32,
+            'Q' => 30,
+            'R' => 34,
+            'S' => 20,
         ];
     }
 
     public function columnFormats(): array
     {
         return [
-            'I' => NumberFormat::FORMAT_NUMBER,
             'J' => NumberFormat::FORMAT_NUMBER,
             'K' => NumberFormat::FORMAT_NUMBER,
             'L' => NumberFormat::FORMAT_NUMBER,
             'M' => NumberFormat::FORMAT_NUMBER,
+            'N' => NumberFormat::FORMAT_NUMBER,
         ];
     }
 
@@ -187,12 +190,12 @@ class InboundReturnsExport implements FromCollection, WithHeadings, WithMapping,
                 ]);
 
                 if ($highestRow >= 2) {
-                    $sheet->getStyle("I2:M{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
-                    $sheet->getStyle("A2:G{$highestRow}")->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+                    $sheet->getStyle("J2:N{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+                    $sheet->getStyle("A2:H{$highestRow}")->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
 
                     for ($row = 2; $row <= $highestRow; $row++) {
-                        if ((int) $sheet->getCell("K{$row}")->getValue() > 0) {
-                            $sheet->getStyle("K{$row}")->applyFromArray([
+                        if ((int) $sheet->getCell("L{$row}")->getValue() > 0) {
+                            $sheet->getStyle("L{$row}")->applyFromArray([
                                 'font' => ['bold' => true, 'color' => ['rgb' => '92400E']],
                                 'fill' => [
                                     'fillType' => Fill::FILL_SOLID,
@@ -201,8 +204,8 @@ class InboundReturnsExport implements FromCollection, WithHeadings, WithMapping,
                             ]);
                         }
 
-                        if ((int) $sheet->getCell("M{$row}")->getValue() > 0) {
-                            $sheet->getStyle("M{$row}")->applyFromArray([
+                        if ((int) $sheet->getCell("N{$row}")->getValue() > 0) {
+                            $sheet->getStyle("N{$row}")->applyFromArray([
                                 'font' => ['bold' => true, 'color' => ['rgb' => '991B1B']],
                                 'fill' => [
                                     'fillType' => Fill::FILL_SOLID,
