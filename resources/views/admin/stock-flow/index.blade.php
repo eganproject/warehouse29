@@ -353,6 +353,39 @@
     </div>
 </div>
 
+@if($isInboundReturnList)
+    <div class="modal fade" id="modal_return_items" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered mw-700px">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="fw-bolder" id="return_items_title">Daftar Item Retur</h2>
+                    <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal">
+                        <i class="fas fa-times"></i>
+                    </div>
+                </div>
+                <div class="modal-body scroll-y mx-5 mx-xl-10 my-6">
+                    <div class="table-responsive">
+                        <table class="table align-middle table-row-dashed fs-6 gy-4 mb-0">
+                            <thead>
+                                <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
+                                    <th style="width:50px">No</th>
+                                    <th>Item</th>
+                                    <th class="text-end" style="width:110px">Qty Resi</th>
+                                    <th class="text-end" style="width:110px">Diterima</th>
+                                    <th class="text-end" style="width:110px">Selisih</th>
+                                    <th class="text-end" style="width:110px">Bagus</th>
+                                    <th class="text-end" style="width:110px">Rusak</th>
+                                </tr>
+                            </thead>
+                            <tbody id="return_items_modal_body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+@endif
+
 <div class="modal fade" id="modal_stock_flow" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered mw-900px">
         <div class="modal-content">
@@ -849,6 +882,60 @@
                 });
             });
         };
+        const parseReturnItemLabel = (label) => {
+            const raw = String(label || '').trim();
+            const match = raw.match(/^(.*?)\s+\(resi\s+(\d+),\s+terima\s+(\d+),\s+selisih\s+(\d+),\s+bagus\s+(\d+),\s+rusak\s+(\d+)\)$/i);
+            if (!match) {
+                return {
+                    name: raw || '-',
+                    qty_resi: '-',
+                    qty_received: '-',
+                    qty_difference: '-',
+                    qty_good: '-',
+                    qty_damaged: '-',
+                };
+            }
+            return {
+                name: match[1],
+                qty_resi: Number(match[2]).toLocaleString('id-ID'),
+                qty_received: Number(match[3]).toLocaleString('id-ID'),
+                qty_difference: Number(match[4]).toLocaleString('id-ID'),
+                qty_good: Number(match[5]).toLocaleString('id-ID'),
+                qty_damaged: Number(match[6]).toLocaleString('id-ID'),
+            };
+        };
+        const openReturnItemsModal = (rowData) => {
+            const modalEl = document.getElementById('modal_return_items');
+            const modalBody = document.getElementById('return_items_modal_body');
+            const modalTitle = document.getElementById('return_items_title');
+            if (!modalEl || !modalBody) return;
+
+            const items = String(rowData?.item || '')
+                .split(',')
+                .map((part) => parseReturnItemLabel(part))
+                .filter((item) => item.name && item.name !== '-');
+
+            modalTitle.textContent = `Daftar Item Retur ${rowData?.code || ''}`.trim();
+            modalBody.innerHTML = items.length
+                ? items.map((item, index) => `
+                    <tr>
+                        <td>${index + 1}</td>
+                        <td class="fw-semibold">${esc(item.name)}</td>
+                        <td class="text-end">${esc(item.qty_resi)}</td>
+                        <td class="text-end">${esc(item.qty_received)}</td>
+                        <td class="text-end">
+                            <span class="badge ${Number(String(item.qty_difference).replace(/\D/g, '') || 0) > 0 ? 'badge-light-warning text-warning' : 'badge-light-success text-success'}">${esc(item.qty_difference)}</span>
+                        </td>
+                        <td class="text-end">${esc(item.qty_good)}</td>
+                        <td class="text-end">
+                            <span class="badge ${Number(String(item.qty_damaged).replace(/\D/g, '') || 0) > 0 ? 'badge-light-danger text-danger' : 'badge-light-secondary'}">${esc(item.qty_damaged)}</span>
+                        </td>
+                    </tr>
+                `).join('')
+                : '<tr><td colspan="7" class="text-center text-muted py-8">Tidak ada item.</td></tr>';
+
+            bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        };
 
         const dt = tableEl.DataTable({
             processing: true,
@@ -889,7 +976,7 @@
                     if (!isInboundReturnFlow || row?.type !== 'return') return esc(data || '-');
                     const parts = String(data || '-').split(',').map((part) => part.trim()).filter(Boolean);
                     const visible = parts.slice(0, 3).map((part) => `<div>${esc(part)}</div>`).join('');
-                    const more = parts.length > 3 ? `<div class="text-muted fs-8">+${parts.length - 3} item lainnya</div>` : '';
+                    const more = parts.length > 3 ? `<button type="button" class="btn btn-sm btn-light-primary mt-2 btn-show-return-items" data-id="${row?.id || ''}">+${parts.length - 3} item lainnya</button>` : '';
                     return visible + more;
                 } },
                 { data: 'qty', className: 'return-list-qty-cell', render: (data, type, row) => {
@@ -998,6 +1085,12 @@
             if (dateToEl?.value) params.set('date_to', dateToEl.value);
             const sep = exportUrl.includes('?') ? '&' : '?';
             window.location.href = `${exportUrl}${params.toString() ? sep + params.toString() : ''}`;
+        });
+
+        tableEl.on('click', '.btn-show-return-items', function(e) {
+            e.preventDefault();
+            const rowData = dt.row($(this).closest('tr')).data();
+            openReturnItemsModal(rowData);
         });
 
         importBtn?.addEventListener('click', () => {
