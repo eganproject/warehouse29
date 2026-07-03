@@ -6,11 +6,21 @@ use App\Models\InboundItem;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromCollection;
-use Maatwebsite\Excel\Concerns\ShouldAutoSize;
+use Maatwebsite\Excel\Concerns\WithColumnFormatting;
+use Maatwebsite\Excel\Concerns\WithColumnWidths;
+use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
+use Maatwebsite\Excel\Concerns\WithStyles;
+use Maatwebsite\Excel\Concerns\WithTitle;
+use Maatwebsite\Excel\Events\AfterSheet;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
+use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class InboundReturnsExport implements FromCollection, WithHeadings, WithMapping, ShouldAutoSize
+class InboundReturnsExport implements FromCollection, WithHeadings, WithMapping, WithStyles, WithColumnWidths, WithColumnFormatting, WithEvents, WithTitle
 {
     public function __construct(private array $filters = [])
     {
@@ -87,6 +97,122 @@ class InboundReturnsExport implements FromCollection, WithHeadings, WithMapping,
             $row->note ?? '',
             $tx?->note ?? '',
             $tx?->creator?->name ?? '-',
+        ];
+    }
+
+    public function title(): string
+    {
+        return 'Retur Inbound';
+    }
+
+    public function columnWidths(): array
+    {
+        return [
+            'A' => 24,
+            'B' => 18,
+            'C' => 16,
+            'D' => 22,
+            'E' => 20,
+            'F' => 18,
+            'G' => 18,
+            'H' => 34,
+            'I' => 12,
+            'J' => 14,
+            'K' => 12,
+            'L' => 12,
+            'M' => 12,
+            'N' => 24,
+            'O' => 32,
+            'P' => 30,
+            'Q' => 34,
+            'R' => 20,
+        ];
+    }
+
+    public function columnFormats(): array
+    {
+        return [
+            'I' => NumberFormat::FORMAT_NUMBER,
+            'J' => NumberFormat::FORMAT_NUMBER,
+            'K' => NumberFormat::FORMAT_NUMBER,
+            'L' => NumberFormat::FORMAT_NUMBER,
+            'M' => NumberFormat::FORMAT_NUMBER,
+        ];
+    }
+
+    public function styles(Worksheet $sheet): array
+    {
+        return [
+            1 => [
+                'font' => [
+                    'bold' => true,
+                    'color' => ['rgb' => 'FFFFFF'],
+                ],
+                'fill' => [
+                    'fillType' => Fill::FILL_SOLID,
+                    'startColor' => ['rgb' => '1F2937'],
+                ],
+                'alignment' => [
+                    'horizontal' => Alignment::HORIZONTAL_CENTER,
+                    'vertical' => Alignment::VERTICAL_CENTER,
+                ],
+            ],
+        ];
+    }
+
+    public function registerEvents(): array
+    {
+        return [
+            AfterSheet::class => function (AfterSheet $event) {
+                $sheet = $event->sheet->getDelegate();
+                $highestRow = max(1, $sheet->getHighestRow());
+                $highestColumn = $sheet->getHighestColumn();
+                $range = "A1:{$highestColumn}{$highestRow}";
+
+                $sheet->freezePane('A2');
+                $sheet->setAutoFilter($range);
+                $sheet->getRowDimension(1)->setRowHeight(24);
+
+                $sheet->getStyle($range)->applyFromArray([
+                    'borders' => [
+                        'allBorders' => [
+                            'borderStyle' => Border::BORDER_THIN,
+                            'color' => ['rgb' => 'D1D5DB'],
+                        ],
+                    ],
+                    'alignment' => [
+                        'vertical' => Alignment::VERTICAL_TOP,
+                        'wrapText' => true,
+                    ],
+                ]);
+
+                if ($highestRow >= 2) {
+                    $sheet->getStyle("I2:M{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+                    $sheet->getStyle("A2:G{$highestRow}")->getAlignment()->setVertical(Alignment::VERTICAL_CENTER);
+
+                    for ($row = 2; $row <= $highestRow; $row++) {
+                        if ((int) $sheet->getCell("K{$row}")->getValue() > 0) {
+                            $sheet->getStyle("K{$row}")->applyFromArray([
+                                'font' => ['bold' => true, 'color' => ['rgb' => '92400E']],
+                                'fill' => [
+                                    'fillType' => Fill::FILL_SOLID,
+                                    'startColor' => ['rgb' => 'FEF3C7'],
+                                ],
+                            ]);
+                        }
+
+                        if ((int) $sheet->getCell("M{$row}")->getValue() > 0) {
+                            $sheet->getStyle("M{$row}")->applyFromArray([
+                                'font' => ['bold' => true, 'color' => ['rgb' => '991B1B']],
+                                'fill' => [
+                                    'fillType' => Fill::FILL_SOLID,
+                                    'startColor' => ['rgb' => 'FEE2E2'],
+                                ],
+                            ]);
+                        }
+                    }
+                }
+            },
         ];
     }
 
