@@ -30,6 +30,128 @@
     ] : null;
 @endphp
 
+@push('styles')
+<style>
+    .return-items-list {
+        display: grid;
+        gap: 1rem;
+    }
+
+    .return-item-card {
+        border: 1px solid #e4e6ef;
+        border-radius: 8px;
+        background: #fff;
+        padding: 1.25rem;
+    }
+
+    .return-item-card.is-difference {
+        border-color: #f6c000;
+        background: #fffdf4;
+    }
+
+    .return-item-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .return-item-index {
+        width: 34px;
+        height: 34px;
+        border-radius: 8px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: #f1f5f9;
+        color: #334155;
+        font-weight: 700;
+        flex: 0 0 34px;
+    }
+
+    .return-item-grid {
+        display: grid;
+        grid-template-columns: minmax(260px, 1.45fr) repeat(5, minmax(92px, .5fr));
+        gap: 1rem;
+        align-items: start;
+    }
+
+    .return-item-reason-grid {
+        display: grid;
+        grid-template-columns: minmax(220px, .8fr) minmax(220px, 1fr) minmax(220px, 1fr);
+        gap: 1rem;
+        margin-top: 1rem;
+    }
+
+    .return-qty-field .form-label {
+        margin-bottom: .35rem;
+        white-space: nowrap;
+    }
+
+    .return-diff-input {
+        font-weight: 700;
+        color: #92400e;
+        background-color: #fff8dd !important;
+    }
+
+    .return-damaged-input {
+        font-weight: 700;
+        color: #991b1b;
+    }
+
+    .return-item-summary {
+        display: flex;
+        flex-wrap: wrap;
+        gap: .5rem;
+        margin-top: .75rem;
+    }
+
+    .return-item-summary .badge {
+        font-size: .75rem;
+        border-radius: 6px;
+    }
+
+    @media (max-width: 1199.98px) {
+        .return-item-grid {
+            grid-template-columns: minmax(240px, 1fr) repeat(3, minmax(96px, .45fr));
+        }
+
+        .return-item-reason-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 767.98px) {
+        .return-item-card {
+            padding: 1rem;
+        }
+
+        .return-item-head {
+            align-items: center;
+        }
+
+        .return-item-grid {
+            grid-template-columns: 1fr 1fr;
+        }
+
+        .return-item-grid .return-item-field-main {
+            grid-column: 1 / -1;
+        }
+    }
+
+    @media (max-width: 479.98px) {
+        .return-item-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .return-item-head {
+            gap: .75rem;
+        }
+    }
+</style>
+@endpush
+
 @section('content')
 <form id="return_form" class="form" autocomplete="off">
     @csrf
@@ -111,25 +233,14 @@
             </div>
         </div>
         <div class="card-body py-6">
-            <div class="table-responsive">
-                <table class="table align-middle table-row-dashed fs-6 gy-4" id="items_table">
-                    <thead>
-                        <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
-                            <th style="min-width:220px">Item</th>
-                            <th style="width:110px">Qty Resi</th>
-                            <th style="width:120px">Diterima</th>
-                            <th style="width:100px">Selisih</th>
-                            <th style="width:110px">Bagus</th>
-                            <th style="width:110px">Rusak</th>
-                            <th style="min-width:180px">Penyebab</th>
-                            <th style="min-width:180px">Catatan Penyebab</th>
-                            <th style="min-width:160px">Catatan Item</th>
-                            <th style="width:60px"></th>
-                        </tr>
-                    </thead>
-                    <tbody id="items_body"></tbody>
-                </table>
+            <div class="alert alert-light-primary d-flex align-items-start p-5 mb-5">
+                <i class="fas fa-circle-info fs-2 me-4"></i>
+                <div>
+                    <div class="fw-bold">Qty Resi adalah jumlah pada data pesanan. Qty diterima adalah fisik yang kembali.</div>
+                    <div class="text-muted fs-7">Selisih dihitung otomatis. Qty bagus + qty rusak harus sama dengan qty diterima.</div>
+                </div>
             </div>
+            <div class="return-items-list" id="items_body"></div>
             <div class="invalid-feedback d-block" id="error_items"></div>
         </div>
     </div>
