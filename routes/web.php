@@ -27,6 +27,7 @@ use App\Http\Controllers\Admin\PickerReportController;
 use App\Http\Controllers\Admin\LowStockReportController;
 use App\Http\Controllers\Admin\ActivityLogController;
 use App\Http\Controllers\Admin\StockOpnameReportController;
+use App\Http\Controllers\Admin\StockAsOfReportController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\MenuController;
 use App\Http\Controllers\Admin\PermissionController;
@@ -346,6 +347,9 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         Route::get('/low-stock/data', [LowStockReportController::class, 'data'])->name('low-stock.data');
         Route::get('/stock-mutations', [AnalyticsReportController::class, 'stockMutations'])->name('stock-mutations.index');
         Route::get('/stock-mutations/data', [AnalyticsReportController::class, 'stockMutationsData'])->name('stock-mutations.data');
+        Route::get('/stock-as-of', [StockAsOfReportController::class, 'index'])->name('stock-as-of.index');
+        Route::get('/stock-as-of/data', [StockAsOfReportController::class, 'data'])->name('stock-as-of.data');
+        Route::get('/stock-as-of/export', [StockAsOfReportController::class, 'export'])->name('stock-as-of.export');
         Route::get('/couriers', [AnalyticsReportController::class, 'couriers'])->name('couriers.index');
         Route::get('/couriers/data', [AnalyticsReportController::class, 'couriersData'])->name('couriers.data');
         Route::get('/stock-health', [AnalyticsReportController::class, 'stockHealth'])->name('stock-health.index');
