@@ -51,7 +51,7 @@ class DamagedStockService
                     : ($stock->stock + $qty);
 
                 // Saat stok benar-benar terpotong (approve alokasi), lepas reservasi yang dipegang
-                if ($direction === 'out') {
+                if ($direction === 'out' && !($payload['preserve_reservation'] ?? false)) {
                     $stock->reserved_stock = max(0, ($stock->reserved_stock ?? 0) - $qty);
                 }
 

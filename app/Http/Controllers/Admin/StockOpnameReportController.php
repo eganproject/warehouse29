@@ -33,23 +33,27 @@ class StockOpnameReportController extends Controller
         }
 
         $this->applyDateFilter($baseQuery, $request);
+        $this->applyScopeFilter($baseQuery, $request);
 
-        $recordsTotal = DB::table('stock_opnames as so')
+        $recordsTotalQuery = DB::table('stock_opnames as so')
             ->join('stock_opname_items as soi', 'soi.stock_opname_id', '=', 'so.id')
-            ->where('so.status', 'completed')
-            ->selectRaw('COUNT(DISTINCT DATE(so.transacted_at)) as total_days')
-            ->value('total_days') ?? 0;
+            ->where('so.status', 'completed');
+        $this->applyScopeFilter($recordsTotalQuery, $request);
+        $recordsTotal = $recordsTotalQuery
+            ->selectRaw("COUNT(DISTINCT CONCAT(DATE(so.transacted_at), '|', COALESCE(so.stock_scope, 'regular'))) as total_rows")
+            ->value('total_rows') ?? 0;
 
         $recordsFiltered = (clone $baseQuery)
-            ->selectRaw('COUNT(DISTINCT DATE(so.transacted_at)) as total_days')
-            ->value('total_days') ?? 0;
+            ->selectRaw("COUNT(DISTINCT CONCAT(DATE(so.transacted_at), '|', COALESCE(so.stock_scope, 'regular'))) as total_rows")
+            ->value('total_rows') ?? 0;
 
         $query = (clone $baseQuery)
             ->selectRaw('DATE(so.transacted_at) as report_date')
+            ->selectRaw("COALESCE(so.stock_scope, 'regular') as stock_scope")
             ->selectRaw('COUNT(DISTINCT so.id) as batch_count')
             ->selectRaw('COUNT(DISTINCT soi.item_id) as sku_count')
             ->selectRaw('COUNT(DISTINCT CASE WHEN soi.adjustment <> 0 THEN soi.item_id END) as diff_sku_count')
-            ->groupBy('report_date')
+            ->groupBy('report_date', 'stock_scope')
             ->orderBy('report_date', 'desc');
 
         $start = (int) $request->input('start', 0);
@@ -64,6 +68,7 @@ class StockOpnameReportController extends Controller
             $accuracy = $skuCount > 0 ? (($skuCount - $diffCount) / $skuCount) * 100 : 100;
             return [
                 'date' => $row->report_date,
+                'stock_scope' => $row->stock_scope,
                 'batch_count' => (int) $row->batch_count,
                 'sku_count' => $skuCount,
                 'diff_sku_count' => $diffCount,
@@ -122,22 +127,26 @@ class StockOpnameReportController extends Controller
         }
 
         $this->applyDateFilter($baseQuery, $request);
+        $this->applyScopeFilter($baseQuery, $request);
 
-        $recordsTotal = DB::table('stock_opname_items as soi')
+        $recordsTotalQuery = DB::table('stock_opname_items as soi')
             ->join('stock_opnames as so', 'so.id', '=', 'soi.stock_opname_id')
             ->where('so.status', 'completed')
-            ->when($isMinus, fn ($q) => $q->where('soi.adjustment', '<', 0), fn ($q) => $q->where('soi.adjustment', '>', 0))
-            ->selectRaw('COUNT(DISTINCT soi.item_id) as total_sku')
+            ->when($isMinus, fn ($q) => $q->where('soi.adjustment', '<', 0), fn ($q) => $q->where('soi.adjustment', '>', 0));
+        $this->applyScopeFilter($recordsTotalQuery, $request);
+        $recordsTotal = $recordsTotalQuery
+            ->selectRaw("COUNT(DISTINCT CONCAT(soi.item_id, '|', COALESCE(so.stock_scope, 'regular'))) as total_sku")
             ->value('total_sku') ?? 0;
 
         $recordsFiltered = (clone $baseQuery)
-            ->selectRaw('COUNT(DISTINCT soi.item_id) as total_sku')
+            ->selectRaw("COUNT(DISTINCT CONCAT(soi.item_id, '|', COALESCE(so.stock_scope, 'regular'))) as total_sku")
             ->value('total_sku') ?? 0;
 
         $query = (clone $baseQuery)
             ->select('i.sku', 'i.name')
+            ->selectRaw("COALESCE(so.stock_scope, 'regular') as stock_scope")
             ->selectRaw('SUM(soi.adjustment) as total_adjustment')
-            ->groupBy('i.id', 'i.sku', 'i.name')
+            ->groupBy('i.id', 'i.sku', 'i.name', 'stock_scope')
             ->orderByRaw('ABS(SUM(soi.adjustment)) DESC');
 
         $start = (int) $request->input('start', 0);
@@ -151,6 +160,7 @@ class StockOpnameReportController extends Controller
             return [
                 'sku' => $row->sku ?? '-',
                 'name' => $row->name ?? '-',
+                'stock_scope' => $row->stock_scope,
                 'qty' => $isMinus ? abs($qty) : $qty,
             ];
         });
@@ -170,6 +180,7 @@ class StockOpnameReportController extends Controller
             'q' => trim((string) $request->input('q', '')),
             'date_from' => $request->input('date_from') ?: $defaultDate,
             'date_to' => $request->input('date_to') ?: $defaultDate,
+            'stock_scope' => $this->scope($request),
         ];
         $filename = 'laporan-stock-opname-'.now()->format('YmdHis').'.xlsx';
 
@@ -202,5 +213,20 @@ class StockOpnameReportController extends Controller
         } catch (\Throwable) {
             // ignore invalid date filters
         }
+    }
+
+    private function applyScopeFilter($query, Request $request): void
+    {
+        $scope = $this->scope($request);
+        if ($scope !== 'all') {
+            $query->where('so.stock_scope', $scope);
+        }
+    }
+
+    private function scope(Request $request): string
+    {
+        return in_array($request->input('stock_scope'), ['regular', 'damaged'], true)
+            ? $request->input('stock_scope')
+            : 'all';
     }
 }

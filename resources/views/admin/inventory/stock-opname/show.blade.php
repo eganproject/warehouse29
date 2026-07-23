@@ -5,6 +5,7 @@
 
 @php
     $statusCompleted = ($opname->status ?? 'open') === 'completed';
+    $isDamagedScope = ($opname->stock_scope ?? 'regular') === 'damaged';
     $accuracy = $totalSku > 0 ? round((($totalSku - $diffSkuCount) / $totalSku) * 100, 2) : 100;
 @endphp
 
@@ -97,6 +98,16 @@
                         <tr>
                             <td class="text-gray-600 fw-semibold w-130px">Kode Dokumen</td>
                             <td class="fw-bold text-gray-900">: {{ $opname->code }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-gray-600 fw-semibold">Jenis Stok</td>
+                            <td class="text-gray-900">:
+                                @if($isDamagedScope)
+                                    <span class="badge badge-light-danger">Barang Rusak</span>
+                                @else
+                                    <span class="badge badge-light-info">Reguler</span>
+                                @endif
+                            </td>
                         </tr>
                         <tr>
                             <td class="text-gray-600 fw-semibold">Tanggal</td>

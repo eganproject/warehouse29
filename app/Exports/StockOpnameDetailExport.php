@@ -27,6 +27,7 @@ class StockOpnameDetailExport implements FromCollection, WithHeadings, WithMappi
     public function headings(): array
     {
         return [
+            'Jenis Stok',
             'SKU',
             'Nama Item',
             'System Qty',
@@ -41,6 +42,7 @@ class StockOpnameDetailExport implements FromCollection, WithHeadings, WithMappi
     {
         /** @var StockOpnameItem $row */
         return [
+            ($this->opname->stock_scope ?? 'regular') === 'damaged' ? 'Barang Rusak' : 'Reguler',
             $row->item?->sku ?? '-',
             $row->item?->name ?? '-',
             (int) $row->system_qty,

@@ -6,10 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Exports\StockOpnameDetailExport;
 use App\Models\Item;
 use App\Models\ItemStock;
+use App\Models\DamagedItemStock;
+use App\Models\DamagedStockMutation;
 use App\Models\StockOpname;
 use App\Models\StockOpnameItem;
 use App\Models\StockMutation;
 use App\Support\StockService;
+use App\Support\DamagedStockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -22,6 +25,7 @@ class StockOpnameController extends Controller
     public function index()
     {
         $items = Item::leftJoin('item_stocks', 'item_stocks.item_id', '=', 'items.id')
+            ->leftJoin('damaged_item_stocks', 'damaged_item_stocks.item_id', '=', 'items.id')
             ->where('items.is_active', true)
             ->orderBy('items.name')
             ->get([
@@ -29,6 +33,7 @@ class StockOpnameController extends Controller
                 'items.sku',
                 'items.name',
                 DB::raw('COALESCE(item_stocks.stock, 0) as stock'),
+                DB::raw('COALESCE(damaged_item_stocks.stock, 0) as damaged_stock'),
             ]);
 
         return view('admin.inventory.stock-opname.index', [
@@ -64,6 +69,7 @@ class StockOpnameController extends Controller
             ->select([
                 'stock_opnames.id',
                 'stock_opnames.code',
+                'stock_opnames.stock_scope',
                 'stock_opnames.transacted_at',
                 'stock_opnames.note',
                 'stock_opnames.status',
@@ -71,7 +77,7 @@ class StockOpnameController extends Controller
                 DB::raw('COUNT(stock_opname_items.id) as items_count'),
                 DB::raw('COALESCE(SUM(stock_opname_items.adjustment), 0) as total_adjustment'),
             ])
-            ->groupBy('stock_opnames.id', 'stock_opnames.code', 'stock_opnames.transacted_at', 'stock_opnames.note', 'stock_opnames.status', 'creators.name')
+            ->groupBy('stock_opnames.id', 'stock_opnames.code', 'stock_opnames.stock_scope', 'stock_opnames.transacted_at', 'stock_opnames.note', 'stock_opnames.status', 'creators.name')
             ->orderBy('stock_opnames.transacted_at', 'desc');
 
         $start = (int) $request->input('start', 0);
@@ -85,6 +91,7 @@ class StockOpnameController extends Controller
             return [
                 'id' => $row->id,
                 'code' => $row->code,
+                'stock_scope' => $row->stock_scope ?? 'regular',
                 'transacted_at' => $ts,
                 'submit_by' => $row->submit_by ?? '-',
                 'items_count' => (int) $row->items_count,
@@ -189,6 +196,10 @@ class StockOpnameController extends Controller
             StockMutation::where('source_type', 'opname')
                 ->where('source_id', $opname->id)
                 ->delete();
+            DamagedStockService::rollbackBySource('opname', $opname->id);
+            DamagedStockMutation::where('source_type', 'opname')
+                ->where('source_id', $opname->id)
+                ->delete();
             StockOpnameItem::where('stock_opname_id', $opname->id)->delete();
             $opname->delete();
 
@@ -217,6 +228,7 @@ class StockOpnameController extends Controller
         try {
             $opname = StockOpname::create([
                 'code' => $code,
+                'stock_scope' => $validated['stock_scope'],
                 'note' => $validated['note'] ?? null,
                 'transacted_at' => $transactedAt,
                 'created_by' => auth()->id(),
@@ -224,10 +236,13 @@ class StockOpnameController extends Controller
             ]);
 
             foreach ($validated['items'] as $row) {
-                $stock = ItemStock::where('item_id', $row['item_id'])->lockForUpdate()->first();
+                $stock = $validated['stock_scope'] === 'damaged'
+                    ? DamagedItemStock::where('item_id', $row['item_id'])->lockForUpdate()->first()
+                    : ItemStock::where('item_id', $row['item_id'])->lockForUpdate()->first();
                 if (!$stock) {
-                    ItemStock::create(['item_id' => $row['item_id'], 'stock' => 0]);
-                    $stock = ItemStock::where('item_id', $row['item_id'])->lockForUpdate()->first();
+                    $model = $validated['stock_scope'] === 'damaged' ? DamagedItemStock::class : ItemStock::class;
+                    $model::create(['item_id' => $row['item_id'], 'stock' => 0]);
+                    $stock = $model::where('item_id', $row['item_id'])->lockForUpdate()->first();
                 }
                 $systemQty = (int) ($stock?->stock ?? 0);
                 $countedQty = (int) $row['counted_qty'];
@@ -265,6 +280,7 @@ class StockOpnameController extends Controller
     private function validatePayload(Request $request): array
     {
         $validated = $request->validate([
+            'stock_scope' => ['nullable', 'in:regular,damaged'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.item_id' => ['required', 'integer', \Illuminate\Validation\Rule::exists('items', 'id')->where('is_active', true)],
             'items.*.counted_qty' => ['required', 'integer', 'min:0'],
@@ -291,6 +307,7 @@ class StockOpnameController extends Controller
         }
 
         $validated['items'] = $items->all();
+        $validated['stock_scope'] = $validated['stock_scope'] ?? 'regular';
         if (!empty($validated['transacted_at'])) {
             $validated['transacted_at'] = Carbon::parse($validated['transacted_at']);
         } else {
@@ -302,26 +319,45 @@ class StockOpnameController extends Controller
 
     private function postStockMovements(StockOpname $opname): void
     {
-        $opname->loadMissing('items');
+        $opname->loadMissing('items.item');
+        $scope = $opname->stock_scope ?? 'regular';
         foreach ($opname->items as $row) {
             $adjustment = (int) $row->adjustment;
             if ($adjustment === 0) {
                 continue;
             }
 
-            StockService::mutate([
+            $payload = [
                 'item_id' => $row->item_id,
                 'direction' => $adjustment > 0 ? 'in' : 'out',
                 'qty' => abs($adjustment),
                 'source_type' => 'opname',
-                'source_subtype' => null,
+                'source_subtype' => $scope,
                 'source_id' => $opname->id,
                 'source_code' => $opname->code,
                 'note' => $row->note ?? null,
                 'occurred_at' => $opname->transacted_at ?? now(),
                 'created_by' => auth()->id(),
-                'idempotency_key' => StockService::idempotencyKey(['stock', 'opname', $opname->id, $row->item_id]),
-            ]);
+                'idempotency_key' => StockService::idempotencyKey(['stock', 'opname', $scope, $opname->id, $row->item_id]),
+            ];
+
+            if ($scope === 'damaged') {
+                if ($adjustment < 0) {
+                    $damagedStock = DamagedItemStock::where('item_id', $row->item_id)->lockForUpdate()->first();
+                    $remainingStock = (int) ($damagedStock?->stock ?? 0) - abs($adjustment);
+                    $reservedStock = (int) ($damagedStock?->reserved_stock ?? 0);
+                    if ($remainingStock < $reservedStock) {
+                        throw ValidationException::withMessages([
+                            'items' => "Penyesuaian stok rusak untuk {$row->item?->sku} tidak dapat disetujui karena {$reservedStock} qty masih direservasi.",
+                        ]);
+                    }
+                }
+
+                $payload['preserve_reservation'] = true;
+                DamagedStockService::mutate($payload);
+            } else {
+                StockService::mutate($payload);
+            }
         }
     }
 

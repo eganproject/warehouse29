@@ -44,6 +44,7 @@
                     <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
                         <th>ID</th>
                         <th>Kode</th>
+                        <th>Jenis Stok</th>
                         <th>Status</th>
                         <th>Tanggal</th>
                         <th>Submit By</th>
@@ -76,6 +77,14 @@
             <div class="modal-body scroll-y mx-5 mx-xl-15 my-7">
                 <form class="form" id="stock_opname_form">
                     @csrf
+                    <div class="fv-row mb-7">
+                        <label class="required fs-6 fw-bold form-label mb-2">Jenis Stok</label>
+                        <select class="form-select form-select-solid" name="stock_scope" id="opname_stock_scope">
+                            <option value="regular">Stok Reguler</option>
+                            <option value="damaged">Stok Barang Rusak</option>
+                        </select>
+                        <div class="form-text" id="opname_stock_scope_help">Saldo sistem dan penyesuaian akan memakai stok reguler.</div>
+                    </div>
                     <div id="opname_items_container"></div>
                     <div class="mb-7">
                         <button type="button" class="btn btn-light" id="btn_add_opname_item">Tambah Item</button>
@@ -116,7 +125,7 @@
     const canUpdate = {{ $canUpdate ? 'true' : 'false' }};
     const canApprove = {{ $canApprove ? 'true' : 'false' }};
     const canDelete = {{ $canDelete ? 'true' : 'false' }};
-    const itemOptionsHtml = `@foreach($items as $item)<option value="{{ $item->id }}" data-stock="{{ $item->stock }}">{{ $item->sku }} - {{ $item->name }}</option>@endforeach`;
+    const itemOptionsHtml = `@foreach($items as $item)<option value="{{ $item->id }}" data-regular-stock="{{ $item->stock }}" data-damaged-stock="{{ $item->damaged_stock }}">{{ $item->sku }} - {{ $item->name }}</option>@endforeach`;
 
     document.addEventListener('DOMContentLoaded', () => {
         const tableEl = $('#stock_opname_table');
@@ -128,6 +137,8 @@
         const addItemBtn = document.getElementById('btn_add_opname_item');
         const openBtn = document.getElementById('btn_open_opname');
         const transactedAtEl = document.getElementById('opname_transacted_at');
+        const stockScopeEl = document.getElementById('opname_stock_scope');
+        const stockScopeHelpEl = document.getElementById('opname_stock_scope_help');
         const dateFromEl = document.getElementById('filter_date_from');
         const dateToEl = document.getElementById('filter_date_to');
         const filterApplyBtn = document.getElementById('filter_apply');
@@ -229,8 +240,19 @@
             const systemEl = row.querySelector('[data-name="system_qty"]');
             const selected = selectEl?.selectedOptions?.[0];
             if (systemEl && selected) {
-                systemEl.value = selected.getAttribute('data-stock') || '0';
+                const scope = stockScopeEl?.value || 'regular';
+                systemEl.value = selected.getAttribute(`data-${scope}-stock`) || '0';
             }
+        };
+
+        const refreshScope = () => {
+            const damaged = stockScopeEl?.value === 'damaged';
+            if (stockScopeHelpEl) {
+                stockScopeHelpEl.textContent = damaged
+                    ? 'Saldo sistem dan penyesuaian akan memakai stok barang rusak.'
+                    : 'Saldo sistem dan penyesuaian akan memakai stok reguler.';
+            }
+            itemsContainer?.querySelectorAll('.opname-item-row').forEach(updateSystemQty);
         };
 
         const createItemRow = (data = {}) => {
@@ -281,6 +303,7 @@
 
         const resetForm = () => {
             form?.reset();
+            if (stockScopeEl) stockScopeEl.value = 'regular';
             const nowJkt = getJakartaNow();
             if (fpTransacted) {
                 fpTransacted.setDate(nowJkt, true, 'Y-m-d H:i');
@@ -290,6 +313,7 @@
             itemsContainer.innerHTML = '';
             createItemRow();
             clearErrors();
+            refreshScope();
             validateUniqueItems();
         };
 
@@ -300,6 +324,8 @@
                 validateUniqueItems();
             }
         });
+
+        stockScopeEl?.addEventListener('change', refreshScope);
 
         itemsContainer?.addEventListener('click', (e) => {
             const btn = e.target.closest('.btn-remove-item');
@@ -339,6 +365,9 @@
             columns: [
                 { data: 'id' },
                 { data: 'code' },
+                { data: 'stock_scope', render: (data) => data === 'damaged'
+                    ? '<span class="badge badge-light-danger">Barang Rusak</span>'
+                    : '<span class="badge badge-light-info">Reguler</span>' },
                 { data: 'status', orderable: false, searchable: false, render: (data) => statusLabel(data) },
                 { data: 'transacted_at' },
                 { data: 'submit_by' },

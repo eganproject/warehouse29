@@ -10,6 +10,11 @@
             <div class="d-flex align-items-center gap-2">
                 <input type="text" class="form-control form-control-solid w-150px" id="filter_date_from" placeholder="Dari" value="{{ $latestOpnameDate ?? '' }}" />
                 <input type="text" class="form-control form-control-solid w-150px" id="filter_date_to" placeholder="Sampai" value="{{ $latestOpnameDate ?? '' }}" />
+                <select class="form-select form-select-solid w-175px" id="filter_stock_scope">
+                    <option value="all">Semua Jenis Stok</option>
+                    <option value="regular">Stok Reguler</option>
+                    <option value="damaged">Stok Barang Rusak</option>
+                </select>
                 <button type="button" class="btn btn-light" id="filter_apply">Filter</button>
                 <button type="button" class="btn btn-light" id="filter_reset">Reset</button>
             </div>
@@ -83,6 +88,7 @@
                             <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
                                 <th>SKU</th>
                                 <th>Nama</th>
+                                <th>Jenis Stok</th>
                                 <th class="text-end">Jumlah Selisih</th>
                             </tr>
                         </thead>
@@ -106,6 +112,7 @@
                             <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
                                 <th>SKU</th>
                                 <th>Nama</th>
+                                <th>Jenis Stok</th>
                                 <th class="text-end">Jumlah Selisih</th>
                             </tr>
                         </thead>
@@ -137,6 +144,7 @@
                 <thead>
                     <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
                         <th>Tanggal</th>
+                        <th>Jenis Stok</th>
                         <th>Total Batch</th>
                         <th>Jumlah SKU</th>
                         <th>SKU Selisih</th>
@@ -164,6 +172,7 @@
         const searchInput = document.getElementById('report_search');
         const dateFromEl = document.getElementById('filter_date_from');
         const dateToEl = document.getElementById('filter_date_to');
+        const stockScopeEl = document.getElementById('filter_stock_scope');
         const applyBtn = document.getElementById('filter_apply');
         const resetBtn = document.getElementById('filter_reset');
         const exportBtn = document.getElementById('btn_export_report');
@@ -220,10 +229,14 @@
                     params.q = searchInput?.value || '';
                     if (dateFromEl?.value) params.date_from = dateFromEl.value;
                     if (dateToEl?.value) params.date_to = dateToEl.value;
+                    params.stock_scope = stockScopeEl?.value || 'all';
                 }
             },
             columns: [
                 { data: 'date' },
+                { data: 'stock_scope', render: (data) => data === 'damaged'
+                    ? '<span class="badge badge-light-danger">Barang Rusak</span>'
+                    : '<span class="badge badge-light-info">Reguler</span>' },
                 { data: 'batch_count' },
                 { data: 'sku_count' },
                 { data: 'diff_sku_count' },
@@ -252,11 +265,13 @@
                         params.q = searchInput?.value || '';
                         if (dateFromEl?.value) params.date_from = dateFromEl.value;
                         if (dateToEl?.value) params.date_to = dateToEl.value;
+                        params.stock_scope = stockScopeEl?.value || 'all';
                     }
                 },
                 columns: [
                     { data: 'sku' },
                     { data: 'name' },
+                    { data: 'stock_scope', render: (data) => data === 'damaged' ? 'Barang Rusak' : 'Reguler' },
                     { data: 'qty', className: 'text-end' },
                 ]
             });
@@ -273,9 +288,11 @@
 
         searchInput?.addEventListener('keyup', reloadAll);
         applyBtn?.addEventListener('click', reloadAll);
+        stockScopeEl?.addEventListener('change', reloadAll);
         resetBtn?.addEventListener('click', () => {
             if (fpFrom && latestOpnameDate) fpFrom.setDate(latestOpnameDate, true); else if (fpFrom) fpFrom.clear(); else if (dateFromEl) dateFromEl.value = latestOpnameDate || '';
             if (fpTo && latestOpnameDate) fpTo.setDate(latestOpnameDate, true); else if (fpTo) fpTo.clear(); else if (dateToEl) dateToEl.value = latestOpnameDate || '';
+            if (stockScopeEl) stockScopeEl.value = 'all';
             reloadAll();
         });
 
@@ -285,6 +302,7 @@
             if (q) params.set('q', q);
             if (dateFromEl?.value || latestOpnameDate) params.set('date_from', dateFromEl?.value || latestOpnameDate);
             if (dateToEl?.value || latestOpnameDate) params.set('date_to', dateToEl?.value || latestOpnameDate);
+            params.set('stock_scope', stockScopeEl?.value || 'all');
             const url = params.toString() ? `${exportUrl}?${params.toString()}` : exportUrl;
             window.location.href = url;
         });

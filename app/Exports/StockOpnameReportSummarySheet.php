@@ -27,6 +27,7 @@ class StockOpnameReportSummarySheet implements FromCollection, WithHeadings, Wit
     {
         return [
             'Tanggal',
+            'Jenis Stok',
             'Total Batch',
             'Jumlah SKU',
             'SKU Selisih',
@@ -46,13 +47,15 @@ class StockOpnameReportSummarySheet implements FromCollection, WithHeadings, Wit
         }
 
         $this->applyDateFilter($baseQuery);
+        $this->applyScopeFilter($baseQuery);
 
         $rows = $baseQuery
             ->selectRaw('DATE(so.transacted_at) as report_date')
+            ->selectRaw("COALESCE(so.stock_scope, 'regular') as stock_scope")
             ->selectRaw('COUNT(DISTINCT so.id) as batch_count')
             ->selectRaw('COUNT(DISTINCT soi.item_id) as sku_count')
             ->selectRaw('COUNT(DISTINCT CASE WHEN soi.adjustment <> 0 THEN soi.item_id END) as diff_sku_count')
-            ->groupBy('report_date')
+            ->groupBy('report_date', 'stock_scope')
             ->orderBy('report_date', 'desc')
             ->get();
 
@@ -62,6 +65,7 @@ class StockOpnameReportSummarySheet implements FromCollection, WithHeadings, Wit
             $accuracy = $skuCount > 0 ? (($skuCount - $diffCount) / $skuCount) * 100 : 100;
             return [
                 $row->report_date,
+                $row->stock_scope === 'damaged' ? 'Barang Rusak' : 'Reguler',
                 (int) $row->batch_count,
                 $skuCount,
                 $diffCount,
@@ -93,6 +97,14 @@ class StockOpnameReportSummarySheet implements FromCollection, WithHeadings, Wit
             }
         } catch (\Throwable) {
             // ignore invalid date filters
+        }
+    }
+
+    private function applyScopeFilter($query): void
+    {
+        $scope = $this->filters['stock_scope'] ?? 'all';
+        if (in_array($scope, ['regular', 'damaged'], true)) {
+            $query->where('so.stock_scope', $scope);
         }
     }
 }

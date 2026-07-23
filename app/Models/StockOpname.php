@@ -11,6 +11,7 @@ class StockOpname extends Model
 
     protected $fillable = [
         'code',
+        'stock_scope',
         'transacted_at',
         'note',
         'status',

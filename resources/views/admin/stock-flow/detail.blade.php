@@ -10,6 +10,8 @@
 @php($isApproved = ($transaction->status ?? '') === 'approved')
 @php($isFinalized = ($transaction->status ?? '') === 'finalized')
 @php($suratJalan = $isManualOutbound ? ($transaction->suratJalan ?? null) : null)
+@php($outboundReturnRegularQty = $isOutboundReturn ? $transaction->items->where('stock_source', '!=', 'damaged')->sum('qty') : 0)
+@php($outboundReturnDamagedQty = $isOutboundReturn ? $transaction->items->where('stock_source', 'damaged')->sum('qty') : 0)
 
 @if($isManualOutbound)
 <style>
@@ -209,7 +211,11 @@
         </div>
     </div>
     <div class="card-body py-6">
-        <div class="row mb-6">
+        <div class="row g-5 mb-6">
+            <div class="col-md-3">
+                <div class="fw-bold text-gray-600">Kode Transaksi</div>
+                <div class="fw-bolder">{{ $transaction->code }}</div>
+            </div>
             <div class="col-md-3">
                 <div class="fw-bold text-gray-600">Ref No</div>
                 <div>{{ $transaction->ref_no ?? '-' }}</div>
@@ -235,14 +241,53 @@
                 </div>
             </div>
             <div class="col-md-3">
-                <div class="fw-bold text-gray-600">Catatan</div>
-                <div>{{ $transaction->note ?? '-' }}</div>
+                <div class="fw-bold text-gray-600">Tanggal Transaksi</div>
+                <div>{{ $transaction->transacted_at?->format('d/m/Y H:i') ?? '-' }}</div>
             </div>
             <div class="col-md-3">
                 <div class="fw-bold text-gray-600">Total Qty</div>
-                <div>{{ $totalQty }}</div>
+                <div class="fw-bolder">{{ number_format($totalQty) }}</div>
+            </div>
+            <div class="col-md-3">
+                <div class="fw-bold text-gray-600">Dibuat Oleh</div>
+                <div>{{ $transaction->creator?->name ?? '-' }}</div>
+                <div class="text-muted fs-8">{{ $transaction->created_at?->format('d/m/Y H:i') ?? '-' }}</div>
+            </div>
+            <div class="col-md-3">
+                <div class="fw-bold text-gray-600">Disetujui Oleh</div>
+                <div>{{ $transaction->approver?->name ?? '-' }}</div>
+                <div class="text-muted fs-8">{{ $transaction->approved_at?->format('d/m/Y H:i') ?? '-' }}</div>
+            </div>
+            @if($isOutboundReturn)
+                <div class="col-md-3">
+                    <div class="fw-bold text-gray-600">Dari Gudang Reguler</div>
+                    <div class="fw-bolder text-info">{{ number_format($outboundReturnRegularQty) }} qty</div>
+                </div>
+                <div class="col-md-3">
+                    <div class="fw-bold text-gray-600">Dari Gudang Rusak</div>
+                    <div class="fw-bolder text-danger">{{ number_format($outboundReturnDamagedQty) }} qty</div>
+                </div>
+            @endif
+            <div class="col-12">
+                <div class="fw-bold text-gray-600">Catatan</div>
+                <div>{{ $transaction->note ?? '-' }}</div>
             </div>
         </div>
+
+        @if($isOutboundReturn)
+            <div class="alert {{ $isApproved ? 'alert-warning' : 'alert-info' }} d-flex align-items-center p-5 mb-6">
+                <i class="fas {{ $isApproved ? 'fa-box-open' : 'fa-clock' }} fs-2 me-4"></i>
+                <div>
+                    @if($isApproved)
+                        <div class="fw-bold">Stok retur outbound sudah dikeluarkan</div>
+                        <div class="text-muted">Saat disetujui, stok dikurangi sesuai sumber stok pada setiap item: gudang reguler atau gudang rusak.</div>
+                    @else
+                        <div class="fw-bold">Menunggu persetujuan</div>
+                        <div class="text-muted">Stok belum berubah sampai retur outbound ini disetujui.</div>
+                    @endif
+                </div>
+            </div>
+        @endif
 
         @if($isInboundReturn && $isApproved)
             <div class="alert alert-primary d-flex align-items-center p-5 mb-6">
@@ -271,7 +316,8 @@
             <table class="table align-middle table-row-dashed fs-6 gy-5">
                 <thead>
                     <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
-                        <th>Item</th>
+                        <th>SKU</th>
+                        <th>Nama Item</th>
                         @if($isInboundReturn)
                             <th>Qty Resi</th>
                             <th>Qty Diterima</th>
@@ -291,7 +337,8 @@
                 <tbody>
                     @foreach($transaction->items as $row)
                         <tr>
-                            <td>{{ $row->item?->sku }} - {{ $row->item?->name }}</td>
+                            <td class="fw-bold">{{ $row->item?->sku ?? '-' }}</td>
+                            <td>{{ $row->item?->name ?? '-' }}</td>
                             @if($isInboundReturn)
                                 <td>{{ $row->qty_resi ?: ($row->qty_received ?: $row->qty) }}</td>
                                 <td>{{ $row->qty_received ?: $row->qty }}</td>

@@ -28,6 +28,7 @@ class StockOpnameReportDiffSheet implements FromCollection, WithHeadings, WithTi
         return [
             'SKU',
             'Nama',
+            'Jenis Stok',
             'Jumlah Selisih',
         ];
     }
@@ -56,11 +57,13 @@ class StockOpnameReportDiffSheet implements FromCollection, WithHeadings, WithTi
         }
 
         $this->applyDateFilter($query);
+        $this->applyScopeFilter($query);
 
         $rows = $query
             ->select('i.sku', 'i.name')
+            ->selectRaw("COALESCE(so.stock_scope, 'regular') as stock_scope")
             ->selectRaw('SUM(soi.adjustment) as total_adjustment')
-            ->groupBy('i.id', 'i.sku', 'i.name')
+            ->groupBy('i.id', 'i.sku', 'i.name', 'stock_scope')
             ->orderByRaw('ABS(SUM(soi.adjustment)) DESC')
             ->get();
 
@@ -69,6 +72,7 @@ class StockOpnameReportDiffSheet implements FromCollection, WithHeadings, WithTi
             return [
                 $row->sku ?? '-',
                 $row->name ?? '-',
+                $row->stock_scope === 'damaged' ? 'Barang Rusak' : 'Reguler',
                 $isMinus ? abs($qty) : $qty,
             ];
         });
@@ -97,6 +101,14 @@ class StockOpnameReportDiffSheet implements FromCollection, WithHeadings, WithTi
             }
         } catch (\Throwable) {
             // ignore invalid date filters
+        }
+    }
+
+    private function applyScopeFilter($query): void
+    {
+        $scope = $this->filters['stock_scope'] ?? 'all';
+        if (in_array($scope, ['regular', 'damaged'], true)) {
+            $query->where('so.stock_scope', $scope);
         }
     }
 }
