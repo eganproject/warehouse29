@@ -96,6 +96,7 @@
                         <th>No</th>
                         <th>SKU</th>
                         <th>Nama</th>
+                        <th>Satuan</th>
                         <th>Tipe</th>
                         <th>Status</th>
                         <th>Kategori</th>
@@ -139,6 +140,12 @@
                         <label class="required fs-6 fw-bold form-label mb-2">Nama</label>
                         <input type="text" class="form-control form-control-solid" name="name" id="item_name" required />
                         <div class="invalid-feedback" id="error_name"></div>
+                    </div>
+                    <div class="fv-row mb-7">
+                        <label class="required fs-6 fw-bold form-label mb-2">Satuan (UOM)</label>
+                        <input type="text" class="form-control form-control-solid" name="uom" id="item_uom" value="pcs" maxlength="30" required />
+                        <div class="form-text">Contoh: pcs, box, kg, liter, roll.</div>
+                        <div class="invalid-feedback" id="error_uom"></div>
                     </div>
                     <div class="fv-row mb-7">
                         <label class="fs-6 fw-bold form-label mb-2">Kategori</label>
@@ -231,6 +238,7 @@
                     <ul class="ms-5 mb-4">
                         <li><strong>sku</strong> (wajib, unik)</li>
                         <li><strong>name</strong> (wajib)</li>
+                        <li><strong>uom</strong> / <strong>satuan</strong> / <strong>unit</strong> (opsional, default <code>pcs</code> untuk item baru)</li>
                         <li><strong>parent_category</strong> (opsional, parent kategori; akan dibuat jika belum ada)</li>
                         <li><strong>category</strong> (opsional, anak kategori; jika kosong akan dimasukkan ke kategori default "Tanpa Kategori")</li>
                         <li><strong>stock</strong> / <strong>stok</strong> / <strong>qty</strong> (opsional, stok awal; akan dicatat sebagai inbound saldo awal)</li>
@@ -239,7 +247,7 @@
                         <li><strong>address</strong> (opsional)</li>
                         <li><strong>description</strong> (opsional)</li>
                     </ul>
-                    <p class="text-muted small mb-1">Contoh header: <code>sku,name,parent_category,category,stock,safety_stock,is_active,address,description</code></p>
+                    <p class="text-muted small mb-1">Contoh header: <code>sku,name,uom,parent_category,category,stock,safety_stock,is_active,address,description</code></p>
                     <p class="text-muted small mb-1">Gunakan format Excel (.xlsx/.xls) dengan header di baris pertama.</p>
                     <p class="text-muted small mb-0">Jika kolom category dikosongkan, item otomatis dimasukkan ke kategori "Tanpa Kategori".</p>
                 </div>
@@ -286,6 +294,7 @@
         const modal          = modalEl ? new bootstrap.Modal(modalEl) : null;
         const formSku        = document.getElementById('item_sku');
         const formName       = document.getElementById('item_name');
+        const formUom        = document.getElementById('item_uom');
         const formCategory   = document.getElementById('item_category_id');
         const formId         = document.getElementById('item_id');
         const formAddress    = document.getElementById('item_address');
@@ -395,7 +404,7 @@
             }
         };
 
-        const errorIds = ['error_sku','error_name','error_category_id','error_address','error_description','error_safety_stock','error_is_active','error_is_bundle','error_components'];
+        const errorIds = ['error_sku','error_name','error_uom','error_category_id','error_address','error_description','error_safety_stock','error_is_active','error_is_bundle','error_components'];
         const clearErrors = () => {
             errorIds.forEach(id => {
                 const el = document.getElementById(id);
@@ -456,6 +465,7 @@
                 { data: null, orderable: false, searchable: false, render: (d, t, r, m) => m.row + m.settings._iDisplayStart + 1 },
                 { data: 'sku' },
                 { data: 'name' },
+                { data: 'uom', render: d => d || 'pcs' },
                 { data: 'is_bundle', render: v => v
                     ? '<span class="badge badge-light-primary">Bundle</span>'
                     : '<span class="badge badge-light-secondary">Regular</span>' },
@@ -519,6 +529,7 @@
             form.reset();
             formId.value = '';
             formSafetyStock && (formSafetyStock.value = 0);
+            formUom && (formUom.value = 'pcs');
             formIsActive.checked = true;
             formIsBundle.checked = false;
             bundleSection.classList.add('d-none');
@@ -542,6 +553,7 @@
                 formId.value = id;
                 formSku && (formSku.value = json.sku || '');
                 formName && (formName.value = json.name || '');
+                formUom && (formUom.value = json.uom || 'pcs');
                 formAddress && (formAddress.value = json.address || '');
                 formDescription && (formDescription.value = json.description || '');
                 formSafetyStock && (formSafetyStock.value = json.safety_stock ?? 0);

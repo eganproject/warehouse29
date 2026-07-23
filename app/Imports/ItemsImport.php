@@ -47,6 +47,7 @@ class ItemsImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
             $stock = $this->parseStock($row);
             $safetyStock = $this->parseSafetyStock($row);
             $activeStatus = $this->parseActiveStatus($row);
+            $uom = $this->parseUom($row);
 
             if ($sku === '' || $name === '') {
                 continue;
@@ -69,6 +70,9 @@ class ItemsImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
                 'category_id' => $catId,
                 'description' => $description,
             ];
+            if ($uom !== null) {
+                $payload['uom'] = $uom;
+            }
             if (isset($row['address'])) {
                 $payload['address'] = $address;
             }
@@ -178,6 +182,19 @@ class ItemsImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
         }
         if (in_array($normalized, ['0', 'false', 'no', 'n', 'tidak aktif', 'nonaktif', 'inactive'], true)) {
             return false;
+        }
+
+        return null;
+    }
+
+    protected function parseUom($row): ?string
+    {
+        foreach (['uom', 'satuan', 'unit'] as $key) {
+            $value = $row instanceof Collection ? $row->get($key) : ($row[$key] ?? null);
+            $value = strtolower(trim((string) $value));
+            if ($value !== '') {
+                return mb_substr($value, 0, 30);
+            }
         }
 
         return null;

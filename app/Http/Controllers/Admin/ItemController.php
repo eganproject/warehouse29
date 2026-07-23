@@ -40,6 +40,7 @@ class ItemController extends Controller
             'id' => $item->id,
             'sku' => $item->sku,
             'name' => $item->name,
+            'uom' => $item->uom ?? 'pcs',
             'category_id' => $item->category_id,
             'address' => $item->address ?? '',
             'description' => $item->description ?? '',
@@ -99,6 +100,7 @@ class ItemController extends Controller
                 'id' => $i->id,
                 'sku' => $i->sku,
                 'name' => $i->name,
+                'uom' => $i->uom ?? 'pcs',
                 'category' => $i->category?->name ?? '-',
                 'category_id' => $i->category_id,
                 'address' => $i->address ?? '',
@@ -122,6 +124,7 @@ class ItemController extends Controller
         $validated = $request->validate([
             'sku' => ['required', 'string', 'max:100', 'unique:items,sku'],
             'name' => ['required', 'string', 'max:150'],
+            'uom' => ['nullable', 'string', 'max:30'],
             'category_id' => ['nullable', 'integer', 'min:0', function($attr, $value, $fail) {
                 if ((int)$value === 0) return;
                 if (!Category::where('id', $value)->exists()) {
@@ -155,6 +158,7 @@ class ItemController extends Controller
         }
         $validated['is_bundle'] = $isBundle;
         $validated['is_active'] = $isActive;
+        $validated['uom'] = strtolower(trim((string) ($validated['uom'] ?? ''))) ?: 'pcs';
         unset($validated['components']);
 
         DB::beginTransaction();
@@ -175,6 +179,7 @@ class ItemController extends Controller
                     'id' => $item->id,
                     'sku' => $item->sku,
                     'name' => $item->name,
+                    'uom' => $item->uom,
                     'category_id' => $item->category_id,
                     'is_bundle' => $item->is_bundle,
                     'is_active' => $item->is_active,
@@ -197,6 +202,7 @@ class ItemController extends Controller
         $validated = $request->validate([
             'sku' => ['required', 'string', 'max:100', Rule::unique('items', 'sku')->ignore($item->id)],
             'name' => ['required', 'string', 'max:150'],
+            'uom' => ['nullable', 'string', 'max:30'],
             'category_id' => ['nullable', 'integer', 'min:0', function($attr, $value, $fail) {
                 if ((int)$value === 0) return;
                 if (!Category::where('id', $value)->exists()) {
@@ -235,6 +241,7 @@ class ItemController extends Controller
         }
         $validated['is_bundle'] = $isBundle;
         $validated['is_active'] = $isActive;
+        $validated['uom'] = strtolower(trim((string) ($validated['uom'] ?? ''))) ?: 'pcs';
         unset($validated['components']);
 
         DB::beginTransaction();
@@ -259,6 +266,7 @@ class ItemController extends Controller
                     'id' => $item->id,
                     'sku' => $item->sku,
                     'name' => $item->name,
+                    'uom' => $item->uom,
                     'category_id' => $item->category_id,
                     'is_bundle' => $item->is_bundle,
                     'is_active' => $item->is_active,
