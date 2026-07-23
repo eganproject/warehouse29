@@ -134,6 +134,15 @@ class DamagedGoodsController extends Controller
             });
         }
 
+        $availability = $request->input('availability', 'all');
+        if ($availability === 'available') {
+            $query->whereRaw('damaged_item_stocks.stock - COALESCE(damaged_item_stocks.reserved_stock, 0) > 0');
+        } elseif ($availability === 'reserved') {
+            $query->where('damaged_item_stocks.reserved_stock', '>', 0);
+        } elseif ($availability === 'unavailable') {
+            $query->whereRaw('damaged_item_stocks.stock - COALESCE(damaged_item_stocks.reserved_stock, 0) <= 0');
+        }
+
         $recordsTotal = Item::join('damaged_item_stocks', 'damaged_item_stocks.item_id', '=', 'items.id')
             ->where('items.is_active', true)
             ->where('damaged_item_stocks.stock', '>', 0)->count();
@@ -184,6 +193,27 @@ class DamagedGoodsController extends Controller
                             ->orWhere('name', 'like', "%{$search}%");
                     });
             });
+        }
+
+        $status = $request->input('status');
+        if (in_array($status, ['pending', 'approved'], true)) {
+            $query->where('damaged_goods.status', $status);
+        }
+
+        $sourceType = $request->input('source_type');
+        if (in_array($sourceType, ['display', 'inbound_return'], true)) {
+            $query->where('damaged_goods.source_type', $sourceType);
+        }
+
+        try {
+            if ($request->input('date_from')) {
+                $query->where('damaged_goods.transacted_at', '>=', Carbon::parse($request->input('date_from'))->startOfDay());
+            }
+            if ($request->input('date_to')) {
+                $query->where('damaged_goods.transacted_at', '<=', Carbon::parse($request->input('date_to'))->endOfDay());
+            }
+        } catch (\Throwable) {
+            // Ignore invalid date filters.
         }
 
         $recordsTotal = DamagedGood::count();

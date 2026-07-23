@@ -12,6 +12,21 @@
 @endphp
 
 @section('content')
+<ul class="nav nav-tabs nav-line-tabs nav-line-tabs-2x mb-6" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#damaged_stock_tab" type="button" role="tab">
+            Saldo Stok Rusak
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#damaged_transactions_tab" type="button" role="tab">
+            Transaksi Barang Rusak
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content">
+<div class="tab-pane fade show active" id="damaged_stock_tab" role="tabpanel">
 {{-- Card Saldo Stok Barang Rusak --}}
 <div class="card mb-6">
     <div class="card-header border-0 pt-6">
@@ -19,9 +34,16 @@
             <h3 class="fw-bolder text-dark">Saldo Stok Barang Rusak</h3>
         </div>
         <div class="card-toolbar">
-            <div class="d-flex align-items-center position-relative my-1">
+            <div class="d-flex align-items-center gap-2 flex-wrap my-1">
                 <i class="fa-solid fa-magnifying-glass position-absolute ms-5 text-gray-500"></i>
                 <input type="text" class="form-control form-control-solid w-250px ps-14" placeholder="Cari SKU / Nama" id="stock_summary_search" />
+                <select class="form-select form-select-solid w-175px" id="stock_summary_availability">
+                    <option value="all">Semua Saldo</option>
+                    <option value="available">Masih Tersedia</option>
+                    <option value="reserved">Ada Reservasi</option>
+                    <option value="unavailable">Tidak Tersedia</option>
+                </select>
+                <button type="button" class="btn btn-light" id="stock_summary_reset">Reset</button>
             </div>
         </div>
     </div>
@@ -42,12 +64,14 @@
         </div>
     </div>
 </div>
+</div>
 
 {{-- Card Transaksi Barang Rusak --}}
+<div class="tab-pane fade" id="damaged_transactions_tab" role="tabpanel">
 <div class="card">
     <div class="card-header border-0 pt-6">
         <div class="card-title">
-            <div class="d-flex align-items-center position-relative my-1">
+            <div class="d-flex align-items-center gap-2 flex-wrap my-1">
                 <span class="svg-icon svg-icon-1 position-absolute ms-6">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
                         <rect opacity="0.5" x="17.0365" y="15.1223" width="8.15546" height="2" rx="1" transform="rotate(45 17.0365 15.1223)" fill="black" />
@@ -55,6 +79,20 @@
                     </svg>
                 </span>
                 <input type="text" class="form-control form-control-solid w-250px ps-14" placeholder="Search" data-kt-filter="search" />
+                <select class="form-select form-select-solid w-150px" id="damage_filter_status">
+                    <option value="">Semua Status</option>
+                    <option value="pending">Menunggu</option>
+                    <option value="approved">Disetujui</option>
+                </select>
+                <select class="form-select form-select-solid w-175px" id="damage_filter_source">
+                    <option value="">Semua Sumber</option>
+                    <option value="display">Display</option>
+                    <option value="inbound_return">Retur Inbound</option>
+                </select>
+                <input type="text" class="form-control form-control-solid w-140px" id="damage_filter_date_from" placeholder="Dari" />
+                <input type="text" class="form-control form-control-solid w-140px" id="damage_filter_date_to" placeholder="Sampai" />
+                <button type="button" class="btn btn-light" id="damage_filter_apply">Filter</button>
+                <button type="button" class="btn btn-light" id="damage_filter_reset">Reset</button>
             </div>
         </div>
         <div class="card-toolbar">
@@ -86,7 +124,9 @@
         </div>
     </div>
 </div>
+</div>
 {{-- End Card Transaksi --}}
+</div>
 
 <div class="modal fade" id="modal_damaged_goods" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered mw-900px">
@@ -209,6 +249,8 @@
     document.addEventListener('DOMContentLoaded', () => {
         // --- Stock Summary Table ---
         const summarySearchInput = document.getElementById('stock_summary_search');
+        const summaryAvailabilityEl = document.getElementById('stock_summary_availability');
+        const summaryResetBtn = document.getElementById('stock_summary_reset');
         const summaryTable = $('#stock_summary_table').DataTable({
             processing: true,
             serverSide: true,
@@ -217,7 +259,10 @@
             ajax: {
                 url: stockSummaryUrl,
                 dataSrc: 'data',
-                data: params => { params.q = summarySearchInput?.value || ''; },
+                data: params => {
+                    params.q = summarySearchInput?.value || '';
+                    params.availability = summaryAvailabilityEl?.value || 'all';
+                },
             },
             columns: [
                 { data: 'sku' },
@@ -245,6 +290,12 @@
             language: { emptyTable: 'Tidak ada stok barang rusak' },
         });
         summarySearchInput?.addEventListener('keyup', () => summaryTable.ajax.reload());
+        summaryAvailabilityEl?.addEventListener('change', () => summaryTable.ajax.reload());
+        summaryResetBtn?.addEventListener('click', () => {
+            if (summarySearchInput) summarySearchInput.value = '';
+            if (summaryAvailabilityEl) summaryAvailabilityEl.value = 'all';
+            summaryTable.ajax.reload();
+        });
 
         // --- Transaction Table ---
         const tableEl = $('#damaged_goods_table');
@@ -257,7 +308,15 @@
         const openBtn = document.getElementById('btn_open_damage');
         const modalTitle = document.getElementById('damage_modal_title');
         const transactedAtEl = document.getElementById('damage_transacted_at');
+        const statusFilterEl = document.getElementById('damage_filter_status');
+        const sourceFilterEl = document.getElementById('damage_filter_source');
+        const dateFromEl = document.getElementById('damage_filter_date_from');
+        const dateToEl = document.getElementById('damage_filter_date_to');
+        const filterApplyBtn = document.getElementById('damage_filter_apply');
+        const filterResetBtn = document.getElementById('damage_filter_reset');
         let fpTransacted = null;
+        let fpFrom = null;
+        let fpTo = null;
 
         const formatDateTime = (date) => {
             const pad = (n) => String(n).padStart(2, '0');
@@ -417,6 +476,10 @@
         if (typeof flatpickr !== 'undefined' && transactedAtEl) {
             fpTransacted = flatpickr(transactedAtEl, { enableTime: true, dateFormat: 'Y-m-d H:i', allowInput: true });
         }
+        if (typeof flatpickr !== 'undefined') {
+            if (dateFromEl) fpFrom = flatpickr(dateFromEl, { dateFormat: 'Y-m-d', allowInput: true });
+            if (dateToEl) fpTo = flatpickr(dateToEl, { dateFormat: 'Y-m-d', allowInput: true });
+        }
 
         if (!tableEl.length || !$.fn.DataTable) {
             console.error('DataTables unavailable');
@@ -433,6 +496,10 @@
                 dataSrc: 'data',
                 data: function(params) {
                     params.q = searchInput?.value || '';
+                    params.status = statusFilterEl?.value || '';
+                    params.source_type = sourceFilterEl?.value || '';
+                    if (dateFromEl?.value) params.date_from = dateFromEl.value;
+                    if (dateToEl?.value) params.date_to = dateToEl.value;
                 }
             },
             columns: [
@@ -479,6 +546,24 @@
 
         const reloadTable = () => { dt.ajax.reload(); summaryTable.ajax.reload(); };
         searchInput?.addEventListener('keyup', reloadTable);
+        filterApplyBtn?.addEventListener('click', reloadTable);
+        statusFilterEl?.addEventListener('change', reloadTable);
+        sourceFilterEl?.addEventListener('change', reloadTable);
+        filterResetBtn?.addEventListener('click', () => {
+            if (searchInput) searchInput.value = '';
+            if (statusFilterEl) statusFilterEl.value = '';
+            if (sourceFilterEl) sourceFilterEl.value = '';
+            if (fpFrom) fpFrom.clear(); else if (dateFromEl) dateFromEl.value = '';
+            if (fpTo) fpTo.clear(); else if (dateToEl) dateToEl.value = '';
+            reloadTable();
+        });
+
+        document.querySelectorAll('[data-bs-toggle="tab"]').forEach((tab) => {
+            tab.addEventListener('shown.bs.tab', () => {
+                summaryTable.columns.adjust();
+                dt.columns.adjust();
+            });
+        });
 
         // --- Import Excel ---
         const importBtn = document.getElementById('btn_import_damage');
