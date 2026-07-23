@@ -33,6 +33,7 @@ use App\Http\Controllers\Admin\MenuController;
 use App\Http\Controllers\Admin\PermissionController;
 use App\Http\Controllers\Admin\DivisiController;
 use App\Http\Controllers\Admin\KurirController;
+use App\Http\Controllers\Admin\UnitOfMeasureController;
 use App\Http\Controllers\Admin\QcScanInputController;
 use App\Http\Controllers\Mobile\StockOpnameMobileController;
 use App\Http\Controllers\Picker\PickerDashboardController;
@@ -139,6 +140,9 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         // Kurir
         Route::get('/kurir/data', [KurirController::class, 'data'])->name('kurir.data');
         Route::resource('kurir', KurirController::class)->except(['create','show','edit'])->names('kurir');
+
+        Route::get('/unit-of-measures/data', [UnitOfMeasureController::class, 'data'])->name('unit-of-measures.data');
+        Route::resource('unit-of-measures', UnitOfMeasureController::class)->except(['create', 'show', 'edit'])->names('unit-of-measures');
 
         // Menus DataTables
         Route::get('/menus/data', [MenuController::class, 'data'])->name('menus.data');

@@ -5,6 +5,7 @@ namespace App\Imports;
 use App\Models\Category;
 use App\Models\Item;
 use App\Models\ItemStock;
+use App\Models\UnitOfMeasure;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 use Maatwebsite\Excel\Concerns\SkipsEmptyRows;
@@ -72,6 +73,7 @@ class ItemsImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
             ];
             if ($uom !== null) {
                 $payload['uom'] = $uom;
+                UnitOfMeasure::firstOrCreate(['code' => $uom], ['name' => strtoupper($uom)]);
             }
             if (isset($row['address'])) {
                 $payload['address'] = $address;

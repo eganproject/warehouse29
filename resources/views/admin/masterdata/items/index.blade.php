@@ -143,8 +143,12 @@
                     </div>
                     <div class="fv-row mb-7">
                         <label class="required fs-6 fw-bold form-label mb-2">Satuan (UOM)</label>
-                        <input type="text" class="form-control form-control-solid" name="uom" id="item_uom" value="pcs" maxlength="30" required />
-                        <div class="form-text">Contoh: pcs, box, kg, liter, roll.</div>
+                        <select class="form-select form-select-solid" name="uom" id="item_uom" required>
+                            @foreach($uoms as $uom)
+                                <option value="{{ $uom->code }}" @selected($uom->code === 'pcs')>{{ $uom->code }} — {{ $uom->name }}</option>
+                            @endforeach
+                        </select>
+                        <div class="form-text">Kelola pilihan satuan melalui menu Master Data → Satuan (UOM).</div>
                         <div class="invalid-feedback" id="error_uom"></div>
                     </div>
                     <div class="fv-row mb-7">
@@ -435,6 +439,7 @@
             $(statusFilter).select2({ placeholder: 'Semua', allowClear: true, width: '100%' })
                 .on('select2:opening select2:closing select2:close', e => e.stopPropagation());
             $(formCategory).select2({ placeholder: 'Pilih kategori', allowClear: true, width: '100%' });
+            $(formUom).select2({ placeholder: 'Pilih satuan', width: '100%' });
         }
 
         if (statusFilter && defaultStatus) {
@@ -529,7 +534,10 @@
             form.reset();
             formId.value = '';
             formSafetyStock && (formSafetyStock.value = 0);
-            formUom && (formUom.value = 'pcs');
+            if (formUom) {
+                formUom.value = 'pcs';
+                if (typeof $ !== 'undefined' && $(formUom).data('select2')) $(formUom).trigger('change');
+            }
             formIsActive.checked = true;
             formIsBundle.checked = false;
             bundleSection.classList.add('d-none');
@@ -553,7 +561,10 @@
                 formId.value = id;
                 formSku && (formSku.value = json.sku || '');
                 formName && (formName.value = json.name || '');
-                formUom && (formUom.value = json.uom || 'pcs');
+                if (formUom) {
+                    formUom.value = json.uom || 'pcs';
+                    if (typeof $ !== 'undefined' && $(formUom).data('select2')) $(formUom).trigger('change');
+                }
                 formAddress && (formAddress.value = json.address || '');
                 formDescription && (formDescription.value = json.description || '');
                 formSafetyStock && (formSafetyStock.value = json.safety_stock ?? 0);

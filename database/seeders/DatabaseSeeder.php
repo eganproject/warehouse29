@@ -22,6 +22,7 @@ class DatabaseSeeder extends Seeder
             CategoryItemSeeder::class,
             ItemStockSeeder::class,
             ItemUomSeeder::class,
+            UnitOfMeasureSeeder::class,
             StoreSeeder::class,
         ]);
     }

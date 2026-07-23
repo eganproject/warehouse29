@@ -9,6 +9,7 @@ use App\Models\InboundTransaction;
 use App\Models\Item;
 use App\Models\ItemBundle;
 use App\Models\ItemStock;
+use App\Models\UnitOfMeasure;
 use App\Imports\ItemsImport;
 use App\Support\StockService;
 use Maatwebsite\Excel\Facades\Excel;
@@ -124,7 +125,7 @@ class ItemController extends Controller
         $validated = $request->validate([
             'sku' => ['required', 'string', 'max:100', 'unique:items,sku'],
             'name' => ['required', 'string', 'max:150'],
-            'uom' => ['nullable', 'string', 'max:30'],
+            'uom' => ['required', 'string', Rule::exists('unit_of_measures', 'code')],
             'category_id' => ['nullable', 'integer', 'min:0', function($attr, $value, $fail) {
                 if ((int)$value === 0) return;
                 if (!Category::where('id', $value)->exists()) {
@@ -158,7 +159,7 @@ class ItemController extends Controller
         }
         $validated['is_bundle'] = $isBundle;
         $validated['is_active'] = $isActive;
-        $validated['uom'] = strtolower(trim((string) ($validated['uom'] ?? ''))) ?: 'pcs';
+        $validated['uom'] = strtolower(trim((string) $validated['uom']));
         unset($validated['components']);
 
         DB::beginTransaction();
@@ -202,7 +203,7 @@ class ItemController extends Controller
         $validated = $request->validate([
             'sku' => ['required', 'string', 'max:100', Rule::unique('items', 'sku')->ignore($item->id)],
             'name' => ['required', 'string', 'max:150'],
-            'uom' => ['nullable', 'string', 'max:30'],
+            'uom' => ['required', 'string', Rule::exists('unit_of_measures', 'code')],
             'category_id' => ['nullable', 'integer', 'min:0', function($attr, $value, $fail) {
                 if ((int)$value === 0) return;
                 if (!Category::where('id', $value)->exists()) {
@@ -241,7 +242,7 @@ class ItemController extends Controller
         }
         $validated['is_bundle'] = $isBundle;
         $validated['is_active'] = $isActive;
-        $validated['uom'] = strtolower(trim((string) ($validated['uom'] ?? ''))) ?: 'pcs';
+        $validated['uom'] = strtolower(trim((string) $validated['uom']));
         unset($validated['components']);
 
         DB::beginTransaction();
@@ -552,9 +553,11 @@ class ItemController extends Controller
     private function itemListView(string $pageTitle, string $defaultStatus = '')
     {
         $categories = Category::orderBy('name')->get(['id', 'name']);
+        $uoms = UnitOfMeasure::orderBy('code')->get(['code', 'name']);
 
         return view('admin.masterdata.items.index', [
             'categories' => $categories,
+            'uoms' => $uoms,
             'pageTitle' => $pageTitle,
             'defaultStatus' => $defaultStatus,
         ]);
