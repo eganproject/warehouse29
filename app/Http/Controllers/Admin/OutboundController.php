@@ -313,6 +313,8 @@ class OutboundController extends Controller
                     }
                 }
 
+                $this->assertOutboundReturnStockAvailable($group['items']);
+
                 $tx = OutboundTransaction::create([
                     'code' => $this->generateCode('OUT-RET'),
                     'type' => 'return',
@@ -328,12 +330,15 @@ class OutboundController extends Controller
                     OutboundItem::create([
                         'outbound_transaction_id' => $tx->id,
                         'item_id' => $row['item_id'],
+                        'stock_source' => $row['stock_source'] ?? 'regular',
                         'qty' => $row['qty'],
                         'note' => $row['note'] ?? null,
                     ]);
                     $createdItems++;
 
                 }
+
+                $this->syncDamagedReturnAllocation($tx, $group['items']);
             }
 
             DB::commit();

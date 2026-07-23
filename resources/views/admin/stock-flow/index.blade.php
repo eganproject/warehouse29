@@ -456,10 +456,13 @@
                         <div class="text-muted fs-7">
                             @if(($typeDefault ?? '') === 'return' && isset($routeMap['receipt']))
                                 Header minimal: <strong>sku</strong>, <strong>qty_resi</strong>, <strong>qty_diterima</strong>, <strong>qty_bagus</strong>, <strong>qty_rusak</strong>.<br>
+                            @elseif(($typeDefault ?? '') === 'return')
+                                Header minimal: <strong>sku</strong>, <strong>qty</strong>.
+                                Opsional: <strong>stock_source</strong> dengan nilai <code>regular</code> (default) atau <code>damaged</code>.<br>
                             @else
                                 Header minimal: <strong>sku</strong>, <strong>qty</strong>.<br>
                             @endif
-                            Opsional: <strong>no_resi</strong>, <strong>id_pesanan</strong>, <strong>return_reason</strong>, <strong>return_reason_note</strong>, <strong>ref_no</strong>, <strong>note</strong>, <strong>item_note</strong>, <strong>transacted_at</strong>.
+                            Opsional: <strong>ref_no</strong>, <strong>note</strong>, <strong>item_note</strong>, <strong>transacted_at</strong>.
                         </div>
                         @if(!empty($templateUrl ?? null))
                             <a href="{{ $templateUrl }}" class="btn btn-sm btn-light-success mt-3">Download Template Excel</a>

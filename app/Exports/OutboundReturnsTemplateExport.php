@@ -14,6 +14,7 @@ class OutboundReturnsTemplateExport implements FromArray, WithHeadings, ShouldAu
     {
         return [
             'sku',
+            'stock_source',
             'qty',
             'ref_no',
             'note',
@@ -29,9 +30,9 @@ class OutboundReturnsTemplateExport implements FromArray, WithHeadings, ShouldAu
         $defaults = $samples ?: ['SKU-CONTOH-1', 'SKU-CONTOH-2'];
 
         return [
-            [$defaults[0], 4, 'RET-001', 'Retur outbound dari customer', 'Barang dikembalikan', $now],
+            [$defaults[0], 'regular', 4, 'RET-001', 'Retur outbound dari customer', 'Barang dikembalikan', $now],
             // ref_no sama -> baris ini tergabung dalam 1 transaksi retur
-            [$defaults[1] ?? $defaults[0], 2, 'RET-001', '', '', $now],
+            [$defaults[1] ?? $defaults[0], 'damaged', 2, 'RET-001', '', 'Retur dari gudang rusak', $now],
         ];
     }
 

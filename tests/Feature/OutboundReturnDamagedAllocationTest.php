@@ -8,7 +8,9 @@ use App\Models\Item;
 use App\Models\ItemStock;
 use App\Models\OutboundTransaction;
 use App\Models\User;
+use App\Imports\OutboundReturnsImport;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Collection;
 use Tests\TestCase;
 
 class OutboundReturnDamagedAllocationTest extends TestCase
@@ -86,5 +88,26 @@ class OutboundReturnDamagedAllocationTest extends TestCase
             ])
             ->assertStatus(422)
             ->assertJsonValidationErrors(['items']);
+    }
+
+    public function test_outbound_return_import_keeps_regular_and_damaged_rows_separate(): void
+    {
+        $item = Item::create([
+            'sku' => 'IMP-RET-001',
+            'name' => 'Imported Return Item',
+        ]);
+
+        $import = new OutboundReturnsImport();
+        $import->collection(collect([
+            new Collection(['sku' => $item->sku, 'stock_source' => 'regular', 'qty' => 2, 'ref_no' => 'IMP-001']),
+            new Collection(['sku' => $item->sku, 'stock_source' => 'damaged', 'qty' => 3, 'ref_no' => 'IMP-001']),
+        ]));
+
+        $items = $import->groups['IMP-001']['items'];
+        $this->assertCount(2, $items);
+        $this->assertSame('regular', $items[0]['stock_source']);
+        $this->assertSame(2, $items[0]['qty']);
+        $this->assertSame('damaged', $items[1]['stock_source']);
+        $this->assertSame(3, $items[1]['qty']);
     }
 }

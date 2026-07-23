@@ -11,7 +11,7 @@ use Maatwebsite\Excel\Concerns\WithHeadingRow;
 
 class OutboundReturnsImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
 {
-    /** @var array<string,array{ref_no:?string,note:?string,transacted_at:?string,items:array<int,array{item_id:int,qty:int,note:?string}>}> */
+    /** @var array<string,array{ref_no:?string,note:?string,transacted_at:?string,items:array<int,array{item_id:int,qty:int,stock_source:string,note:?string}>}> */
     public array $groups = [];
 
     public function collection(Collection $rows)
@@ -26,7 +26,7 @@ class OutboundReturnsImport implements ToCollection, WithHeadingRow, SkipsEmptyR
         $headers = array_keys($first?->toArray() ?? []);
         if (!in_array('sku', $headers, true)) {
             throw ValidationException::withMessages([
-                'file' => 'Header wajib: sku, qty (opsional: ref_no, note, item_note, transacted_at)',
+                'file' => 'Header wajib: sku, qty (opsional: stock_source, ref_no, note, item_note, transacted_at)',
             ]);
         }
         $qtyKey = $this->detectQtyKey($headers);
@@ -67,6 +67,7 @@ class OutboundReturnsImport implements ToCollection, WithHeadingRow, SkipsEmptyR
             $note = trim((string) ($row['note'] ?? ''));
             $itemNote = trim((string) ($row['item_note'] ?? $row['note_item'] ?? ''));
             $transactedAt = trim((string) ($row['transacted_at'] ?? $row['tanggal'] ?? ''));
+            $stockSource = $this->parseStockSource($row, $rowIndex, $sku, $errors);
 
             $groupKey = $ref !== '' ? $ref : '__default__';
             if (!isset($this->groups[$groupKey])) {
@@ -86,16 +87,20 @@ class OutboundReturnsImport implements ToCollection, WithHeadingRow, SkipsEmptyR
             }
 
             $itemId = (int) $skuMap[$sku];
-            if (!isset($this->groups[$groupKey]['items'][$itemId])) {
-                $this->groups[$groupKey]['items'][$itemId] = [
+            // Satu SKU boleh muncul dua kali dalam retur yang sama hanya bila
+            // sumber stoknya berbeda (reguler dan rusak).
+            $itemKey = $itemId.'|'.$stockSource;
+            if (!isset($this->groups[$groupKey]['items'][$itemKey])) {
+                $this->groups[$groupKey]['items'][$itemKey] = [
                     'item_id' => $itemId,
                     'qty' => $qty,
+                    'stock_source' => $stockSource,
                     'note' => $itemNote !== '' ? $itemNote : null,
                 ];
             } else {
-                $this->groups[$groupKey]['items'][$itemId]['qty'] += $qty;
-                if ($itemNote !== '' && empty($this->groups[$groupKey]['items'][$itemId]['note'])) {
-                    $this->groups[$groupKey]['items'][$itemId]['note'] = $itemNote;
+                $this->groups[$groupKey]['items'][$itemKey]['qty'] += $qty;
+                if ($itemNote !== '' && empty($this->groups[$groupKey]['items'][$itemKey]['note'])) {
+                    $this->groups[$groupKey]['items'][$itemKey]['note'] = $itemNote;
                 }
             }
         }
@@ -154,5 +159,27 @@ class OutboundReturnsImport implements ToCollection, WithHeadingRow, SkipsEmptyR
         }
         $value = is_numeric($raw) ? (int) $raw : (int) preg_replace('/[^0-9\-]/', '', (string) $raw);
         return $value > 0 ? $value : 0;
+    }
+
+    private function parseStockSource($row, int $rowIndex, string $sku, array &$errors): string
+    {
+        $raw = trim((string) ($row['stock_source'] ?? $row['sumber_stok'] ?? ''));
+        if ($raw === '') {
+            return 'regular';
+        }
+
+        $normalized = strtolower(str_replace([' ', '-'], '_', $raw));
+        $source = match ($normalized) {
+            'regular', 'reguler', 'gudang_reguler' => 'regular',
+            'damaged', 'rusak', 'gudang_rusak' => 'damaged',
+            default => null,
+        };
+
+        if ($source === null) {
+            $errors[] = "Baris {$rowIndex}: stock_source untuk SKU {$sku} harus regular atau damaged";
+            return 'regular';
+        }
+
+        return $source;
     }
 }
