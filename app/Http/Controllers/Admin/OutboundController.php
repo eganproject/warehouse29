@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\ItemBundle;
 use App\Models\DamagedItemStock;
+use App\Models\DamagedAllocation;
+use App\Models\DamagedAllocationItem;
 use App\Models\OutboundItem;
 use App\Models\OutboundTransaction;
 use App\Models\Item;
@@ -176,7 +178,7 @@ class OutboundController extends Controller
 
     public function manualsViewSuratJalan(int $id)
     {
-        $tx = OutboundTransaction::with(['items.item', 'creator', 'approver', 'suratJalan.creator'])
+        $tx = OutboundTransaction::with(['items.item', 'creator', 'approver', 'suratJalan.creator', 'damagedAllocation'])
             ->where('type', 'manual')
             ->findOrFail($id);
 
@@ -589,6 +591,8 @@ class OutboundController extends Controller
 
             }
 
+            $this->syncDamagedReturnAllocation($tx, $validated['items']);
+
             DB::commit();
         } catch (ValidationException $e) {
             DB::rollBack();
@@ -627,6 +631,8 @@ class OutboundController extends Controller
             DamagedStockMutation::where('source_type', 'outbound')->where('source_id', $tx->id)->delete();
             OutboundItem::where('outbound_transaction_id', $tx->id)->delete();
 
+            $this->removeDamagedReturnAllocation($tx);
+
             $tx->update([
                 'ref_no' => $validated['ref_no'] ?? null,
                 'note' => $validated['note'] ?? null,
@@ -643,6 +649,8 @@ class OutboundController extends Controller
                 ]);
 
             }
+
+            $this->syncDamagedReturnAllocation($tx, $validated['items']);
 
             DB::commit();
         } catch (ValidationException $e) {
@@ -675,6 +683,7 @@ class OutboundController extends Controller
             StockMutation::where('source_type', 'outbound')->where('source_id', $tx->id)->delete();
             DamagedStockService::rollbackBySource('outbound', $tx->id);
             DamagedStockMutation::where('source_type', 'outbound')->where('source_id', $tx->id)->delete();
+            $this->removeDamagedReturnAllocation($tx);
             $tx->delete();
 
             DB::commit();
@@ -718,8 +727,28 @@ class OutboundController extends Controller
                         'stock_source' => $row->stock_source ?? 'regular',
                     ])->all()
                 );
+                $hasDamagedItem = $tx->items->contains(fn ($row) => ($row->stock_source ?? 'regular') === 'damaged');
+                if ($hasDamagedItem) {
+                    $allocation = DamagedAllocation::with('items')
+                        ->where('outbound_transaction_id', $tx->id)
+                        ->lockForUpdate()
+                        ->first();
+                    $this->assertDamagedReturnAllocationMatches($tx, $allocation);
+                }
             }
             $this->postStockMovements($tx, $type);
+
+            if ($type === 'return') {
+                $allocation = DamagedAllocation::where('outbound_transaction_id', $tx->id)
+                    ->lockForUpdate()
+                    ->first();
+                if ($allocation && ($allocation->status ?? 'pending') !== 'approved') {
+                    $allocation->status = 'approved';
+                    $allocation->approved_at = now();
+                    $allocation->approved_by = auth()->id();
+                    $allocation->save();
+                }
+            }
 
             $tx->status = 'approved';
             $tx->approved_at = now();
@@ -784,6 +813,109 @@ class OutboundController extends Controller
                     'items' => "Stok gudang reguler tidak mencukupi untuk {$sku}. Tersedia {$available}, diminta {$qty}.",
                 ]);
             }
+        }
+    }
+
+    /**
+     * A manual outbound return may still use damaged stock, but its damaged
+     * rows are always backed by one linked allocation and reservation.
+     */
+    private function syncDamagedReturnAllocation(OutboundTransaction $tx, array $items): void
+    {
+        if ($tx->type !== 'return') {
+            return;
+        }
+
+        $damagedItems = collect($items)
+            ->where('stock_source', 'damaged')
+            ->values();
+        $existing = DamagedAllocation::with('items')
+            ->where('outbound_transaction_id', $tx->id)
+            ->lockForUpdate()
+            ->first();
+
+        if ($existing) {
+            foreach ($existing->items as $row) {
+                DamagedStockService::releaseReservation($row->item_id, $row->qty);
+            }
+            DamagedAllocationItem::where('damaged_allocation_id', $existing->id)->delete();
+        }
+
+        if ($damagedItems->isEmpty()) {
+            if ($existing) {
+                $existing->delete();
+            }
+            return;
+        }
+
+        $allocation = $existing ?: DamagedAllocation::create([
+            'code' => $this->generateCode('DMG-ALC'),
+            'allocation_type' => 'return_vendor',
+            'ref_no' => $tx->code,
+            'transacted_at' => $tx->transacted_at ?? now(),
+            'note' => 'Alokasi otomatis untuk retur outbound '.$tx->code,
+            'created_by' => auth()->id(),
+            'status' => 'pending',
+            'outbound_transaction_id' => $tx->id,
+        ]);
+
+        if ($existing) {
+            $allocation->update([
+                'ref_no' => $tx->code,
+                'transacted_at' => $tx->transacted_at ?? now(),
+                'status' => 'pending',
+            ]);
+        }
+
+        foreach ($damagedItems as $row) {
+            DamagedAllocationItem::create([
+                'damaged_allocation_id' => $allocation->id,
+                'item_id' => $row['item_id'],
+                'qty' => $row['qty'],
+                'note' => $row['note'] ?? null,
+            ]);
+            DamagedStockService::reserve($row['item_id'], $row['qty']);
+        }
+    }
+
+    private function removeDamagedReturnAllocation(OutboundTransaction $tx): void
+    {
+        $allocation = DamagedAllocation::with('items')
+            ->where('outbound_transaction_id', $tx->id)
+            ->lockForUpdate()
+            ->first();
+        if (! $allocation || ($allocation->status ?? 'pending') === 'approved') {
+            return;
+        }
+
+        foreach ($allocation->items as $row) {
+            DamagedStockService::releaseReservation($row->item_id, $row->qty);
+        }
+        $allocation->delete();
+    }
+
+    private function assertDamagedReturnAllocationMatches(OutboundTransaction $tx, ?DamagedAllocation $allocation): void
+    {
+        if (! $allocation || ($allocation->allocation_type ?? '') !== 'return_vendor') {
+            throw ValidationException::withMessages([
+                'items' => 'Retur outbound dari gudang rusak wajib memiliki alokasi barang rusak yang terkait.',
+            ]);
+        }
+
+        $returnItems = $tx->items
+            ->where('stock_source', 'damaged')
+            ->mapWithKeys(fn ($row) => [(int) $row->item_id => (int) $row->qty])
+            ->all();
+        $allocationItems = $allocation->items
+            ->mapWithKeys(fn ($row) => [(int) $row->item_id => (int) $row->qty])
+            ->all();
+        ksort($returnItems);
+        ksort($allocationItems);
+
+        if ($returnItems !== $allocationItems) {
+            throw ValidationException::withMessages([
+                'items' => 'Item atau qty retur barang rusak tidak sesuai dengan alokasi terkait.',
+            ]);
         }
     }
 

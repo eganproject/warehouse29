@@ -12,6 +12,7 @@
 @php($suratJalan = $isManualOutbound ? ($transaction->suratJalan ?? null) : null)
 @php($outboundReturnRegularQty = $isOutboundReturn ? $transaction->items->where('stock_source', '!=', 'damaged')->sum('qty') : 0)
 @php($outboundReturnDamagedQty = $isOutboundReturn ? $transaction->items->where('stock_source', 'damaged')->sum('qty') : 0)
+@php($damagedAllocation = $isOutboundReturn ? ($transaction->damagedAllocation ?? null) : null)
 
 @if($isManualOutbound)
 <style>
@@ -287,6 +288,15 @@
                     @endif
                 </div>
             </div>
+            @if($damagedAllocation)
+                <div class="alert alert-light-primary d-flex align-items-center p-5 mb-6">
+                    <i class="fas fa-link fs-2 me-4"></i>
+                    <div>
+                        <div class="fw-bold">Terhubung ke Alokasi Barang Rusak {{ $damagedAllocation->code }}</div>
+                        <div class="text-muted">Alokasi menjaga reservasi stok rusak sampai retur outbound disetujui.</div>
+                    </div>
+                </div>
+            @endif
         @endif
 
         @if($isInboundReturn && $isApproved)

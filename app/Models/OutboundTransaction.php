@@ -45,4 +45,9 @@ class OutboundTransaction extends Model
     {
         return $this->hasOne(SuratJalan::class, 'outbound_transaction_id');
     }
+
+    public function damagedAllocation()
+    {
+        return $this->hasOne(DamagedAllocation::class, 'outbound_transaction_id');
+    }
 }
