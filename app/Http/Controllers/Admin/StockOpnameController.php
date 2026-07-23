@@ -60,9 +60,16 @@ class StockOpnameController extends Controller
             });
         }
 
+        $stockScope = $request->input('stock_scope');
+        if (in_array($stockScope, ['regular', 'damaged'], true)) {
+            $baseQuery->where('stock_opnames.stock_scope', $stockScope);
+        }
+
         $this->applyDateFilter($baseQuery, $request);
 
-        $recordsTotal = StockOpname::count();
+        $recordsTotal = StockOpname::query()
+            ->when(in_array($stockScope, ['regular', 'damaged'], true), fn ($query) => $query->where('stock_scope', $stockScope))
+            ->count();
         $recordsFiltered = (clone $baseQuery)->distinct('stock_opnames.id')->count('stock_opnames.id');
 
         $query = (clone $baseQuery)

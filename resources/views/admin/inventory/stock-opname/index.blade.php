@@ -29,6 +29,11 @@
             <div class="d-flex align-items-center gap-2 me-4">
                 <input type="text" class="form-control form-control-solid w-150px" id="filter_date_from" placeholder="Dari" />
                 <input type="text" class="form-control form-control-solid w-150px" id="filter_date_to" placeholder="Sampai" />
+                <select class="form-select form-select-solid w-175px" id="filter_stock_scope">
+                    <option value="">Semua Jenis Stok</option>
+                    <option value="regular">Stok Reguler</option>
+                    <option value="damaged">Stok Barang Rusak</option>
+                </select>
                 <button type="button" class="btn btn-light" id="filter_apply">Filter</button>
                 <button type="button" class="btn btn-light" id="filter_reset">Reset</button>
             </div>
@@ -141,6 +146,7 @@
         const stockScopeHelpEl = document.getElementById('opname_stock_scope_help');
         const dateFromEl = document.getElementById('filter_date_from');
         const dateToEl = document.getElementById('filter_date_to');
+        const stockScopeFilterEl = document.getElementById('filter_stock_scope');
         const filterApplyBtn = document.getElementById('filter_apply');
         const filterResetBtn = document.getElementById('filter_reset');
         let fpFrom = null;
@@ -360,6 +366,7 @@
                     params.q = searchInput?.value || '';
                     if (dateFromEl?.value) params.date_from = dateFromEl.value;
                     if (dateToEl?.value) params.date_to = dateToEl.value;
+                    params.stock_scope = stockScopeFilterEl?.value || '';
                 }
             },
             columns: [
@@ -409,9 +416,11 @@
         const reloadTable = () => dt.ajax.reload();
         searchInput?.addEventListener('keyup', reloadTable);
         filterApplyBtn?.addEventListener('click', reloadTable);
+        stockScopeFilterEl?.addEventListener('change', reloadTable);
         filterResetBtn?.addEventListener('click', () => {
             if (fpFrom) fpFrom.clear(); else if (dateFromEl) dateFromEl.value = '';
             if (fpTo) fpTo.clear(); else if (dateToEl) dateToEl.value = '';
+            if (stockScopeFilterEl) stockScopeFilterEl.value = '';
             reloadTable();
         });
 
