@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Mobile;
 
 use App\Http\Controllers\Controller;
+use App\Models\DamagedItemStock;
 use App\Models\Item;
 use App\Models\ItemStock;
 use App\Models\StockOpname;
@@ -122,10 +123,16 @@ class StockOpnameMobileController extends Controller
                 ]);
             }
 
-            $stock = ItemStock::where('item_id', $validated['item_id'])->lockForUpdate()->first();
+            $stockModel = ($opname->stock_scope ?? 'regular') === 'damaged'
+                ? DamagedItemStock::class
+                : ItemStock::class;
+
+            // Saldo sistem harus mengikuti scope batch. Sebelumnya halaman mobile
+            // selalu memakai ItemStock (reguler), termasuk untuk batch barang rusak.
+            $stock = $stockModel::where('item_id', $validated['item_id'])->lockForUpdate()->first();
             if (!$stock) {
-                ItemStock::create(['item_id' => $validated['item_id'], 'stock' => 0]);
-                $stock = ItemStock::where('item_id', $validated['item_id'])->lockForUpdate()->first();
+                $stockModel::create(['item_id' => $validated['item_id'], 'stock' => 0]);
+                $stock = $stockModel::where('item_id', $validated['item_id'])->lockForUpdate()->first();
             }
 
             $systemQty = (int) ($stock?->stock ?? 0);
@@ -257,6 +264,7 @@ class StockOpnameMobileController extends Controller
             'batch' => [
                 'id' => $opname->id,
                 'code' => $opname->code,
+                'stock_scope' => $opname->stock_scope ?? 'regular',
                 'transacted_at' => $opname->transacted_at?->format('Y-m-d H:i'),
                 'note' => $opname->note,
                 'creator' => $opname->creator?->name,

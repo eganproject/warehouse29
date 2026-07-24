@@ -7,6 +7,7 @@ use App\Models\Category;
 use App\Models\InboundItem;
 use App\Models\InboundTransaction;
 use App\Models\Item;
+use App\Models\StockApiSyncRecord;
 use App\Models\ItemBundle;
 use App\Models\ItemStock;
 use App\Models\UnitOfMeasure;
@@ -123,7 +124,11 @@ class ItemController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'sku' => ['required', 'string', 'max:100', 'unique:items,sku'],
+            'sku' => ['required', 'string', 'max:64', 'unique:items,sku', function ($attribute, $value, $fail) {
+                if (StockApiSyncRecord::where('sku', trim((string) $value))->where('status', 'deleted')->exists()) {
+                    $fail('SKU pernah dihapus dan tidak dapat digunakan kembali demi integritas sinkronisasi API.');
+                }
+            }],
             'name' => ['required', 'string', 'max:150'],
             'uom' => ['required', 'string', Rule::exists('unit_of_measures', 'code')],
             'category_id' => ['nullable', 'integer', 'min:0', function($attr, $value, $fail) {
@@ -201,7 +206,11 @@ class ItemController extends Controller
     public function update(Request $request, Item $item)
     {
         $validated = $request->validate([
-            'sku' => ['required', 'string', 'max:100', Rule::unique('items', 'sku')->ignore($item->id)],
+            'sku' => ['required', 'string', 'max:100', Rule::unique('items', 'sku')->ignore($item->id), function ($attribute, $value, $fail) use ($item) {
+                if (trim((string) $value) !== $item->sku) {
+                    $fail('SKU tidak dapat diubah setelah item dibuat demi integritas sinkronisasi API.');
+                }
+            }],
             'name' => ['required', 'string', 'max:150'],
             'uom' => ['required', 'string', Rule::exists('unit_of_measures', 'code')],
             'category_id' => ['nullable', 'integer', 'min:0', function($attr, $value, $fail) {

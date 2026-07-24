@@ -5,6 +5,7 @@ namespace App\Imports;
 use App\Models\Category;
 use App\Models\Item;
 use App\Models\ItemStock;
+use App\Models\StockApiSyncRecord;
 use App\Models\UnitOfMeasure;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
@@ -52,6 +53,12 @@ class ItemsImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
 
             if ($sku === '' || $name === '') {
                 continue;
+            }
+            if (mb_strlen($sku) > 64) {
+                throw ValidationException::withMessages(['file' => "SKU {$sku} melebihi batas 64 karakter untuk sinkronisasi API."]);
+            }
+            if (! Item::where('sku', $sku)->exists() && StockApiSyncRecord::where('sku', $sku)->where('status', 'deleted')->exists()) {
+                throw ValidationException::withMessages(['file' => "SKU {$sku} pernah dihapus dan tidak dapat digunakan kembali."]);
             }
 
             $parentCategoryId = 0;

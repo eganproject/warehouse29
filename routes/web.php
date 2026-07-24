@@ -34,6 +34,7 @@ use App\Http\Controllers\Admin\PermissionController;
 use App\Http\Controllers\Admin\DivisiController;
 use App\Http\Controllers\Admin\KurirController;
 use App\Http\Controllers\Admin\UnitOfMeasureController;
+use App\Http\Controllers\Admin\ApiIpAllowlistController;
 use App\Http\Controllers\Admin\QcScanInputController;
 use App\Http\Controllers\Mobile\StockOpnameMobileController;
 use App\Http\Controllers\Picker\PickerDashboardController;
@@ -143,6 +144,9 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
 
         Route::get('/unit-of-measures/data', [UnitOfMeasureController::class, 'data'])->name('unit-of-measures.data');
         Route::resource('unit-of-measures', UnitOfMeasureController::class)->except(['create', 'show', 'edit'])->names('unit-of-measures');
+
+        Route::get('/api-ip-allowlists/data', [ApiIpAllowlistController::class, 'data'])->name('api-ip-allowlists.data');
+        Route::resource('api-ip-allowlists', ApiIpAllowlistController::class)->except(['create', 'show', 'edit'])->names('api-ip-allowlists');
 
         // Menus DataTables
         Route::get('/menus/data', [MenuController::class, 'data'])->name('menus.data');

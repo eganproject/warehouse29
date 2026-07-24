@@ -23,6 +23,7 @@ class MenuSeeder extends Seeder
             ['name' => 'Divisi', 'slug' => 'divisi', 'route' => 'admin.masterdata.divisi.index', 'icon' => 'fa-solid fa-people-group', 'parent_slug' => 'master-data', 'sort_order' => 21.4],
             ['name' => 'Kurir', 'slug' => 'kurir', 'route' => 'admin.masterdata.kurir.index', 'icon' => 'fa-solid fa-truck', 'parent_slug' => 'master-data', 'sort_order' => 21.45],
             ['name' => 'Satuan (UOM)', 'slug' => 'unit-of-measures', 'route' => 'admin.masterdata.unit-of-measures.index', 'icon' => 'fa-solid fa-ruler-combined', 'parent_slug' => 'master-data', 'sort_order' => 21.46],
+            ['name' => 'Akses API', 'slug' => 'api-ip-allowlists', 'route' => 'admin.masterdata.api-ip-allowlists.index', 'icon' => 'fa-solid fa-shield-halved', 'parent_slug' => 'master-data', 'sort_order' => 21.47],
             ['name' => 'Categories', 'slug' => 'categories', 'route' => 'admin.masterdata.categories.index', 'icon' => 'fa-solid fa-sitemap', 'parent_slug' => 'master-data', 'sort_order' => 21.5],
             ['name' => 'Items', 'slug' => 'items', 'route' => 'admin.masterdata.items.index', 'icon' => 'fa-solid fa-box', 'parent_slug' => 'master-data', 'sort_order' => 21.6],
             ['name' => 'Item Nonaktif', 'slug' => 'items-inactive', 'route' => 'admin.masterdata.items.inactive', 'icon' => 'fa-solid fa-box-archive', 'parent_slug' => 'master-data', 'sort_order' => 21.65],

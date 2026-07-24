@@ -245,8 +245,10 @@
         el.batchChip.textContent = state.batch.code || '-';
         el.batchInfo.style.display = 'block';
         const note = state.batch.note ? `<br>Catatan: ${state.batch.note}` : '';
+        const stockScope = state.batch.stock_scope === 'damaged' ? 'Barang Rusak' : 'Reguler';
         el.batchInfo.innerHTML = `
             <div><strong>Kode:</strong> ${state.batch.code}</div>
+            <div><strong>Jenis stok:</strong> ${stockScope}</div>
             <div><strong>Tanggal:</strong> ${state.batch.transacted_at || '-'}</div>
             <div><strong>Dibuat oleh:</strong> ${state.batch.creator || '-'}</div>
             ${note}
