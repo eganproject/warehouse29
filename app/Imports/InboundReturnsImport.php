@@ -81,12 +81,8 @@ class InboundReturnsImport implements ToCollection, WithHeadingRow, SkipsEmptyRo
             $damagedQty = $this->parseQty($row, $damagedKey);
             $qtyResi = $qtyResi > 0 ? $qtyResi : $receivedQty;
 
-            if ($receivedQty <= 0) {
-                $errors[] = "Baris {$rowIndex}: qty diterima tidak valid untuk SKU {$sku}";
-                continue;
-            }
             if ($qtyResi <= 0 || $receivedQty > $qtyResi) {
-                $errors[] = "Baris {$rowIndex}: qty diterima tidak boleh lebih besar dari qty resi untuk SKU {$sku}";
+                $errors[] = "Baris {$rowIndex}: qty resi wajib lebih dari 0 dan qty diterima tidak boleh lebih besar dari qty resi untuk SKU {$sku}";
                 continue;
             }
             if ($goodQty + $damagedQty !== $receivedQty) {

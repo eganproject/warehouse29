@@ -41,6 +41,8 @@ class InboundReturnsTemplateExport implements FromArray, WithHeadings, ShouldAut
         $rows[] = ['JX123456789', 'ORD-001', $defaults[0], 10, 8, 6, 2, 'Barang rusak', 'Kemasan rusak', 'RET-001', 'Retur dari customer', 'Sebagian kemasan rusak', $now];
         // Baris 2: semua barang bagus, ref_no sama agar tergabung dalam 1 transaksi
         $rows[] = ['JX123456789', 'ORD-001', $defaults[1] ?? $defaults[0], 5, 5, 5, 0, 'Customer batal', '', 'RET-001', '', '', $now];
+        // Baris 3: barang tidak kembali, sehingga qty diterima/bagus/rusak bernilai 0
+        $rows[] = ['JX987654321', 'ORD-002', $defaults[0], 1, 0, 0, 0, 'Qty kurang', 'Barang tidak kembali dari pengiriman', 'RET-002', 'Barang hilang', '', $now];
 
         return $rows;
     }

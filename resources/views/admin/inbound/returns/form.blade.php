@@ -237,7 +237,7 @@
                 <i class="fas fa-circle-info fs-2 me-4"></i>
                 <div>
                     <div class="fw-bold">Qty Resi adalah jumlah pada data pesanan. Qty diterima adalah fisik yang kembali.</div>
-                    <div class="text-muted fs-7">Selisih dihitung otomatis. Qty bagus + qty rusak harus sama dengan qty diterima.</div>
+                    <div class="text-muted fs-7">Selisih dihitung otomatis. Qty diterima dapat 0 bila barang tidak kembali; qty bagus + qty rusak harus sama dengan qty diterima.</div>
                 </div>
             </div>
             <div class="return-items-list" id="items_body"></div>
@@ -393,7 +393,7 @@
                     </div>
                     <div class="return-qty-field">
                         <label class="required fs-7 fw-bold form-label">Diterima</label>
-                        <input type="number" min="1" class="form-control form-control-solid text-end" data-name="qty_received" value="${esc(data.qty_received ?? data.qty_resi ?? 1)}" required>
+                        <input type="number" min="0" class="form-control form-control-solid text-end" data-name="qty_received" value="${esc(data.qty_received ?? data.qty_resi ?? 1)}" required>
                         <div class="invalid-feedback d-block" data-error-for="qty_received"></div>
                     </div>
                     <div class="return-qty-field">

@@ -922,7 +922,7 @@ class InboundController extends Controller
                     'items' => "Qty diterima tidak boleh lebih besar dari qty resi untuk {$sku}.",
                 ]);
             }
-            if ($received <= 0 || $good + $damaged !== $received) {
+            if ($good + $damaged !== $received) {
                 $sku = $row->item?->sku ?? 'item '.$row->item_id;
                 throw ValidationException::withMessages([
                     'items' => "Qty OK + qty reject harus sama dengan qty diterima untuk {$sku}.",
@@ -1031,7 +1031,7 @@ class InboundController extends Controller
             $rules['resi_id'] = ['nullable', 'integer', 'exists:resis,id'];
             $rules['return_resi_no'] = ['nullable', 'string', 'max:100'];
             $rules['items.*.qty_resi'] = ['nullable', 'integer', 'min:1'];
-            $rules['items.*.qty_received'] = ['required', 'integer', 'min:1'];
+            $rules['items.*.qty_received'] = ['required', 'integer', 'min:0'];
             $rules['items.*.qty_good'] = ['required', 'integer', 'min:0'];
             $rules['items.*.qty_damaged'] = ['required', 'integer', 'min:0'];
             $rules['items.*.return_reason_id'] = ['nullable', 'integer', 'exists:return_reasons,id'];
@@ -1087,9 +1087,6 @@ class InboundController extends Controller
             foreach ($items as $idx => $row) {
                 if ((int) $row['qty_resi'] <= 0) {
                     throw ValidationException::withMessages(["items.{$idx}.qty_resi" => 'Qty resi wajib lebih dari 0']);
-                }
-                if ((int) $row['qty_received'] <= 0) {
-                    throw ValidationException::withMessages(["items.{$idx}.qty_received" => 'Qty diterima wajib lebih dari 0']);
                 }
                 if ((int) $row['qty_received'] > (int) $row['qty_resi']) {
                     throw ValidationException::withMessages(["items.{$idx}.qty_received" => 'Qty diterima tidak boleh lebih besar dari qty resi']);

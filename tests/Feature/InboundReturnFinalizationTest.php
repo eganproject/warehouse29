@@ -89,4 +89,43 @@ class InboundReturnFinalizationTest extends TestCase
         $this->assertSame(3, ItemStock::where('item_id', $item->id)->value('stock'));
         $this->assertSame(2, DamagedItemStock::where('item_id', $item->id)->value('stock'));
     }
+
+    public function test_inbound_return_allows_zero_received_qty_and_does_not_mutate_stock(): void
+    {
+        $user = User::create([
+            'name' => 'Admin',
+            'email' => 'admin-return-missing@example.test',
+            'password' => 'password',
+        ]);
+        $item = Item::create([
+            'sku' => 'RET-003',
+            'name' => 'Missing Return Item',
+        ]);
+
+        $this->actingAs($user)
+            ->postJson(route('admin.inbound.returns.store'), [
+                'transacted_at' => now()->format('Y-m-d H:i'),
+                'items' => [
+                    [
+                        'item_id' => $item->id,
+                        'qty_resi' => 1,
+                        'qty_received' => 0,
+                        'qty_good' => 0,
+                        'qty_damaged' => 0,
+                    ],
+                ],
+            ])
+            ->assertOk();
+
+        $tx = InboundTransaction::with('items')->where('type', 'return')->firstOrFail();
+        $this->assertSame(1, (int) $tx->items->first()->qty_difference);
+
+        $this->actingAs($user)
+            ->postJson(route('admin.inbound.returns.finalize', $tx->id))
+            ->assertOk();
+
+        $this->assertSame('finalized', $tx->fresh()->status);
+        $this->assertNull(ItemStock::where('item_id', $item->id)->value('stock'));
+        $this->assertNull(DamagedItemStock::where('item_id', $item->id)->value('stock'));
+    }
 }
