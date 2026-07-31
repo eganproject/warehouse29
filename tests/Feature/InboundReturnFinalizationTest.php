@@ -128,4 +128,39 @@ class InboundReturnFinalizationTest extends TestCase
         $this->assertNull(ItemStock::where('item_id', $item->id)->value('stock'));
         $this->assertNull(DamagedItemStock::where('item_id', $item->id)->value('stock'));
     }
+
+    public function test_approved_inbound_return_can_be_deleted_before_finalization(): void
+    {
+        $user = User::create([
+            'name' => 'Admin',
+            'email' => 'admin-return-delete@example.test',
+            'password' => 'password',
+        ]);
+        $item = Item::create([
+            'sku' => 'RET-004',
+            'name' => 'Deletable Return Item',
+        ]);
+
+        $this->actingAs($user)
+            ->postJson(route('admin.inbound.returns.store'), [
+                'transacted_at' => now()->format('Y-m-d H:i'),
+                'items' => [[
+                    'item_id' => $item->id,
+                    'qty_received' => 1,
+                    'qty_good' => 1,
+                    'qty_damaged' => 0,
+                ]],
+            ])
+            ->assertOk();
+
+        $tx = InboundTransaction::where('type', 'return')->firstOrFail();
+        $this->assertSame('approved', $tx->status);
+
+        $this->actingAs($user)
+            ->deleteJson(route('admin.inbound.returns.destroy', $tx->id))
+            ->assertOk()
+            ->assertJsonPath('message', 'Inbound berhasil dihapus');
+
+        $this->assertDatabaseMissing('inbound_transactions', ['id' => $tx->id]);
+    }
 }

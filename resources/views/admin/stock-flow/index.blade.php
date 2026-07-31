@@ -1013,7 +1013,10 @@
                             ? `<div class="menu-item px-3"><a href="${resolveRoute(rowType, 'edit').replace(':id', data)}" class="menu-link px-3">Edit</a></div>`
                             : `<div class="menu-item px-3"><a href="#" class="menu-link px-3 btn-edit" data-id="${data}" data-type="${rowType}">Edit</a></div>`)
                         : '';
-                    const delItem = (!isApproved && !isFinalized && perms.delete)
+                    const canDelete = perms.delete && !isFinalized && (
+                        !isApproved || (isInboundReturnFlow && rowType === 'return')
+                    );
+                    const delItem = canDelete
                         ? `<div class="menu-item px-3"><a href="#" class="menu-link px-3 text-danger btn-delete" data-id="${data}" data-type="${rowType}">Hapus</a></div>`
                         : '';
                     const actions = `${detailItem}${approveItem}${finalizeItem}${editItem}${delItem}`;
@@ -1176,7 +1179,9 @@
             if (typeof Swal !== 'undefined') {
                 const res = await Swal.fire({
                     title: 'Apakah Anda yakin?',
-                    text: 'Data akan dihapus dan stok akan dikembalikan',
+                    text: isInboundReturnFlow && rowType === 'return'
+                        ? 'Retur di Gudang Retur akan dihapus. Stok reguler dan barang rusak belum terpengaruh sebelum finalisasi.'
+                        : 'Data akan dihapus dan stok akan dikembalikan',
                     icon: 'warning',
                     showCancelButton: true,
                     confirmButtonText: 'Hapus',
