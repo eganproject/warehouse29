@@ -3,14 +3,15 @@
 namespace App\Exports;
 
 use App\Models\StockMutation;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Collection;
-use Maatwebsite\Excel\Concerns\FromCollection;
+use Maatwebsite\Excel\Concerns\FromQuery;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
+use Maatwebsite\Excel\Concerns\WithStrictNullComparison;
 
-class StockMutationsExport implements FromCollection, WithHeadings, WithMapping, ShouldAutoSize
+class StockMutationsExport implements FromQuery, WithHeadings, WithMapping, ShouldAutoSize, WithStrictNullComparison
 {
     public function __construct(
         private string $search = '',
@@ -19,16 +20,17 @@ class StockMutationsExport implements FromCollection, WithHeadings, WithMapping,
     ) {
     }
 
-    public function collection(): Collection
+    public function query(): Builder
     {
         $query = StockMutation::query()
             ->with(['item', 'creator'])
-            ->orderBy('occurred_at', 'desc');
+            ->orderByDesc('occurred_at')
+            ->orderByDesc('id');
 
         $this->applySearch($query);
         $this->applyDateFilter($query);
 
-        return $query->get();
+        return $query;
     }
 
     public function headings(): array
@@ -52,6 +54,14 @@ class StockMutationsExport implements FromCollection, WithHeadings, WithMapping,
     public function map($row): array
     {
         $source = strtoupper($row->source_type ?? '').($row->source_subtype ? ' / '.$row->source_subtype : '');
+        $stockBefore = $row->stockBeforeValue();
+        $stockAfter = $row->stock_after !== null
+            ? (int) $row->stock_after
+            : ($stockBefore === null
+                ? null
+                : ($row->direction === 'out'
+                    ? $stockBefore - (int) $row->qty
+                    : $stockBefore + (int) $row->qty));
 
         return [
             $row->id,
@@ -61,15 +71,15 @@ class StockMutationsExport implements FromCollection, WithHeadings, WithMapping,
             $row->creator?->name ?? '-',
             $row->direction === 'in' ? 'IN' : 'OUT',
             (int) $row->qty,
-            $row->stockBeforeValue(),
-            $row->stockAfterValue(),
+            $stockBefore,
+            $stockAfter,
             trim($source),
             $row->source_code ?? '',
             $row->note ?? '',
         ];
     }
 
-    private function applySearch($query): void
+    private function applySearch(Builder $query): void
     {
         $search = trim($this->search);
         if ($search === '') {
@@ -91,7 +101,7 @@ class StockMutationsExport implements FromCollection, WithHeadings, WithMapping,
         });
     }
 
-    private function applyDateFilter($query): void
+    private function applyDateFilter(Builder $query): void
     {
         try {
             if ($this->dateFrom) {
