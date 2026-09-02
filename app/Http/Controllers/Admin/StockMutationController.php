@@ -11,9 +11,9 @@ use App\Models\PickerSession;
 use App\Models\QcScanResi;
 use App\Models\StockMutation;
 use App\Models\StockOpname;
+use App\Support\StreamingXlsxWriter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
-use Maatwebsite\Excel\Facades\Excel;
 
 class StockMutationController extends Controller
 {
@@ -88,7 +88,7 @@ class StockMutationController extends Controller
         ]);
     }
 
-    public function export(Request $request)
+    public function export(Request $request, StreamingXlsxWriter $writer)
     {
         $search = trim((string) $request->input('q', ''));
         $today = now()->toDateString();
@@ -96,7 +96,12 @@ class StockMutationController extends Controller
         $dateTo = $request->input('date_to') ?: $today;
         $filename = 'stock-mutations-'.now()->format('YmdHis').'.xlsx';
 
-        return Excel::download(new StockMutationsExport($search, $dateFrom, $dateTo), $filename);
+        $export = new StockMutationsExport($search, $dateFrom, $dateTo);
+
+        return $writer->downloadWorkbook(
+            $filename,
+            $export->workbookSheets($request->user()?->name ?? '-')
+        );
     }
 
     private function applyDateFilter($query, Request $request): void
