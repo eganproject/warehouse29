@@ -283,18 +283,77 @@
             exportBtn.disabled = isLoading;
             exportBtn.setAttribute('data-kt-indicator', isLoading ? 'on' : 'off');
         };
-        window.addEventListener('focus', () => setExportLoading(false));
-        window.addEventListener('pageshow', () => setExportLoading(false));
-        exportBtn?.addEventListener('click', () => {
+        const showExportError = (message) => {
+            if (typeof Swal !== 'undefined') {
+                Swal.fire('Export gagal', message, 'error');
+            } else {
+                window.alert(message);
+            }
+        };
+        const downloadFilename = (disposition) => {
+            const encoded = disposition?.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+            if (encoded) {
+                try { return decodeURIComponent(encoded); } catch (_) {}
+            }
+            return disposition?.match(/filename="?([^";]+)"?/i)?.[1] || `stock-mutations-${todayStr}.xlsx`;
+        };
+        exportBtn?.addEventListener('click', async () => {
             const params = new URLSearchParams();
             const q = searchInput?.value?.trim() || '';
             if (q) params.set('q', q);
             params.set('date_from', dateFromEl?.value || todayStr);
             params.set('date_to', dateToEl?.value || todayStr);
             const query = params.toString();
+            const url = query ? `${exportUrl}?${query}` : exportUrl;
+
             setExportLoading(true);
-            setTimeout(() => setExportLoading(false), 15000);
-            window.location.href = query ? `${exportUrl}?${query}` : exportUrl;
+            try {
+                const response = await fetch(url, {
+                    method: 'GET',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Accept': 'application/json, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                });
+                const contentType = response.headers.get('Content-Type') || '';
+
+                if (!response.ok) {
+                    let message = `Server mengembalikan HTTP ${response.status}.`;
+                    if (contentType.includes('application/json')) {
+                        const error = await response.json();
+                        message = error.message || message;
+                        if (error.error_id) message += ` (Referensi: ${error.error_id})`;
+                    } else {
+                        const errorText = (await response.text()).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+                        if (errorText && errorText.length < 300) message = errorText;
+                    }
+                    throw new Error(message);
+                }
+
+                if (response.redirected || contentType.includes('text/html')) {
+                    throw new Error('Sesi login sudah berakhir atau respons export dialihkan. Silakan login ulang.');
+                }
+
+                const blob = await response.blob();
+                if (!blob.size) {
+                    throw new Error('File export kosong. Silakan periksa filter tanggal lalu coba kembali.');
+                }
+
+                const objectUrl = URL.createObjectURL(blob);
+                const anchor = document.createElement('a');
+                anchor.href = objectUrl;
+                anchor.download = downloadFilename(response.headers.get('Content-Disposition'));
+                document.body.appendChild(anchor);
+                anchor.click();
+                anchor.remove();
+                setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+            } catch (error) {
+                console.error('Stock Mutation export failed', error);
+                showExportError(error?.message || 'File gagal diunduh dari server.');
+            } finally {
+                setExportLoading(false);
+            }
         });
 
         const modalEl = document.getElementById('modal_mutation_detail');

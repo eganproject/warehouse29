@@ -6,7 +6,7 @@ use Illuminate\Filesystem\Filesystem;
 use PhpOffice\PhpSpreadsheet\Shared\StringHelper;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
-use ZipArchive;
+use ZipStream\ZipStream;
 
 class StreamingXlsxWriter
 {
@@ -53,8 +53,7 @@ class StreamingXlsxWriter
 
     public function writeWorkbook(array $sheets): string
     {
-        $directory = storage_path('framework/cache/laravel-excel');
-        $this->files->ensureDirectoryExists($directory);
+        $directory = $this->temporaryDirectory();
 
         $sheets = $this->normalizeSheets($sheets);
         $sheetPaths = [];
@@ -95,6 +94,27 @@ class StreamingXlsxWriter
         } finally {
             $this->files->delete($sheetPaths);
         }
+    }
+
+    private function temporaryDirectory(): string
+    {
+        $candidates = [
+            storage_path('framework/cache/laravel-excel'),
+            rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.'warehouse29-excel',
+        ];
+
+        foreach ($candidates as $directory) {
+            try {
+                $this->files->ensureDirectoryExists($directory);
+                if (is_writable($directory)) {
+                    return $directory;
+                }
+            } catch (\Throwable) {
+                // Try the next writable temporary directory.
+            }
+        }
+
+        throw new RuntimeException('Direktori temporary export tidak dapat ditulis oleh server.');
     }
 
     private function normalizeSheets(array $sheets): array
@@ -220,26 +240,33 @@ class StreamingXlsxWriter
 
     private function writeArchive(string $xlsxPath, array $sheets): void
     {
-        $archive = new ZipArchive;
-        $result = $archive->open($xlsxPath, ZipArchive::CREATE | ZipArchive::OVERWRITE);
-        if ($result !== true) {
+        $output = fopen($xlsxPath, 'wb');
+        if ($output === false) {
             throw new RuntimeException('Gagal membuat arsip XLSX Stock Mutation.');
         }
 
         try {
-            $archive->addFromString('[Content_Types].xml', $this->contentTypesXml(count($sheets)));
-            $archive->addFromString('_rels/.rels', $this->rootRelationshipsXml());
-            $archive->addFromString('xl/workbook.xml', $this->workbookXml($sheets));
-            $archive->addFromString('xl/_rels/workbook.xml.rels', $this->workbookRelationshipsXml(count($sheets)));
-            $archive->addFromString('xl/styles.xml', $this->stylesXml());
+            $archive = new ZipStream(
+                outputStream: $output,
+                sendHttpHeaders: false,
+                enableZip64: true
+            );
+            $archive->addFile('[Content_Types].xml', $this->contentTypesXml(count($sheets)));
+            $archive->addFile('_rels/.rels', $this->rootRelationshipsXml());
+            $archive->addFile('xl/workbook.xml', $this->workbookXml($sheets));
+            $archive->addFile('xl/_rels/workbook.xml.rels', $this->workbookRelationshipsXml(count($sheets)));
+            $archive->addFile('xl/styles.xml', $this->stylesXml());
 
             foreach ($sheets as $index => $sheet) {
-                if (! $archive->addFile($sheet['path'], 'xl/worksheets/sheet'.($index + 1).'.xml')) {
-                    throw new RuntimeException('Gagal menambahkan worksheet ke arsip XLSX.');
-                }
+                $archive->addFileFromPath(
+                    'xl/worksheets/sheet'.($index + 1).'.xml',
+                    $sheet['path']
+                );
             }
+
+            $archive->finish();
         } finally {
-            $archive->close();
+            fclose($output);
         }
     }
 

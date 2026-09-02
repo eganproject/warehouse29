@@ -14,6 +14,8 @@ use App\Models\StockOpname;
 use App\Support\StreamingXlsxWriter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
+use RuntimeException;
 
 class StockMutationController extends Controller
 {
@@ -90,18 +92,44 @@ class StockMutationController extends Controller
 
     public function export(Request $request, StreamingXlsxWriter $writer)
     {
+        if (function_exists('set_time_limit')) {
+            @set_time_limit(0);
+        }
+
         $search = trim((string) $request->input('q', ''));
         $today = now()->toDateString();
         $dateFrom = $request->input('date_from') ?: $today;
         $dateTo = $request->input('date_to') ?: $today;
         $filename = 'stock-mutations-'.now()->format('YmdHis').'.xlsx';
 
-        $export = new StockMutationsExport($search, $dateFrom, $dateTo);
+        try {
+            $export = new StockMutationsExport($search, $dateFrom, $dateTo);
 
-        return $writer->downloadWorkbook(
-            $filename,
-            $export->workbookSheets($request->user()?->name ?? '-')
-        );
+            return $writer->downloadWorkbook(
+                $filename,
+                $export->workbookSheets($request->user()?->name ?? '-')
+            );
+        } catch (\Throwable $exception) {
+            $errorId = now()->format('YmdHis').'-'.bin2hex(random_bytes(3));
+
+            Log::error('Stock Mutation export failed', [
+                'error_id' => $errorId,
+                'user_id' => $request->user()?->id,
+                'date_from' => $dateFrom,
+                'date_to' => $dateTo,
+                'search' => $search,
+                'exception' => $exception,
+            ]);
+
+            $message = $exception instanceof RuntimeException
+                ? $exception->getMessage()
+                : 'Export gagal diproses di server.';
+
+            return response()->json([
+                'message' => $message,
+                'error_id' => $errorId,
+            ], 500);
+        }
     }
 
     private function applyDateFilter($query, Request $request): void

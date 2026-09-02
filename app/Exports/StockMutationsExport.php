@@ -18,9 +18,7 @@ class StockMutationsExport
     public function query(): Builder
     {
         return $this->filteredQuery()
-            ->with(['item.category', 'creator'])
-            ->orderByDesc('occurred_at')
-            ->orderByDesc('id');
+            ->with(['item.category', 'creator']);
     }
 
     public function headings(): array
@@ -83,7 +81,7 @@ class StockMutationsExport
     public function rows(): \Generator
     {
         $number = 1;
-        foreach ($this->query()->lazy($this->chunkSize()) as $mutation) {
+        foreach ($this->query()->lazyByIdDesc($this->chunkSize(), 'stock_mutations.id', 'id') as $mutation) {
             yield $this->map($mutation, $number);
             $number++;
         }
