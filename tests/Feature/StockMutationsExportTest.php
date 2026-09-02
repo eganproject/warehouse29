@@ -127,4 +127,38 @@ class StockMutationsExportTest extends TestCase
             $this->assertSame(32.0, $detailSheet->getColumnDimension('E')->getWidth());
         } finally {
             if (isset($spreadsheet)) {
-                $sp
+                $spreadsheet->disconnectWorksheets();
+            }
+            @unlink($temporaryFile);
+        }
+    }
+
+    private function createItem(string $sku, string $name): Item
+    {
+        return Item::create([
+            'sku' => $sku,
+            'name' => $name,
+            'category_id' => 0,
+            'uom' => 'PCS',
+            'address' => 'A-01',
+        ]);
+    }
+
+    private function createMutation(Item $item, User $user, array $overrides = []): StockMutation
+    {
+        return StockMutation::create(array_merge([
+            'item_id' => $item->id,
+            'direction' => 'in',
+            'qty' => 10,
+            'stock_before' => 0,
+            'stock_after' => 10,
+            'source_type' => 'inbound',
+            'source_subtype' => 'purchase',
+            'source_id' => 1,
+            'source_code' => 'IN-DEFAULT',
+            'note' => 'Export test',
+            'occurred_at' => '2026-05-08 09:00:00',
+            'created_by' => $user->id,
+        ], $overrides));
+    }
+}
