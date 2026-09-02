@@ -90,6 +90,11 @@ class StockMutationsExportTest extends TestCase
         );
 
         try {
+            $binary = file_get_contents($temporaryFile);
+            $this->assertIsString($binary);
+            $this->assertStringNotContainsString("PK\x06\x06", $binary, 'XLSX tidak boleh memakai ZIP64 karena ditolak oleh sebagian Microsoft Excel.');
+            $this->assertStringNotContainsString("PK\x06\x07", $binary, 'XLSX tidak boleh memakai ZIP64 locator.');
+
             $spreadsheet = IOFactory::load($temporaryFile);
             $this->assertSame(['Ringkasan', 'Rekap Sumber', 'Detail Mutasi'], $spreadsheet->getSheetNames());
 

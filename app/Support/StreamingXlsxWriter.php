@@ -6,7 +6,7 @@ use Illuminate\Filesystem\Filesystem;
 use PhpOffice\PhpSpreadsheet\Shared\StringHelper;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
-use ZipStream\ZipStream;
+use ZipArchive;
 
 class StreamingXlsxWriter
 {
@@ -240,33 +240,49 @@ class StreamingXlsxWriter
 
     private function writeArchive(string $xlsxPath, array $sheets): void
     {
-        $output = fopen($xlsxPath, 'wb');
-        if ($output === false) {
-            throw new RuntimeException('Gagal membuat arsip XLSX Stock Mutation.');
+        if (! class_exists(ZipArchive::class)) {
+            throw new RuntimeException('Ekstensi PHP ZIP belum aktif pada server.');
+        }
+
+        $archive = new ZipArchive();
+        $openResult = $archive->open($xlsxPath, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+        if ($openResult !== true) {
+            throw new RuntimeException('Gagal membuat arsip XLSX Stock Mutation (kode ZIP '.$openResult.').');
         }
 
         try {
-            $archive = new ZipStream(
-                outputStream: $output,
-                sendHttpHeaders: false,
-                enableZip64: true
-            );
-            $archive->addFile('[Content_Types].xml', $this->contentTypesXml(count($sheets)));
-            $archive->addFile('_rels/.rels', $this->rootRelationshipsXml());
-            $archive->addFile('xl/workbook.xml', $this->workbookXml($sheets));
-            $archive->addFile('xl/_rels/workbook.xml.rels', $this->workbookRelationshipsXml(count($sheets)));
-            $archive->addFile('xl/styles.xml', $this->stylesXml());
+            $this->addArchiveContent($archive, '[Content_Types].xml', $this->contentTypesXml(count($sheets)));
+            $this->addArchiveContent($archive, '_rels/.rels', $this->rootRelationshipsXml());
+            $this->addArchiveContent($archive, 'xl/workbook.xml', $this->workbookXml($sheets));
+            $this->addArchiveContent($archive, 'xl/_rels/workbook.xml.rels', $this->workbookRelationshipsXml(count($sheets)));
+            $this->addArchiveContent($archive, 'xl/styles.xml', $this->stylesXml());
 
             foreach ($sheets as $index => $sheet) {
-                $archive->addFileFromPath(
-                    'xl/worksheets/sheet'.($index + 1).'.xml',
-                    $sheet['path']
-                );
+                $entry = 'xl/worksheets/sheet'.($index + 1).'.xml';
+                if (! $archive->addFile($sheet['path'], $entry)) {
+                    throw new RuntimeException('Gagal menambahkan worksheet ke arsip XLSX.');
+                }
             }
+        } catch (\Throwable $exception) {
+            $archive->unchangeAll();
+            $archive->close();
 
-            $archive->finish();
-        } finally {
-            fclose($output);
+            throw $exception;
+        }
+
+        if (! $archive->close()) {
+            throw new RuntimeException('Gagal menyelesaikan arsip XLSX Stock Mutation.');
+        }
+
+        if (! is_file($xlsxPath) || filesize($xlsxPath) === 0) {
+            throw new RuntimeException('File XLSX Stock Mutation kosong setelah dibuat.');
+        }
+    }
+
+    private function addArchiveContent(ZipArchive $archive, string $name, string $contents): void
+    {
+        if (! $archive->addFromString($name, $contents)) {
+            throw new RuntimeException('Gagal menambahkan metadata ke arsip XLSX.');
         }
     }
 
