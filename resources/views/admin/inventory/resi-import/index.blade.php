@@ -450,6 +450,9 @@
                                 }
                                 return `<button type="button" class="btn btn-sm btn-light-warning btn-uncancel" data-id="${idPesanan}" data-resi="${noResi}">Batal Cancel</button>`;
                             }
+                            if (!row.can_cancel_today) {
+                                return '<span class="text-muted fs-8">Cancel hanya untuk hari berjalan</span>';
+                            }
                             return `<button type="button" class="btn btn-sm btn-light-danger btn-cancel" data-id="${idPesanan}" data-resi="${noResi}" data-stage="${processStage}">Cancel</button>`;
                         }},
                     ],

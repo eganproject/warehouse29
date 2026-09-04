@@ -201,6 +201,32 @@ class ResiCancellationTest extends TestCase
         $this->assertSame('Cancel kedua', $resi->fresh()->cancellation?->reason);
     }
 
+    public function test_resi_from_previous_date_cannot_be_canceled(): void
+    {
+        [$user, $item, $resi] = $this->makeOrder('PREVIOUS-DATE', 2, 10);
+        $previousDate = now()->subDay()->toDateString();
+        $resi->tanggal_upload = $previousDate;
+        $resi->save();
+        PickingList::where('sku', $item->sku)->update(['list_date' => $previousDate]);
+
+        $this->actingAs($user)
+            ->postJson(route('admin.inventory.resi-import.cancel'), [
+                'id_pesanan' => $resi->id_pesanan,
+                'reason' => 'Mencoba cancel data kemarin',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('resi');
+
+        $this->assertDatabaseHas('resis', ['id' => $resi->id, 'status' => 'active']);
+        $this->assertDatabaseMissing('resi_cancellations', ['resi_id' => $resi->id]);
+        $this->assertSame(10, $item->stock()->value('stock'));
+
+        $this->actingAs($user)
+            ->getJson(route('admin.inventory.resi-import.data', ['date' => $previousDate]))
+            ->assertOk()
+            ->assertJsonPath('data.0.can_cancel_today', false);
+    }
+
     private function makeOrder(
         string $suffix,
         int $qty,

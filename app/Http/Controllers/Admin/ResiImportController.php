@@ -83,7 +83,7 @@ class ResiImportController extends Controller
             ->count();
 
         $query = Resi::query()
-            ->select(['id', 'id_pesanan', 'no_resi', 'tanggal_pesanan', 'kurir_id', 'catatan_pembeli', 'status'])
+            ->select(['id', 'id_pesanan', 'no_resi', 'tanggal_pesanan', 'tanggal_upload', 'kurir_id', 'catatan_pembeli', 'status'])
             ->selectSub(function ($sub) {
                 $sub->from('packer_scan_outs')
                     ->selectRaw('count(1)')
@@ -121,6 +121,7 @@ class ResiImportController extends Controller
             $hasScanOut = (int) ($row->scan_out_count ?? 0) > 0;
             $hasQcScan = (int) ($row->qc_scan_count ?? 0) > 0;
             $processStage = $hasScanOut ? 'after_scan_out' : ($hasQcScan ? 'after_qc' : 'before_qc');
+            $canCancelToday = $row->tanggal_upload?->isToday() ?? false;
             return [
                 'id' => $row->id,
                 'no_resi' => $row->no_resi ?? '-',
@@ -134,6 +135,7 @@ class ResiImportController extends Controller
                 'has_scan_out' => $hasScanOut,
                 'has_qc_scan' => $hasQcScan,
                 'process_stage' => $processStage,
+                'can_cancel_today' => $canCancelToday,
                 'cancellation_stage' => $row->cancellation?->voided_at ? null : $row->cancellation?->stage,
                 'returned_stock_qty' => (int) ($row->cancellation?->returned_stock_qty ?? 0),
             ];

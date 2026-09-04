@@ -39,6 +39,13 @@ class ResiCancellationService
                 ]);
             }
 
+            $uploadDate = $resi->tanggal_upload?->toDateString();
+            if ($uploadDate !== now()->toDateString()) {
+                throw ValidationException::withMessages([
+                    'resi' => 'Cancel hanya dapat dilakukan untuk resi yang di-upload pada tanggal hari berjalan.',
+                ]);
+            }
+
             $qcResi = QcScanResi::where('resi_id', $resi->id)
                 ->lockForUpdate()
                 ->first();
