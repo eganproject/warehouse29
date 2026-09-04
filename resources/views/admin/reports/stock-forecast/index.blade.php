@@ -287,7 +287,14 @@ document.addEventListener('DOMContentLoaded', () => {
         updated: document.getElementById('forecast_updated'),
         limit: document.getElementById('forecast_limit'),
     };
-    const numberText = (value, decimals = 0) => Number(value || 0).toLocaleString('id-ID', { maximumFractionDigits: decimals });
+    const numberText = (value, decimals = 0) => {
+        const parsedDecimals = Number(decimals);
+        const precision = Number.isInteger(parsedDecimals)
+            ? Math.min(20, Math.max(0, parsedDecimals))
+            : 0;
+
+        return Number(value || 0).toLocaleString('id-ID', { maximumFractionDigits: precision });
+    };
     const esc = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#039;', '"': '&quot;' }[char]));
     const emptyHtml = (text = 'Belum ada data untuk ditampilkan') => `<div class="forecast-empty"><i class="fa-regular fa-folder-open"></i><span>${esc(text)}</span></div>`;
     const dateText = (value, compact = false) => {
@@ -409,7 +416,7 @@ document.addEventListener('DOMContentLoaded', () => {
             { data: null, render: (row) => `<div class="fw-semibold text-gray-700">${esc(row.category)}</div><div class="text-muted fs-8 mt-1"><i class="fa-solid fa-location-dot me-1"></i>${esc(row.address)}</div>` },
             { data: null, render: (row) => `<div class="forecast-number">${numberText(row.sales_qty)} unit</div><div class="text-muted fs-8 mt-1">Langsung ${numberText(row.direct_sales_qty)} · bundle ${numberText(row.bundle_demand_qty)}</div>` },
             { data: 'average_daily_sales', className: 'text-end forecast-number', render: (value) => numberText(value, 2) },
-            { data: 'current_stock', className: 'text-end forecast-number', render: numberText },
+            { data: 'current_stock', className: 'text-end forecast-number', render: (value) => numberText(value) },
             { data: null, render: (row) => {
                 if (row.days_cover === null) return '<span class="text-muted">Tidak terukur</span>';
                 const width = Math.min(100, (Number(row.days_cover) / Math.max(1, Number(elements.coverage.value))) * 100);
