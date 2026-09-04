@@ -28,6 +28,7 @@ use App\Http\Controllers\Admin\LowStockReportController;
 use App\Http\Controllers\Admin\ActivityLogController;
 use App\Http\Controllers\Admin\StockOpnameReportController;
 use App\Http\Controllers\Admin\StockAsOfReportController;
+use App\Http\Controllers\Admin\ReturnReportController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\MenuController;
 use App\Http\Controllers\Admin\PermissionController;
@@ -342,6 +343,10 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
     });
 
     Route::prefix('reports')->as('reports.')->group(function () {
+        Route::get('/returns', [ReturnReportController::class, 'index'])->name('returns.index');
+        Route::get('/returns/data/{direction}', [ReturnReportController::class, 'data'])
+            ->whereIn('direction', ['inbound', 'outbound'])
+            ->name('returns.data');
         Route::get('/activity-logs', [ActivityLogController::class, 'index'])->name('activity-logs.index');
         Route::get('/activity-logs/data', [ActivityLogController::class, 'data'])->name('activity-logs.data');
         Route::get('/activity-logs/{id}', [ActivityLogController::class, 'show'])->name('activity-logs.show');
