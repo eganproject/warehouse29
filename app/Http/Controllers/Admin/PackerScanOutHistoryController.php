@@ -19,7 +19,7 @@ class PackerScanOutHistoryController extends Controller
     public function data(Request $request)
     {
         $baseQuery = PackerScanOut::query()
-            ->with(['resi', 'scanner'])
+            ->with(['resi.cancellation', 'scanner'])
             ->orderByDesc('scanned_at');
 
         $this->applyDateFilter($baseQuery, $request);
@@ -56,6 +56,7 @@ class PackerScanOutHistoryController extends Controller
         }
 
         $data = $query->get()->map(function ($row) {
+            $isCanceled = ($row->resi?->status ?? 'active') === 'canceled';
             return [
                 'id' => $row->id,
                 'scan_date' => $row->scan_date?->format('Y-m-d') ?? '-',
@@ -65,6 +66,8 @@ class PackerScanOutHistoryController extends Controller
                 'scan_code' => $row->scan_code ?? '-',
                 'id_pesanan' => $row->resi?->id_pesanan ?? '-',
                 'no_resi' => $row->resi?->no_resi ?? '-',
+                'status' => $isCanceled ? 'canceled' : 'completed',
+                'cancellation_stage' => $isCanceled ? $row->resi?->cancellation?->stage : null,
             ];
         });
 

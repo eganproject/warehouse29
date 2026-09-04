@@ -13,7 +13,9 @@ use App\Models\PickingListException;
 use App\Models\QcTransitItem;
 use App\Models\QcScanResi;
 use App\Models\Resi;
+use App\Models\ResiCancellation;
 use App\Models\ResiDetail;
+use App\Support\ResiCancellationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -87,9 +89,14 @@ class ResiImportController extends Controller
                     ->selectRaw('count(1)')
                     ->whereColumn('packer_scan_outs.resi_id', 'resis.id');
             }, 'scan_out_count')
+            ->selectSub(function ($sub) {
+                $sub->from('qc_scan_resis')
+                    ->selectRaw('count(1)')
+                    ->whereColumn('qc_scan_resis.resi_id', 'resis.id');
+            }, 'qc_scan_count')
             ->with(['details' => function ($q) {
                 $q->select(['id', 'resi_id', 'sku', 'qty']);
-            }, 'kurir'])
+            }, 'kurir', 'cancellation'])
             ->whereDate('tanggal_upload', $filterDate)
             ->orderByDesc('id');
 
@@ -112,6 +119,8 @@ class ResiImportController extends Controller
             $skuList = $skuItems !== '' ? $skuItems : '-';
             $tanggalOrder = $row->tanggal_pesanan?->format('Y-m-d') ?? $row->tanggal_pesanan ?? '-';
             $hasScanOut = (int) ($row->scan_out_count ?? 0) > 0;
+            $hasQcScan = (int) ($row->qc_scan_count ?? 0) > 0;
+            $processStage = $hasScanOut ? 'after_scan_out' : ($hasQcScan ? 'after_qc' : 'before_qc');
             return [
                 'id' => $row->id,
                 'no_resi' => $row->no_resi ?? '-',
@@ -123,6 +132,10 @@ class ResiImportController extends Controller
                 'has_catatan_pembeli' => trim((string) ($row->catatan_pembeli ?? '')) !== '',
                 'status' => $row->status ?? 'active',
                 'has_scan_out' => $hasScanOut,
+                'has_qc_scan' => $hasQcScan,
+                'process_stage' => $processStage,
+                'cancellation_stage' => $row->cancellation?->voided_at ? null : $row->cancellation?->stage,
+                'returned_stock_qty' => (int) ($row->cancellation?->returned_stock_qty ?? 0),
             ];
         });
 
@@ -255,6 +268,15 @@ class ResiImportController extends Controller
                         'file' => 'ID Pesanan '.$group['id_pesanan'].' sudah dibatalkan. Aktifkan kembali resi tersebut sebelum import ulang.',
                     ]);
                 }
+                if ($existing && (
+                    QcScanResi::where('resi_id', $existing->id)->exists()
+                    || PackerResiScan::where('resi_id', $existing->id)->exists()
+                    || PackerScanOut::where('resi_id', $existing->id)->exists()
+                )) {
+                    throw ValidationException::withMessages([
+                        'file' => 'ID Pesanan '.$group['id_pesanan'].' sudah masuk proses QC/scan out dan tidak boleh di-import ulang.',
+                    ]);
+                }
 
                 $oldTanggalUpload = $existing?->tanggal_upload?->format('Y-m-d');
                 $oldDetails = $existing
@@ -341,45 +363,16 @@ class ResiImportController extends Controller
                 'message' => 'Resi sudah dibatalkan sebelumnya.',
             ]);
         }
-
-        $hasPackerScan = PackerResiScan::where('resi_id', $resi->id)->exists();
-        $hasScanOut = PackerScanOut::where('resi_id', $resi->id)->exists();
-        $hasQcScan = QcScanResi::where('resi_id', $resi->id)->exists();
-        if ($hasScanOut) {
-            return response()->json([
-                'message' => 'Resi sudah scan out, tidak bisa dibatalkan.',
-            ], 422);
-        }
-        if ($hasPackerScan) {
-            return response()->json([
-                'message' => 'Resi sudah diproses, tidak bisa dibatalkan.',
-            ], 422);
-        }
-        if ($hasQcScan) {
-            return response()->json([
-                'message' => 'Resi sudah masuk proses QC, tidak bisa dibatalkan.',
-            ], 422);
-        }
-
-        DB::beginTransaction();
         try {
-            $resi->status = 'canceled';
-            $resi->canceled_at = now();
-            $resi->canceled_by = auth()->id();
-            $resi->cancel_reason = $validated['reason'] ?? null;
-            $resi->uncanceled_at = null;
-            $resi->uncanceled_by = null;
-            $resi->save();
-
-            $details = ResiDetail::where('resi_id', $resi->id)->get(['sku', 'qty']);
-            $listDate = $resi->tanggal_upload?->format('Y-m-d') ?? now()->toDateString();
-            if ($details->isNotEmpty()) {
-                $this->adjustPickingList($listDate, $details, -1);
-            }
-
-            DB::commit();
+            $cancellation = ResiCancellationService::cancel(
+                $resi->id,
+                $validated['reason'] ?? null,
+                $request->boolean('confirm_stock_returned'),
+                auth()->id()
+            );
+        } catch (ValidationException $e) {
+            throw $e;
         } catch (\Throwable $e) {
-            DB::rollBack();
             return response()->json([
                 'message' => 'Gagal membatalkan resi.',
                 'error' => $e->getMessage(),
@@ -387,7 +380,11 @@ class ResiImportController extends Controller
         }
 
         return response()->json([
-            'message' => 'Resi berhasil dibatalkan.',
+            'message' => $cancellation->returned_stock_qty > 0
+                ? 'Resi berhasil dibatalkan dan stok berhasil dikembalikan.'
+                : 'Resi berhasil dibatalkan.',
+            'stage' => $cancellation->stage,
+            'returned_stock_qty' => (int) $cancellation->returned_stock_qty,
         ]);
     }
 
@@ -425,6 +422,15 @@ class ResiImportController extends Controller
 
         DB::beginTransaction();
         try {
+            $cancellation = ResiCancellation::where('resi_id', $resi->id)
+                ->lockForUpdate()
+                ->first();
+            if ($cancellation && !$cancellation->voided_at) {
+                $cancellation->voided_at = now();
+                $cancellation->voided_by = auth()->id();
+                $cancellation->save();
+            }
+
             $resi->status = 'active';
             $resi->uncanceled_at = now();
             $resi->uncanceled_by = auth()->id();

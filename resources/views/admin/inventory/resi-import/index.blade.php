@@ -6,6 +6,7 @@
 @php
     use App\Support\Permission as Perm;
     $canCreate = Perm::can(auth()->user(), 'admin.inventory.resi-import.index', 'create');
+    $canCancel = Perm::can(auth()->user(), 'admin.inventory.resi-import.index', 'update');
 @endphp
 
 @section('content')
@@ -181,6 +182,10 @@
             <div class="modal-body mx-5 mx-xl-15 my-7">
                 <form id="form_cancel_resi">
                     @csrf
+                    <div class="alert alert-warning d-flex align-items-start mb-6" id="cancel_stage_notice">
+                        <i class="fa-solid fa-triangle-exclamation me-3 mt-1"></i>
+                        <div>Resi akan dibatalkan dan tidak dapat diproses kembali.</div>
+                    </div>
                     <div class="fv-row mb-5">
                         <label class="fs-6 fw-bold form-label mb-2">ID Pesanan</label>
                         <input type="text" class="form-control form-control-solid" id="cancel_id_pesanan" name="id_pesanan" readonly />
@@ -190,9 +195,18 @@
                         <input type="text" class="form-control form-control-solid" id="cancel_no_resi" name="no_resi" readonly />
                     </div>
                     <div class="fv-row mb-7">
-                        <label class="fs-6 fw-bold form-label mb-2">Alasan Cancel</label>
+                        <label class="fs-6 fw-bold form-label mb-2" id="cancel_reason_label">Alasan Cancel</label>
                         <textarea class="form-control form-control-solid" id="cancel_reason" name="reason" rows="3" placeholder="Tulis alasan cancel"></textarea>
                         <div class="text-danger fs-7 mt-2" data-error="reason"></div>
+                    </div>
+                    <div class="fv-row mb-7 d-none" id="cancel_return_confirmation">
+                        <label class="form-check form-check-custom form-check-solid align-items-start">
+                            <input class="form-check-input mt-1" type="checkbox" value="1" name="confirm_stock_returned" id="confirm_stock_returned" />
+                            <span class="form-check-label ms-3">
+                                Saya memastikan barang sudah kembali secara fisik dan siap dimasukkan kembali ke stok gudang.
+                            </span>
+                        </label>
+                        <div class="text-danger fs-7 mt-2" data-error="confirm_stock_returned"></div>
                     </div>
                     <div class="text-end">
                         <button type="button" class="btn btn-light me-3" data-bs-dismiss="modal">Batal</button>
@@ -309,6 +323,7 @@
     const uncancelUrl = '{{ route('admin.inventory.resi-import.uncancel') }}';
     const csrfToken = '{{ csrf_token() }}';
     const todayStr = '{{ $today ?? '' }}';
+    const canCancelResi = @json($canCancel);
 
     document.addEventListener('DOMContentLoaded', () => {
         const importBtn = document.getElementById('btn_import_resi');
@@ -323,6 +338,10 @@
         const cancelIdInput = document.getElementById('cancel_id_pesanan');
         const cancelNoResiInput = document.getElementById('cancel_no_resi');
         const cancelReasonInput = document.getElementById('cancel_reason');
+        const cancelReasonLabel = document.getElementById('cancel_reason_label');
+        const cancelStageNotice = document.getElementById('cancel_stage_notice');
+        const cancelReturnConfirmation = document.getElementById('cancel_return_confirmation');
+        const confirmStockReturned = document.getElementById('confirm_stock_returned');
         const loadingOverlay = document.getElementById('import_loading_overlay');
         const filterDateEl = document.getElementById('filter_date');
         const filterSearchEl = document.getElementById('filter_search');
@@ -404,9 +423,16 @@
                         { data: 'id_pesanan' },
                         { data: 'sku' },
                         { data: 'tanggal_pesanan' },
-                        { data: 'status', render: (data) => {
+                        { data: 'status', render: (data, type, row) => {
                             if (data === 'canceled') {
-                                return '<span class="badge badge-light-danger">Cancel</span>';
+                                const stageLabels = {
+                                    before_qc: 'Sebelum QC',
+                                    after_partial_qc: 'Setelah QC Sebagian',
+                                    after_qc: 'Setelah QC',
+                                    after_scan_out: 'Setelah Scan Out',
+                                };
+                                const detail = stageLabels[row.cancellation_stage] || '';
+                                return `<span class="badge badge-light-danger">Cancel</span>${detail ? `<div class="text-muted fs-9 mt-1">${detail}</div>` : ''}`;
                             }
                             return '<span class="badge badge-light-success">Aktif</span>';
                         }},
@@ -415,13 +441,16 @@
                             const noResi = row.no_resi || '';
                             const status = row.status || 'active';
                             const hasScanOut = !!row.has_scan_out;
+                            const hasQcScan = !!row.has_qc_scan;
+                            const processStage = row.process_stage || 'before_qc';
+                            if (!canCancelResi) return '<span class="text-muted">-</span>';
                             if (status === 'canceled') {
+                                if (hasScanOut || hasQcScan || (row.cancellation_stage && row.cancellation_stage !== 'before_qc')) {
+                                    return '<span class="text-muted">Tidak dapat diaktifkan kembali</span>';
+                                }
                                 return `<button type="button" class="btn btn-sm btn-light-warning btn-uncancel" data-id="${idPesanan}" data-resi="${noResi}">Batal Cancel</button>`;
                             }
-                            if (hasScanOut) {
-                                return '<span class="text-muted">-</span>';
-                            }
-                            return `<button type="button" class="btn btn-sm btn-light-danger btn-cancel" data-id="${idPesanan}" data-resi="${noResi}">Cancel</button>`;
+                            return `<button type="button" class="btn btn-sm btn-light-danger btn-cancel" data-id="${idPesanan}" data-resi="${noResi}" data-stage="${processStage}">Cancel</button>`;
                         }},
                     ],
                     language: {
@@ -650,10 +679,23 @@
             e.preventDefault();
             const id = this.getAttribute('data-id');
             const resi = this.getAttribute('data-resi');
+            const stage = this.getAttribute('data-stage') || 'before_qc';
             const openModal = () => {
                 if (cancelIdInput) cancelIdInput.value = id || '';
                 if (cancelNoResiInput) cancelNoResiInput.value = resi || '';
                 if (cancelReasonInput) cancelReasonInput.value = '';
+                if (confirmStockReturned) confirmStockReturned.checked = false;
+                if (cancelReturnConfirmation) cancelReturnConfirmation.classList.toggle('d-none', stage !== 'after_scan_out');
+                if (cancelReasonLabel) cancelReasonLabel.textContent = stage === 'before_qc' ? 'Alasan Cancel' : 'Alasan Cancel (wajib)';
+                if (cancelStageNotice) {
+                    const messages = {
+                        before_qc: 'Resi belum diproses QC. Kebutuhan pada picking list akan dibatalkan.',
+                        after_qc: 'Resi sudah masuk QC. Stok hasil QC akan dikembalikan dan QC transit akan dikoreksi.',
+                        after_scan_out: 'Resi sudah scan out. Stok hanya boleh dikembalikan setelah barang kembali secara fisik.',
+                    };
+                    cancelStageNotice.querySelector('div').textContent = messages[stage] || messages.after_qc;
+                }
+                cancelForm.dataset.stage = stage;
                 clearCancelErrors();
                 cancelModal?.show();
             };
@@ -661,7 +703,11 @@
             if (typeof Swal !== 'undefined') {
                 Swal.fire({
                     title: 'Batalkan resi ini?',
-                    text: 'Resi yang dibatalkan tidak bisa diproses QC scan maupun scan out.',
+                    text: stage === 'after_scan_out'
+                        ? 'Resi sudah scan out. Pastikan barang telah kembali sebelum melanjutkan.'
+                        : (stage === 'before_qc'
+                            ? 'Resi akan dikeluarkan dari picking list dan tidak dapat diproses.'
+                            : 'Barang hasil QC akan dikembalikan ke stok dan resi tidak dapat diproses kembali.'),
                     icon: 'warning',
                     showCancelButton: true,
                     confirmButtonText: 'Ya, cancel',
@@ -734,6 +780,18 @@
         cancelForm?.addEventListener('submit', async (e) => {
             e.preventDefault();
             clearCancelErrors();
+            const stage = cancelForm.dataset.stage || 'before_qc';
+            if (stage !== 'before_qc' && !(cancelReasonInput?.value || '').trim()) {
+                const reasonError = cancelForm.querySelector('[data-error="reason"]');
+                if (reasonError) reasonError.textContent = 'Alasan cancel wajib diisi.';
+                cancelReasonInput?.focus();
+                return;
+            }
+            if (stage === 'after_scan_out' && !confirmStockReturned?.checked) {
+                const confirmError = cancelForm.querySelector('[data-error="confirm_stock_returned"]');
+                if (confirmError) confirmError.textContent = 'Konfirmasi barang sudah kembali wajib dicentang.';
+                return;
+            }
             const formData = new FormData(cancelForm);
             try {
                 const res = await fetch(cancelUrl, {
@@ -759,7 +817,9 @@
                     return;
                 }
                 if (typeof Swal !== 'undefined') {
-                    Swal.fire('Berhasil', json?.message || 'Resi dibatalkan', 'success');
+                    const returnedQty = Number(json?.returned_stock_qty || 0);
+                    const detail = returnedQty > 0 ? `${json?.message || 'Resi dibatalkan'} Total unit stok kembali: ${returnedQty}.` : (json?.message || 'Resi dibatalkan');
+                    Swal.fire('Berhasil', detail, 'success');
                 }
                 cancelModal?.hide();
                 reloadTable();

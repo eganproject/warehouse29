@@ -11,7 +11,7 @@ class Permission
 {
     public static function resolveBaseRoute(string $routeName): string
     {
-        $base = preg_replace('/\.(create|store|edit|update|destroy|show|data|import|detail|approve)$/', '.index', $routeName);
+        $base = preg_replace('/\.(create|store|edit|update|destroy|show|data|import|detail|approve|cancel|uncancel)$/', '.index', $routeName);
         return $base;
     }
 
@@ -19,7 +19,7 @@ class Permission
     {
         if (preg_match('/\.(create|store|import)$/', $routeName)) return 'create';
         if (preg_match('/\.(approve)$/', $routeName)) return 'approve';
-        if (preg_match('/\.(edit|update)$/', $routeName)) return 'update';
+        if (preg_match('/\.(edit|update|cancel|uncancel)$/', $routeName)) return 'update';
         if (preg_match('/\.(destroy)$/', $routeName)) return 'delete';
         // index, show, data, others default to view
         return 'view';

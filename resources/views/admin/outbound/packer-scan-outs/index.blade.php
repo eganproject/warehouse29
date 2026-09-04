@@ -46,6 +46,7 @@
                         <th>Kode Scan</th>
                         <th>ID Pesanan</th>
                         <th>No Resi</th>
+                        <th>Status</th>
                     </tr>
                 </thead>
                 <tbody></tbody>
@@ -115,6 +116,9 @@
                 { data: 'scan_code' },
                 { data: 'id_pesanan' },
                 { data: 'no_resi' },
+                { data: 'status', render: (status) => status === 'canceled'
+                    ? '<span class="badge badge-light-danger">Dibatalkan / Reversed</span>'
+                    : '<span class="badge badge-light-success">Selesai</span>' },
             ]
         });
 

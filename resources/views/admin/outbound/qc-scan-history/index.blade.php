@@ -23,6 +23,7 @@
                 <option value="">Semua Status QC</option>
                 <option value="in_progress">Belum Lengkap</option>
                 <option value="completed">Selesai</option>
+                <option value="canceled">Dibatalkan</option>
             </select>
             <select id="filter_limit" class="form-select form-select-solid w-110px" aria-label="Jumlah data">
                 <option value="10" selected>10 / hal</option>
@@ -332,6 +333,9 @@
         }
 
         function qcStatusBadge(status) {
+            if (status === 'canceled') {
+                return '<span class="badge badge-light-danger"><i class="bi bi-x-circle me-1"></i>Dibatalkan</span>';
+            }
             if (status === 'completed') {
                 return '<span class="badge badge-light-success"><i class="bi bi-check-circle me-1"></i>Selesai</span>';
             }

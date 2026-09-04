@@ -72,8 +72,11 @@ class QcScanHistoryController extends Controller
         }
 
         $status = $request->input('status');
-        if (in_array($status, ['in_progress', 'completed'], true)) {
-            $query->where('status', $status);
+        if ($status === 'canceled') {
+            $query->whereHas('resi', fn ($resiQ) => $resiQ->where('status', 'canceled'));
+        } elseif (in_array($status, ['in_progress', 'completed'], true)) {
+            $query->where('status', $status)
+                ->whereHas('resi', fn ($resiQ) => $resiQ->whereNull('status')->orWhere('status', '!=', 'canceled'));
         }
 
         $this->applyDateFilter($query, $request);
@@ -88,6 +91,7 @@ class QcScanHistoryController extends Controller
         }
 
         $data = $query->get()->map(function ($row) {
+            $isCanceled = ($row->resi?->status ?? 'active') === 'canceled';
             $ledgerItems = $row->items ?? collect();
             $requiredQty = (int) $ledgerItems->sum('required_qty');
             $scannedQty = (int) $ledgerItems->sum('scanned_qty');
@@ -106,7 +110,7 @@ class QcScanHistoryController extends Controller
                 'no_resi'      => $row->resi?->no_resi ?? '-',
                 'id_pesanan'   => $row->resi?->id_pesanan ?? '-',
                 'picker'       => $row->scanner?->name ?? '-',
-                'status'       => $row->status,
+                'status'       => $isCanceled ? 'canceled' : $row->status,
                 'scanned_at'   => $row->scanned_at ? Carbon::parse($row->scanned_at)->format('Y-m-d H:i') : '',
                 'completed_at' => $row->completed_at ? Carbon::parse($row->completed_at)->format('Y-m-d H:i') : '',
                 'item'         => $labels->implode(', ') ?: '-',

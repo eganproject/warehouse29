@@ -39,4 +39,9 @@ class QcScanResi extends Model
     {
         return $this->belongsTo(User::class, 'completed_by');
     }
+
+    public function cancellation()
+    {
+        return $this->hasOne(ResiCancellation::class);
+    }
 }

@@ -185,6 +185,16 @@ class PackerScanOutController extends Controller
 
         DB::beginTransaction();
         try {
+            $resi = Resi::where('id', $resi->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+            if (($resi->status ?? 'active') === 'canceled') {
+                DB::rollBack();
+                return response()->json([
+                    'message' => 'Resi sudah dibatalkan.',
+                ], 422);
+            }
+
             $existingScan = PackerScanOut::where('resi_id', $resi->id)
                 ->lockForUpdate()
                 ->first();

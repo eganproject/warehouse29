@@ -56,4 +56,9 @@ class Resi extends Model
     {
         return $this->belongsTo(Kurir::class, 'kurir_id');
     }
+
+    public function cancellation()
+    {
+        return $this->hasOne(ResiCancellation::class);
+    }
 }
