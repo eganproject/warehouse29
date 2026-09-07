@@ -2,173 +2,85 @@
 
 namespace App\Exports;
 
-use App\Http\Controllers\Admin\StockAsOfReportController;
 use App\Models\Category;
+use App\Support\StockPeriodReport;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
 use Maatwebsite\Excel\Concerns\WithCustomStartCell;
+use Maatwebsite\Excel\Concerns\WithCustomValueBinder;
 use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
-use Maatwebsite\Excel\Concerns\WithStyles;
 use Maatwebsite\Excel\Events\AfterSheet;
-use PhpOffice\PhpSpreadsheet\Style\Alignment;
-use PhpOffice\PhpSpreadsheet\Style\Border;
-use PhpOffice\PhpSpreadsheet\Style\Fill;
-use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
+use PhpOffice\PhpSpreadsheet\Cell\Cell;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
+use PhpOffice\PhpSpreadsheet\Cell\DefaultValueBinder;
 
-class StockAsOfReportExport implements FromCollection, WithHeadings, WithMapping, ShouldAutoSize, WithCustomStartCell, WithStyles, WithEvents
+class StockAsOfReportExport extends DefaultValueBinder implements FromCollection, ShouldAutoSize, WithCustomStartCell, WithCustomValueBinder, WithEvents, WithHeadings, WithMapping
 {
-    private array $summary = [];
-
-    public function __construct(private array $filters)
-    {
-    }
+    public function __construct(private array $filters) {}
 
     public function collection(): Collection
     {
-        $controller = app(StockAsOfReportController::class);
-        $this->summary = $controller->summaryForExport($this->filters);
-
-        return $controller->rowsForExport($this->filters);
+        return app(StockPeriodReport::class)->ordered($this->filters)->get();
     }
 
     public function startCell(): string
     {
-        return 'A8';
+        return 'A6';
     }
 
     public function headings(): array
     {
-        return [
-            'No',
-            'SKU',
-            'Nama Item',
-            'Tipe',
-            'Kategori',
-            'Stok Reguler',
-            'Stok Rusak',
-            'Total Stok',
-            'Safety Stock',
-            'Gap Safety',
-            'Status',
-            'Total IN s/d Tanggal',
-            'Total OUT s/d Tanggal',
-            'Mutasi Terakhir',
-            'Alamat',
-        ];
+        return $this->filters['tab'] === 'movement'
+            ? ['SKU', 'Nama Barang', 'Kategori', 'Alamat', 'Satuan', 'Qty Out', 'Rata-rata Out / Hari', 'Hari Keluar', 'Klasifikasi', 'Stok Akhir', 'Keluar Terakhir']
+            : ['SKU', 'Nama Barang', 'Kategori', 'Alamat', 'Satuan', 'Stok Awal', 'Qty In', 'Qty Out', 'Stok Akhir'];
     }
 
     public function map($row): array
     {
-        static $no = 0;
-        $no++;
+        $identity = [$row->sku, $row->name, $row->category, $row->address, $row->uom];
 
-        return [
-            $no,
-            $row['sku'],
-            $row['name'],
-            $row['item_type'],
-            $row['category'],
-            $row['stock_as_of'],
-            $row['damaged_stock_as_of'],
-            $row['total_stock_as_of'],
-            $row['safety_stock'],
-            $row['gap'],
-            $row['status'],
-            $row['inbound_as_of'],
-            $row['outbound_as_of'],
-            $row['last_mutation_at'],
-            $row['address'],
-        ];
+        return array_merge($identity, $this->filters['tab'] === 'movement'
+            ? [(int) $row->qty_out, round((float) $row->average_out, 2), (int) $row->outgoing_days, StockPeriodReport::MOVEMENTS[$row->movement], (int) $row->closing, $row->last_out_at ?? '-']
+            : [(int) $row->opening, (int) $row->qty_in, (int) $row->qty_out, (int) $row->closing]);
     }
 
-    public function styles(Worksheet $sheet): array
+    public function bindValue(Cell $cell, mixed $value): bool
     {
-        return [
-            1 => ['font' => ['bold' => true, 'size' => 14]],
-            8 => [
-                'font' => ['bold' => true, 'color' => ['argb' => 'FFFFFFFF']],
-                'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['argb' => 'FF1F2937']],
-                'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
-            ],
-        ];
+        if (is_string($value)) {
+            $cell->setValueExplicit($value, DataType::TYPE_STRING);
+
+            return true;
+        }
+
+        return parent::bindValue($cell, $value);
     }
 
     public function registerEvents(): array
     {
-        return [
-            AfterSheet::class => function (AfterSheet $event) {
-                $sheet = $event->sheet->getDelegate();
-                $highestRow = $sheet->getHighestRow();
-
-                $sheet->mergeCells('A1:O1');
-                $sheet->setCellValue('A1', 'Laporan Stok Per Tanggal');
-                $sheet->setCellValue('A3', 'Tanggal Posisi');
-                $sheet->setCellValue('B3', $this->filters['as_of_date'] ?? '');
-                $sheet->setCellValue('D3', 'Dibuat Pada');
-                $sheet->setCellValue('E3', now()->format('Y-m-d H:i'));
-
-                $sheet->setCellValue('A4', 'Pencarian');
-                $sheet->setCellValue('B4', $this->filters['q'] !== '' ? $this->filters['q'] : 'Semua');
-                $sheet->setCellValue('D4', 'Kategori');
-                $sheet->setCellValue('E4', $this->categoryLabel());
-
-                $sheet->setCellValue('A5', 'Status');
-                $sheet->setCellValue('B5', $this->statusLabel());
-                $sheet->setCellValue('D5', 'Jenis Filter Stok');
-                $sheet->setCellValue('E5', $this->stockTypeLabel());
-
-                $sheet->setCellValue('A6', 'Total SKU');
-                $sheet->setCellValue('B6', $this->summary['total_sku'] ?? 0);
-                $sheet->setCellValue('D6', 'Total Reguler');
-                $sheet->setCellValue('E6', $this->summary['total_regular'] ?? 0);
-                $sheet->setCellValue('G6', 'Total Rusak');
-                $sheet->setCellValue('H6', $this->summary['total_damaged'] ?? 0);
-                $sheet->setCellValue('J6', 'Total Semua');
-                $sheet->setCellValue('K6', $this->summary['total_all'] ?? 0);
-
-                $sheet->freezePane('A9');
-                $sheet->setAutoFilter('A8:O'.$highestRow);
-                $sheet->getStyle('A8:O'.$highestRow)->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
-                $sheet->getStyle('F9:M'.$highestRow)->getNumberFormat()->setFormatCode('#,##0');
-                $sheet->getStyle('A8:O'.$highestRow)->getAlignment()->setVertical(Alignment::VERTICAL_TOP);
-                $sheet->getStyle('A9:A'.$highestRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-                $sheet->getStyle('F9:M'.$highestRow)->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
-            },
-        ];
-    }
-
-    private function categoryLabel(): string
-    {
-        $categoryId = $this->filters['category_id'] ?? '';
-        if ($categoryId === '' || $categoryId === null) {
-            return 'Semua';
-        }
-        if ((int) $categoryId === 0) {
-            return 'Tanpa Kategori';
-        }
-
-        return Category::whereKey((int) $categoryId)->value('name') ?? 'Kategori '.$categoryId;
-    }
-
-    private function statusLabel(): string
-    {
-        return match ($this->filters['status'] ?? '') {
-            'positive' => 'Stok > 0',
-            'zero' => 'Stok = 0',
-            'negative' => 'Stok < 0',
-            'low' => 'Di bawah safety stock',
-            default => 'Semua',
-        };
-    }
-
-    private function stockTypeLabel(): string
-    {
-        return match ($this->filters['stock_type'] ?? 'regular') {
-            'damaged' => 'Stok Rusak',
-            default => 'Stok Reguler',
-        };
+        return [AfterSheet::class => function (AfterSheet $event) {
+            $sheet = $event->sheet->getDelegate();
+            $lastColumn = $this->filters['tab'] === 'movement' ? 'K' : 'I';
+            $sheet->mergeCells('A1:'.$lastColumn.'1');
+            $sheet->setCellValue('A1', $this->filters['tab'] === 'movement' ? 'Analisis Pergerakan Stok' : 'Saldo Stok per Periode');
+            $sheet->mergeCells('A2:'.$lastColumn.'2');
+            $sheet->setCellValue('A2', $this->filters['date_from'].' s.d. '.$this->filters['date_to'].' | Stok '.($this->filters['stock_type'] === 'damaged' ? 'rusak' : 'reguler'));
+            $sheet->mergeCells('A3:'.$lastColumn.'3');
+            $sheet->setCellValue('A3', 'SKU fisik aktif; berdasarkan mutasi tercatat. Stok akhir = stok awal + qty in - qty out.');
+            $sheet->mergeCells('A4:'.$lastColumn.'4');
+            $sheet->setCellValue('A4', $this->filters['tab'] === 'movement'
+                ? 'Fast: keluar pada >= 50% hari periode; slow: > 0 dan < 50%; non-moving: tidak ada mutasi keluar. Seluruh jenis mutasi keluar, bukan penjualan saja.'
+                : 'Stok awal: sebelum tanggal awal. Qty in/out: selama periode termasuk tanggal akhir.');
+            $categoryId = $this->filters['category_id'] ?? '';
+            $category = $categoryId === '' ? 'Semua' : ((int) $categoryId === 0 ? 'Tanpa kategori' : (Category::find($categoryId)?->name ?? $categoryId));
+            $sheet->mergeCells('A5:'.$lastColumn.'5');
+            $sheet->setCellValueExplicit('A5', 'Kategori: '.$category.' | Pencarian: '.($this->filters['q'] ?: 'Semua').' | Status: '.($this->filters['status'] ?: 'Semua').' | Pergerakan: '.($this->filters['tab'] === 'movement' ? (StockPeriodReport::MOVEMENTS[$this->filters['movement'] ?? ''] ?? 'Semua') : 'Semua'), DataType::TYPE_STRING);
+            $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(14);
+            $sheet->getStyle('A6:'.$lastColumn.'6')->getFont()->setBold(true);
+            $sheet->freezePane('F7');
+            $sheet->setAutoFilter('A6:'.$lastColumn.max(6, $sheet->getHighestRow()));
+        }];
     }
 }
