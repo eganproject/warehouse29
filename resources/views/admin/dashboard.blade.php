@@ -754,9 +754,16 @@
 </style>
 
 <div class="dash-wrap">
+    @if ($errors->any())
+        <div class="alert alert-danger" role="alert">
+            @foreach ($errors->all() as $error)
+                <div>{{ $error }}</div>
+            @endforeach
+        </div>
+    @endif
     <ul class="nav nav-tabs dash-tabs mb-6" id="dashboard_tabs" role="tablist">
         <li class="nav-item" role="presentation">
-            <button class="nav-link active" id="tab-resi" data-bs-toggle="tab" data-bs-target="#pane-resi" type="button" role="tab" aria-controls="pane-resi" aria-selected="true">
+            <button class="nav-link {{ request('tab') !== 'report' ? 'active' : '' }}" id="tab-resi" data-bs-toggle="tab" data-bs-target="#pane-resi" type="button" role="tab" aria-controls="pane-resi" aria-selected="{{ request('tab') !== 'report' ? 'true' : 'false' }}">
                 <i class="fa-solid fa-truck-fast me-2"></i>Operasional Resi
             </button>
         </li>
@@ -770,10 +777,18 @@
                 <i class="fa-solid fa-chart-line me-2"></i>Aktivitas Inventory
             </button>
         </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link {{ request('tab') === 'report' ? 'active' : '' }}" id="tab-report" data-bs-toggle="tab" data-bs-target="#pane-report" type="button" role="tab" aria-controls="pane-report" aria-selected="{{ request('tab') === 'report' ? 'true' : 'false' }}">
+                <i class="fa-solid fa-chart-column me-2"></i>Laporan Resi
+            </button>
+        </li>
     </ul>
 
     <div class="tab-content" id="dashboard_tab_content">
-        <div class="tab-pane fade show active" id="pane-resi" role="tabpanel" aria-labelledby="tab-resi">
+        <div class="tab-pane fade {{ request('tab') === 'report' ? 'show active' : '' }}" id="pane-report" role="tabpanel" aria-labelledby="tab-report">
+            @include('admin.dashboards.resi-report')
+        </div>
+        <div class="tab-pane fade {{ request('tab') !== 'report' ? 'show active' : '' }}" id="pane-resi" role="tabpanel" aria-labelledby="tab-resi">
     {{-- ============ Ringkasan Resi ============ --}}
     <div class="card mb-6">
         <div class="card-body">

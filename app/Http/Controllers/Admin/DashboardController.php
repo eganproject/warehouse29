@@ -7,6 +7,7 @@ use App\Models\Kurir;
 use App\Models\PackerScanOut;
 use App\Models\QcScanResi;
 use App\Models\Resi;
+use App\Support\ResiReport;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -15,6 +16,19 @@ class DashboardController extends Controller
 {
     public function index(Request $request)
     {
+        $reportFilters = $request->validate([
+            'report_start' => ['nullable', 'date_format:Y-m-d'],
+            'report_end' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:report_start'],
+            'report_kurir' => ['nullable', 'integer', 'exists:kurirs,id'],
+            'report_status' => ['nullable', 'in:pending,qc_progress,ready,scanned,canceled'],
+        ]);
+        $reportFilters['report_start'] = $reportFilters['report_start'] ?? now()->toDateString();
+        $reportFilters['report_end'] = $reportFilters['report_end'] ?? $reportFilters['report_start'];
+        validator($reportFilters, [
+            'report_end' => ['after_or_equal:report_start', 'before_or_equal:'.Carbon::parse($reportFilters['report_start'])->addDays(365)->toDateString()],
+        ], ['report_end.before_or_equal' => 'Rentang laporan maksimal 366 hari.'])->validate();
+        $report = app(ResiReport::class)->build($reportFilters);
+
         $today = now()->toDateString();
         $selectedDate = $today;
         $dateInput = $request->query('date');
@@ -201,6 +215,8 @@ class DashboardController extends Controller
             });
 
         return view('admin.dashboard', [
+            'report' => $report,
+            'reportFilters' => $reportFilters,
             'today' => $selectedDate,
             'totalResi' => $totalResiActive,
             'totalResiCanceled' => $totalResiCanceled,
