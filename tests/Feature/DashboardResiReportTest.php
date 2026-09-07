@@ -103,6 +103,29 @@ class DashboardResiReportTest extends TestCase
         });
     }
 
+    public function test_couriers_are_sorted_by_unfinished_resis_then_name(): void
+    {
+        $user = User::factory()->create();
+        foreach (['A' => 1, 'C' => 2, 'B' => 2] as $name => $pendingCount) {
+            $courier = Kurir::create(['name' => $name]);
+            for ($i = 0; $i < $pendingCount; $i++) {
+                $resi = $this->resi($user, $name.$i, ['kurir_id' => $courier->id]);
+                if ($i === 1) {
+                    QcScanResi::create([
+                        'resi_id' => $resi->id, 'scanned_by' => $user->id,
+                        'status' => $name === 'B' ? 'completed' : 'in_progress',
+                    ]);
+                }
+            }
+            $this->resi($user, $name.'-CANCELED', ['kurir_id' => $courier->id, 'status' => 'canceled']);
+        }
+
+        $report = app(ResiReport::class)->build(['report_start' => '2026-09-05', 'report_end' => '2026-09-05']);
+
+        $this->assertSame(['B', 'C', 'A'], $report['couriers']->pluck('courier_name')->all());
+        $this->assertEquals([3, 3, 2], $report['couriers']->pluck('total')->all());
+    }
+
     private function resi(User $user, string $code, array $attributes = []): Resi
     {
         return Resi::create(array_merge([

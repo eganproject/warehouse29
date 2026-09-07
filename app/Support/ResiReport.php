@@ -58,8 +58,11 @@ class ResiReport
                 'tanggal_upload' => $key, 'total' => 0, 'total_qty' => 0, 'active_qty' => 0,
             ], array_fill_keys(array_keys(self::STAGES), 0)));
         }
-        $couriers = $aggregate((clone $rows)->select('kurir_id', 'courier_name'))
-            ->groupBy('kurir_id', 'courier_name')->orderByRaw('(pending + qc_progress + ready) DESC')
+        $courierTotals = $aggregate((clone $rows)->select('kurir_id', 'courier_name'))
+            ->groupBy('kurir_id', 'courier_name');
+        // MySQL cannot combine aggregate aliases in ORDER BY at the same query level.
+        $couriers = DB::query()->fromSub($courierTotals, 'courier_totals')
+            ->orderByRaw('(pending + qc_progress + ready) DESC')
             ->orderBy('courier_name')->get();
         $details = (clone $rows)
             ->when($filters['report_status'] ?? null, fn ($q, $stage) => $q->where('stage', $stage))
