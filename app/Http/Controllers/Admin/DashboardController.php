@@ -18,12 +18,10 @@ class DashboardController extends Controller
     {
         $reportFilters = $request->validate([
             'report_start' => ['nullable', 'date_format:Y-m-d'],
-            'report_end' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:report_start'],
-            'report_kurir' => ['nullable', 'integer', 'exists:kurirs,id'],
-            'report_status' => ['nullable', 'in:pending,qc_progress,ready,scanned,canceled'],
+            'report_end' => ['nullable', 'date_format:Y-m-d'],
         ]);
-        $reportFilters['report_start'] = $reportFilters['report_start'] ?? now()->toDateString();
-        $reportFilters['report_end'] = $reportFilters['report_end'] ?? $reportFilters['report_start'];
+        $reportFilters['report_start'] = $reportFilters['report_start'] ?? Carbon::parse($reportFilters['report_end'] ?? now())->startOfMonth()->toDateString();
+        $reportFilters['report_end'] = $reportFilters['report_end'] ?? max($reportFilters['report_start'], now()->toDateString());
         validator($reportFilters, [
             'report_end' => ['after_or_equal:report_start', 'before_or_equal:'.Carbon::parse($reportFilters['report_start'])->addDays(365)->toDateString()],
         ], ['report_end.before_or_equal' => 'Rentang laporan maksimal 366 hari.'])->validate();
