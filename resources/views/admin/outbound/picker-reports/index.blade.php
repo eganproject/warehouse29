@@ -4,6 +4,9 @@
 @section('page_title', 'Laporan QC Scan')
 
 @section('page_actions')
+    <button type="button" class="btn btn-sm btn-success me-2" id="btn_export_report">
+        <i class="bi bi-file-earmark-excel me-1"></i>Export Excel
+    </button>
     <button type="button" class="btn btn-sm btn-light-primary" id="btn_print_report">
         <i class="bi bi-printer me-1"></i>Cetak Laporan
     </button>
@@ -106,6 +109,9 @@
         gap: 12px;
         margin: 18px 0;
     }
+    .pr-summary-grid.pr-summary-grid--six { grid-template-columns: repeat(3, 1fr); }
+    @media (max-width: 991px) { .pr-summary-grid.pr-summary-grid--six { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 575px) { .pr-summary-grid.pr-summary-grid--six { grid-template-columns: 1fr; } }
     @media (max-width: 767px) { .pr-summary-grid { grid-template-columns: repeat(2, 1fr); } }
     .pr-tile {
         display: flex;
@@ -164,6 +170,15 @@
     .pr-chip--blue  { background: rgba(29, 78, 216, 0.1);  color: #1d4ed8; }
     .pr-chip--green { background: rgba(4, 120, 87, 0.12);  color: #047857; }
     .pr-chip--amber { background: rgba(180, 83, 9, 0.12);  color: #b45309; }
+    .pr-rate {
+        display: inline-flex;
+        align-items: baseline;
+        gap: 4px;
+        color: #1d4ed8;
+        font-size: 17px;
+        font-weight: 800;
+    }
+    .pr-rate small { color: #64748b; font-size: 10px; font-weight: 700; }
     .pr-progress {
         height: 7px;
         border-radius: 999px;
@@ -201,6 +216,22 @@
     .pr-sku-chip b { font-weight: 800; }
     .pr-sku-chip.is-done b { color: #047857; }
     .pr-sku-chip.is-wip b { color: #b45309; }
+    .pr-hour-panel { border: 1px solid #e5e9f0; border-radius: 12px; overflow: hidden; }
+    .pr-hour-panel-head { padding: 13px 16px; background: #f8fafc; border-bottom: 1px solid #e5e9f0; }
+    .pr-hour-bar { width: 90px; height: 6px; border-radius: 999px; background: #e2e8f0; overflow: hidden; }
+    .pr-hour-bar > span { display: block; height: 100%; border-radius: inherit; background: #2563eb; }
+    .pr-metric-note {
+        display: flex;
+        align-items: flex-start;
+        gap: 9px;
+        padding: 10px 13px;
+        margin: -2px 0 16px;
+        border-radius: 9px;
+        background: #eff6ff;
+        color: #475569;
+        font-size: 11px;
+        line-height: 1.55;
+    }
 
     /* ---------- Signature (print only) ---------- */
     .pr-doc-sign { display: none; }
@@ -331,7 +362,7 @@
             </div>
 
             {{-- Ringkasan --}}
-            <div class="pr-summary-grid">
+            <div class="pr-summary-grid pr-summary-grid--six">
                 <div class="pr-tile pr-tile--blue">
                     <div class="pr-tile-icon"><i class="bi bi-people"></i></div>
                     <div>
@@ -356,6 +387,22 @@
                         <div class="pr-tile-sub" id="sum_completed_pct">0% dari total</div>
                     </div>
                 </div>
+                <div class="pr-tile pr-tile--blue">
+                    <div class="pr-tile-icon"><i class="bi bi-speedometer2"></i></div>
+                    <div>
+                        <div class="pr-tile-label">Rata-rata Produktivitas</div>
+                        <div class="pr-tile-value" id="sum_rate">0</div>
+                        <div class="pr-tile-sub" id="sum_active_hours">0 jam aktif</div>
+                    </div>
+                </div>
+                <div class="pr-tile pr-tile--indigo">
+                    <div class="pr-tile-icon"><i class="bi bi-stopwatch"></i></div>
+                    <div>
+                        <div class="pr-tile-label">Rata-rata Durasi</div>
+                        <div class="pr-tile-value" id="sum_duration">-</div>
+                        <div class="pr-tile-sub">scan awal sampai selesai</div>
+                    </div>
+                </div>
                 <div class="pr-tile pr-tile--amber">
                     <div class="pr-tile-icon"><i class="bi bi-box-seam"></i></div>
                     <div>
@@ -364,6 +411,11 @@
                         <div class="pr-tile-sub">qty SKU terverifikasi</div>
                     </div>
                 </div>
+            </div>
+
+            <div class="pr-metric-note">
+                <i class="bi bi-info-circle-fill text-primary mt-1"></i>
+                <span><b>Resi/jam aktif</b> = total resi dibagi jumlah blok jam yang memiliki aktivitas. <b>Rata-rata durasi</b> dihitung dari scan awal sampai QC selesai dan hanya memakai resi dengan waktu selesai yang valid.</span>
             </div>
 
             {{-- Tabel --}}
@@ -375,12 +427,11 @@
                             <th>Tanggal</th>
                             <th>Petugas QC</th>
                             <th class="text-center">Total Resi</th>
-                            <th class="text-center">Selesai</th>
-                            <th class="text-center">Belum</th>
-                            <th width="150">Penyelesaian</th>
-                            <th class="text-center">SKU</th>
-                            <th class="text-center">Qty (Scan/Wajib)</th>
-                            <th>Jam Kerja</th>
+                            <th width="145">Produktivitas</th>
+                            <th width="170">Penyelesaian</th>
+                            <th class="text-center">Volume Item</th>
+                            <th class="text-center">Rata-rata Durasi</th>
+                            <th>Rentang Aktivitas</th>
                             <th class="text-end pr-no-print" width="80">Aksi</th>
                         </tr>
                     </thead>
@@ -421,22 +472,48 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <div class="pr-summary-grid mb-4">
+                <div class="pr-summary-grid pr-summary-grid--six mb-4">
                     <div class="pr-tile pr-tile--indigo">
                         <div class="pr-tile-icon"><i class="bi bi-clipboard-data"></i></div>
                         <div><div class="pr-tile-label">Total Resi</div><div class="pr-tile-value fs-3" id="detail_total">0</div></div>
                     </div>
                     <div class="pr-tile pr-tile--green">
-                        <div class="pr-tile-icon"><i class="bi bi-check2-circle"></i></div>
-                        <div><div class="pr-tile-label">Selesai</div><div class="pr-tile-value fs-3" id="detail_completed">0</div></div>
+                        <div class="pr-tile-icon"><i class="bi bi-speedometer2"></i></div>
+                        <div><div class="pr-tile-label">Resi/Jam Aktif</div><div class="pr-tile-value fs-3" id="detail_rate">0</div></div>
                     </div>
                     <div class="pr-tile pr-tile--amber">
-                        <div class="pr-tile-icon"><i class="bi bi-hourglass-split"></i></div>
-                        <div><div class="pr-tile-label">Belum Lengkap</div><div class="pr-tile-value fs-3" id="detail_pending">0</div></div>
+                        <div class="pr-tile-icon"><i class="bi bi-bar-chart"></i></div>
+                        <div><div class="pr-tile-label">Jam Tersibuk</div><div class="pr-tile-value fs-5" id="detail_peak">-</div></div>
+                    </div>
+                    <div class="pr-tile pr-tile--blue">
+                        <div class="pr-tile-icon"><i class="bi bi-stopwatch"></i></div>
+                        <div><div class="pr-tile-label">Rata-rata Durasi</div><div class="pr-tile-value fs-3" id="detail_duration">-</div></div>
+                    </div>
+                    <div class="pr-tile pr-tile--green">
+                        <div class="pr-tile-icon"><i class="bi bi-check2-circle"></i></div>
+                        <div><div class="pr-tile-label">Selesai</div><div class="pr-tile-value fs-3" id="detail_completed">0</div></div>
                     </div>
                     <div class="pr-tile pr-tile--blue">
                         <div class="pr-tile-icon"><i class="bi bi-box-seam"></i></div>
                         <div><div class="pr-tile-label">Qty Discan</div><div class="pr-tile-value fs-3" id="detail_qty">0</div></div>
+                    </div>
+                </div>
+
+                <div class="pr-hour-panel mb-5">
+                    <div class="pr-hour-panel-head d-flex flex-wrap align-items-center justify-content-between gap-2">
+                        <div>
+                            <div class="fw-bold text-gray-800"><i class="bi bi-clock-history text-primary me-2"></i>Performa Per Jam</div>
+                            <div class="text-muted fs-8">Resi dikelompokkan berdasarkan jam saat mulai diproses QC.</div>
+                        </div>
+                        <span class="badge badge-light-primary" id="detail_active_hours">0 jam aktif</span>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table align-middle mb-0 fs-7">
+                            <thead><tr class="text-gray-500 fw-bolder text-uppercase fs-8">
+                                <th class="ps-4">Jam</th><th>Resi</th><th>Selesai</th><th>Penyelesaian</th><th>SKU</th><th>Qty Scan/Wajib</th><th class="pe-4">Rata-rata Durasi</th>
+                            </tr></thead>
+                            <tbody id="detail_hourly_body"><tr><td colspan="7" class="text-center text-muted py-4">Belum ada data.</td></tr></tbody>
+                        </table>
                     </div>
                 </div>
 
@@ -475,6 +552,7 @@
 <script>
     const dataUrl   = '{{ $dataUrl }}';
     const detailUrl = '{{ route('admin.outbound.picker-reports.detail') }}';
+    const exportUrl = '{{ $exportUrl }}';
     const todayStr  = '{{ $today ?? '' }}';
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -487,6 +565,7 @@
         const applyBtn = document.getElementById('filter_apply');
         const resetBtn = document.getElementById('filter_reset');
         const printBtn = document.getElementById('btn_print_report');
+        const exportBtn = document.getElementById('btn_export_report');
         const presetGroup = document.getElementById('pr_preset_group');
         const periodText = document.getElementById('pr_period_text');
         const printedAtEl = document.getElementById('pr_printed_at');
@@ -494,6 +573,7 @@
         const detailModal = detailModalEl ? new bootstrap.Modal(detailModalEl) : null;
         const detailSearchEl = document.getElementById('detail_search');
         const detailBody = document.getElementById('detail_body');
+        const detailHourlyBody = document.getElementById('detail_hourly_body');
 
         const ID_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
         const esc = v => String(v ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
@@ -588,6 +668,9 @@
             setText('sum_completed', num(completed));
             setText('sum_completed_pct', `${pct}% dari total`);
             setText('sum_qty', num(s.qty_total));
+            setText('sum_rate', `${num(s.resi_per_hour)} resi/jam`);
+            setText('sum_active_hours', `${num(s.active_hours_total)} jam aktif`);
+            setText('sum_duration', s.avg_completion_minutes === null ? '-' : `${num(s.avg_completion_minutes)} menit`);
         };
 
         // ---------- DataTable ----------
@@ -625,25 +708,29 @@
                 { data: 'date', render: d => `<span class="fw-bold">${esc(formatDateID(d)) || '-'}</span>` },
                 { data: 'petugas', render: d => `<span class="fw-semibold text-gray-800">${esc(d) || '-'}</span>` },
                 { data: 'total_resi', className: 'text-center', render: d => `<span class="pr-chip pr-chip--blue">${num(d)}</span>` },
-                { data: 'completed', className: 'text-center pr-num fw-bold text-success', render: num },
-                { data: 'pending', className: 'text-center pr-num fw-bold text-warning', render: num },
+                {
+                    data: 'resi_per_hour',
+                    render: (d, t, row) => `<div class="pr-rate">${num(d)} <small>resi/jam</small></div>
+                        <div class="text-muted fs-8">${num(row.active_hours)} jam aktif</div>`,
+                },
                 {
                     data: 'completion_pct',
-                    render(d) {
+                    render(d, t, row) {
                         const pct = Number(d || 0);
                         const color = pct >= 100 ? '#047857' : (pct > 0 ? '#b45309' : '#cbd5e1');
                         return `<div class="d-flex align-items-center gap-2">
                                     <div class="pr-progress flex-grow-1"><div class="pr-progress-bar" style="width:${pct}%;background:${color}"></div></div>
                                     <span class="fw-bold fs-8">${pct}%</span>
-                                </div>`;
+                                </div><div class="text-muted fs-8 mt-1">${num(row.completed)} selesai • ${num(row.pending)} belum</div>`;
                     },
                 },
-                { data: 'sku_lines', className: 'text-center pr-num', render: num },
                 {
                     data: 'scanned_qty',
                     className: 'text-center pr-num',
-                    render: (d, t, row) => `<span class="fw-bold">${num(d)}</span> <span class="text-muted">/ ${num(row.required_qty)}</span>`,
+                    render: (d, t, row) => `<span class="fw-bold">${num(d)}</span> <span class="text-muted">/ ${num(row.required_qty)}</span>
+                        <div class="text-muted fs-8">${num(row.sku_lines)} baris SKU</div>`,
                 },
+                { data: 'avg_completion_minutes', className: 'text-center pr-num', render: d => d === null ? '<span class="text-muted">-</span>' : `<span class="fw-bold">${num(d)}</span><div class="text-muted fs-8">menit/resi</div>` },
                 { data: 'range', render: d => `<span class="text-muted"><i class="bi bi-clock me-1"></i>${esc(d) || '-'}</span>` },
                 {
                     data: null,
@@ -682,6 +769,15 @@
         });
 
         printBtn?.addEventListener('click', () => window.print());
+        exportBtn?.addEventListener('click', () => {
+            const params = new URLSearchParams({
+                q: searchInput?.value || '',
+                divisi_id: divisiSelect?.value || '',
+                date_from: dateFromEl?.value || '',
+                date_to: dateToEl?.value || '',
+            });
+            window.location.href = `${exportUrl}?${params.toString()}`;
+        });
 
         // ---------- Detail modal ----------
         let detailRows = [];
@@ -722,13 +818,34 @@
                     </td>
                     <td>${statusBadge(r.status)}</td>
                     <td><span class="fw-semibold">${esc(r.scanned_at) || '-'}</span>
-                        <div class="text-muted fs-8">${r.completed_at && r.completed_at !== '-' ? 'Selesai ' + esc(r.completed_at) : 'Belum selesai'}</div>
+                        <div class="text-muted fs-8">${r.completed_at && r.completed_at !== '-' ? 'Selesai ' + esc(r.completed_at) + (r.completion_minutes !== null ? ` • ${num(r.completion_minutes)} menit` : '') : 'Belum selesai'}</div>
                     </td>
                     <td>${skuChips(r.items)}</td>
                 </tr>`).join('');
         };
 
         detailSearchEl?.addEventListener('input', renderDetailRows);
+
+        const renderHourlyRows = (rows) => {
+            if (!detailHourlyBody) return;
+            if (!Array.isArray(rows) || !rows.length) {
+                detailHourlyBody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">Tidak ada aktivitas per jam.</td></tr>';
+                return;
+            }
+            const maxResi = Math.max(...rows.map(row => Number(row.total_resi || 0)), 1);
+            detailHourlyBody.innerHTML = rows.map(row => {
+                const width = Math.max(6, Math.round(Number(row.total_resi || 0) / maxResi * 100));
+                return `<tr>
+                    <td class="ps-4 fw-semibold text-nowrap">${esc(row.hour)}</td>
+                    <td><div class="d-flex align-items-center gap-2"><b>${num(row.total_resi)}</b><div class="pr-hour-bar"><span style="width:${width}%"></span></div></div></td>
+                    <td><b class="text-success">${num(row.completed)}</b><span class="text-muted"> / ${num(row.total_resi)}</span></td>
+                    <td><span class="fw-bold">${num(row.completion_pct)}%</span></td>
+                    <td>${num(row.sku_lines)}</td>
+                    <td><b>${num(row.scanned_qty)}</b><span class="text-muted"> / ${num(row.required_qty)}</span></td>
+                    <td class="pe-4">${row.avg_completion_minutes === null ? '<span class="text-muted">-</span>' : `<b>${num(row.avg_completion_minutes)}</b> menit`}</td>
+                </tr>`;
+            }).join('');
+        };
 
         tableEl.on('click', '.btn-detail', async function(e) {
             e.preventDefault();
@@ -740,7 +857,11 @@
             detailRows = [];
             if (detailSearchEl) detailSearchEl.value = '';
             setText('detail_subtitle', `${petugas} • ${formatDateID(date)}`);
-            ['detail_total', 'detail_completed', 'detail_pending', 'detail_qty'].forEach(id => setText(id, '0'));
+            ['detail_total', 'detail_completed', 'detail_qty', 'detail_rate'].forEach(id => setText(id, '0'));
+            setText('detail_peak', '-');
+            setText('detail_duration', '-');
+            setText('detail_active_hours', '0 jam aktif');
+            renderHourlyRows([]);
             if (detailBody) detailBody.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-4"><span class="spinner-border spinner-border-sm me-2"></span>Memuat data...</td></tr>`;
             detailModal.show();
 
@@ -753,8 +874,12 @@
                 setText('detail_subtitle', `${json.petugas || petugas} • ${formatDateID(json.date)}`);
                 setText('detail_total', num(json.total_resi));
                 setText('detail_completed', num(json.completed));
-                setText('detail_pending', num(json.pending));
                 setText('detail_qty', `${num(json.scanned_qty)} / ${num(json.required_qty)}`);
+                setText('detail_rate', `${num(json.resi_per_hour)} / jam`);
+                setText('detail_peak', `${json.peak_hour || '-'} • ${num(json.peak_hour_resi)} resi`);
+                setText('detail_duration', json.avg_completion_minutes === null ? '-' : `${num(json.avg_completion_minutes)} menit`);
+                setText('detail_active_hours', `${num(json.active_hours)} jam aktif`);
+                renderHourlyRows(json.hourly || []);
                 detailRows = Array.isArray(json.resis) ? json.resis : [];
                 renderDetailRows();
             } catch (err) {
