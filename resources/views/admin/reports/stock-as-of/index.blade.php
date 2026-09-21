@@ -194,10 +194,17 @@
 
         const numberText = (value) => Number(value || 0).toLocaleString('id-ID');
         const dateText = (value, options = { day: 'numeric', month: 'short' }) => {
-            const [year, month, day] = String(value).split('-').map(Number);
-            return new Intl.DateTimeFormat('id-ID', options).format(new Date(year, month - 1, day));
+            const parts = String(value ?? '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+            if (!parts) return '';
+
+            const date = new Date(Number(parts[1]), Number(parts[2]) - 1, Number(parts[3]));
+            if (Number.isNaN(date.getTime())) return '';
+
+            return new Intl.DateTimeFormat('id-ID', options).format(date);
         };
         const labelCount = trend.dates.length;
+        const maxVisibleLabels = window.innerWidth < 576 ? 5 : 9;
+        const labelStep = Math.max(1, Math.ceil(labelCount / maxVisibleLabels));
 
         new ApexCharts(element, {
             series: [
@@ -230,14 +237,17 @@
             },
             xaxis: {
                 categories: trend.dates,
-                tickAmount: Math.min(labelCount - 1, window.innerWidth < 576 ? 4 : 8),
                 axisBorder: { show: false },
                 axisTicks: { show: false },
                 title: { text: 'Tanggal', offsetY: 2, style: { color: '#64748b', fontSize: '12px', fontWeight: 600 } },
                 labels: {
                     rotate: 0,
                     hideOverlappingLabels: true,
-                    formatter: (value) => dateText(value),
+                    formatter: (value) => {
+                        const index = trend.dates.indexOf(String(value));
+                        if (index < 0 || (index % labelStep !== 0 && index !== labelCount - 1)) return '';
+                        return dateText(value);
+                    },
                     style: { colors: '#64748b', fontSize: '11px' },
                 },
             },
