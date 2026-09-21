@@ -37,6 +37,13 @@
     .stock-report .sr-green { color: #15803d; }
     .stock-report .sr-red { color: #be185d; }
     .stock-report .sr-amber { color: #a16207; }
+    .stock-report .sr-chart-panel { padding-bottom: 18px; }
+    .stock-report .sr-chart-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; flex-wrap: wrap; margin-bottom: 8px; }
+    .stock-report .sr-chart-legend { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; color: #526077; font-size: 12px; font-weight: 600; }
+    .stock-report .sr-chart-legend span { display: inline-flex; align-items: center; gap: 7px; }
+    .stock-report .sr-chart-legend i { display: inline-block; width: 22px; height: 3px; border-radius: 999px; background: var(--legend-color); }
+    .stock-report .sr-chart { min-height: 340px; }
+    .stock-report .sr-chart-fallback { display: grid; place-items: center; min-height: 300px; color: #64748b; font-size: 13px; }
     .stock-report .sr-table-header { display: flex; align-items: start; justify-content: space-between; gap: 18px; margin-bottom: 18px; flex-wrap: wrap; }
     .stock-report .sr-scroll { overflow-x: auto; }
     .stock-report .sr-scroll-hint { display: none; color: #64748b; font-size: 12px; margin: 0 0 12px; }
@@ -109,6 +116,22 @@
         @endforeach
     </div>
 
+    @if ($isMovement)
+        <section class="sr-panel sr-chart-panel" aria-labelledby="stock-movement-chart-title">
+            <div class="sr-chart-header">
+                <div>
+                    <h2 class="sr-title" id="stock-movement-chart-title">Tren Pergerakan Stok</h2>
+                    <p class="sr-muted">Total mutasi masuk dan keluar per tanggal · {{ $period }}</p>
+                </div>
+                <div class="sr-chart-legend" aria-label="Keterangan grafik">
+                    <span><i style="--legend-color: #0f9f6e"></i>Qty Masuk</span>
+                    <span><i style="--legend-color: #e05263"></i>Qty Keluar</span>
+                </div>
+            </div>
+            <div id="stock-movement-chart" class="sr-chart" role="img" aria-label="Grafik garis jumlah stok masuk dan keluar berdasarkan tanggal"></div>
+        </section>
+    @endif
+
     <section class="sr-panel">
         <div class="sr-table-header">
             <div><h2 class="sr-title">{{ $isMovement ? 'Rincian Pergerakan Barang' : 'Rincian Saldo Stok' }}</h2><p class="sr-muted">{{ $number($summary->total_sku) }} SKU sesuai filter. {{ $isMovement ? 'Diurutkan dari qty keluar terbesar.' : 'Stok akhir = stok awal + qty in − qty out.' }}</p></div>
@@ -155,3 +178,91 @@
     </section>
 </div>
 @endsection
+
+@if ($isMovement)
+@push('scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const element = document.getElementById('stock-movement-chart');
+        const trend = @json($dailyTrend);
+
+        if (!element) return;
+        if (typeof ApexCharts === 'undefined') {
+            element.innerHTML = '<div class="sr-chart-fallback">Grafik tidak dapat dimuat.</div>';
+            return;
+        }
+
+        const numberText = (value) => Number(value || 0).toLocaleString('id-ID');
+        const dateText = (value, options = { day: 'numeric', month: 'short' }) => {
+            const [year, month, day] = String(value).split('-').map(Number);
+            return new Intl.DateTimeFormat('id-ID', options).format(new Date(year, month - 1, day));
+        };
+        const labelCount = trend.dates.length;
+
+        new ApexCharts(element, {
+            series: [
+                { name: 'Qty Masuk', data: trend.qty_in },
+                { name: 'Qty Keluar', data: trend.qty_out },
+            ],
+            chart: {
+                type: 'line',
+                height: 340,
+                fontFamily: 'inherit',
+                toolbar: { show: false },
+                zoom: { enabled: false },
+                animations: { enabled: true, easing: 'easeinout', speed: 450 },
+            },
+            colors: ['#0f9f6e', '#e05263'],
+            stroke: { curve: 'smooth', width: 3, lineCap: 'round' },
+            markers: {
+                size: labelCount <= 31 ? 3 : 0,
+                hover: { size: 6 },
+                strokeWidth: 2,
+                strokeColors: '#ffffff',
+            },
+            dataLabels: { enabled: false },
+            legend: { show: false },
+            grid: {
+                borderColor: '#e8edf3',
+                strokeDashArray: 4,
+                padding: { left: 12, right: 18, top: 10, bottom: 0 },
+                xaxis: { lines: { show: false } },
+            },
+            xaxis: {
+                categories: trend.dates,
+                tickAmount: Math.min(labelCount - 1, window.innerWidth < 576 ? 4 : 8),
+                axisBorder: { show: false },
+                axisTicks: { show: false },
+                title: { text: 'Tanggal', offsetY: 2, style: { color: '#64748b', fontSize: '12px', fontWeight: 600 } },
+                labels: {
+                    rotate: 0,
+                    hideOverlappingLabels: true,
+                    formatter: (value) => dateText(value),
+                    style: { colors: '#64748b', fontSize: '11px' },
+                },
+            },
+            yaxis: {
+                min: 0,
+                forceNiceScale: true,
+                decimalsInFloat: 0,
+                title: { text: 'Jumlah', style: { color: '#64748b', fontSize: '12px', fontWeight: 600 } },
+                labels: { formatter: numberText, style: { colors: '#64748b', fontSize: '11px' } },
+            },
+            tooltip: {
+                shared: true,
+                intersect: false,
+                x: {
+                    formatter: (_value, context) => dateText(trend.dates[context.dataPointIndex], {
+                        weekday: 'short', day: 'numeric', month: 'long', year: 'numeric'
+                    }),
+                },
+                y: { formatter: (value) => `${numberText(value)} unit` },
+                marker: { show: true },
+                style: { fontSize: '12px' },
+            },
+            noData: { text: 'Tidak ada data pergerakan stok pada periode ini.' },
+        }).render();
+    });
+</script>
+@endpush
+@endif

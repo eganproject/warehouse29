@@ -98,4 +98,40 @@ class StockPeriodReport
             ->selectRaw("COUNT(CASE WHEN movement = 'fast' THEN 1 END) as fast, COUNT(CASE WHEN movement = 'slow' THEN 1 END) as slow, COUNT(CASE WHEN movement = 'non' THEN 1 END) as non")
             ->first();
     }
+
+    public function dailyTrend(array $filters): array
+    {
+        $start = Carbon::parse($filters['date_from'])->startOfDay();
+        $end = Carbon::parse($filters['date_to'])->addDay()->startOfDay();
+        $table = $filters['stock_type'] === 'damaged' ? 'damaged_stock_mutations' : 'stock_mutations';
+        $filteredItems = $this->query($filters)->select('id');
+
+        $totals = DB::table($table.' as sm')
+            ->joinSub($filteredItems, 'filtered_items', 'filtered_items.id', '=', 'sm.item_id')
+            ->where('sm.occurred_at', '>=', $start)
+            ->where('sm.occurred_at', '<', $end)
+            ->selectRaw('DATE(sm.occurred_at) as movement_date')
+            ->selectRaw("SUM(CASE WHEN sm.direction = 'in' THEN sm.qty ELSE 0 END) as qty_in")
+            ->selectRaw("SUM(CASE WHEN sm.direction = 'out' THEN sm.qty ELSE 0 END) as qty_out")
+            ->groupByRaw('DATE(sm.occurred_at)')
+            ->get()
+            ->keyBy('movement_date');
+
+        $dates = [];
+        $qtyIn = [];
+        $qtyOut = [];
+        $cursor = $start->copy();
+        $lastDate = $end->copy()->subDay();
+
+        while ($cursor->lte($lastDate)) {
+            $date = $cursor->toDateString();
+            $daily = $totals->get($date);
+            $dates[] = $date;
+            $qtyIn[] = (int) ($daily->qty_in ?? 0);
+            $qtyOut[] = (int) ($daily->qty_out ?? 0);
+            $cursor->addDay();
+        }
+
+        return ['dates' => $dates, 'qty_in' => $qtyIn, 'qty_out' => $qtyOut];
+    }
 }

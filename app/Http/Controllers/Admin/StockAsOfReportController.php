@@ -20,6 +20,7 @@ class StockAsOfReportController extends Controller
             'filters' => $filters,
             'days' => $report->days($filters),
             'summary' => $report->summary($filters),
+            'dailyTrend' => $filters['tab'] === 'movement' ? $report->dailyTrend($filters) : null,
             'rows' => $report->ordered($filters)->paginate($filters['per_page'])->appends($filters),
             'categories' => Category::orderBy('name')->get(['id', 'name']),
             'movements' => StockPeriodReport::MOVEMENTS,

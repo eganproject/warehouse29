@@ -60,6 +60,24 @@ class StockPeriodReportTest extends TestCase
         $this->assertEquals(3, $report->query($this->filters(['movement' => 'fast']))->count());
     }
 
+    public function test_daily_trend_contains_every_date_and_respects_item_filters(): void
+    {
+        $visible = $this->item('VISIBLE');
+        $hidden = $this->item('HIDDEN');
+        $this->mutation($visible, 'in', 12, '2026-09-01 08:00:00');
+        $this->mutation($visible, 'out', 5, '2026-09-03 09:00:00');
+        $this->mutation($hidden, 'out', 20, '2026-09-02 09:00:00');
+
+        $trend = app(StockPeriodReport::class)->dailyTrend($this->filters([
+            'tab' => 'movement',
+            'q' => 'VISIBLE',
+        ]));
+
+        $this->assertSame(['2026-09-01', '2026-09-02', '2026-09-03', '2026-09-04'], $trend['dates']);
+        $this->assertSame([12, 0, 0, 0], $trend['qty_in']);
+        $this->assertSame([0, 0, 5, 0], $trend['qty_out']);
+    }
+
     public function test_damaged_balances_are_separate_and_category_and_stock_filters_apply(): void
     {
         $item = $this->item('DAMAGED', ['safety_stock' => 10]);
@@ -87,6 +105,10 @@ class StockPeriodReportTest extends TestCase
                 ->assertOk()->assertSee('Saldo Stok')->assertSee('Pergerakan Stok')
                 ->assertViewHas('rows', fn ($rows) => $rows->count() === 1 && str_contains($rows->previousPageUrl(), 'tab='.$tab));
         }
+        $this->get(route('admin.reports.stock-as-of.index', $this->filters(['tab' => 'movement'])))
+            ->assertOk()
+            ->assertSee('Tren Pergerakan Stok')
+            ->assertSee('stock-movement-chart');
         $this->getJson(route('admin.reports.stock-as-of.data', $this->filters(['date_to' => '2026-08-01'])))
             ->assertUnprocessable();
         $this->getJson(route('admin.reports.stock-as-of.data', $this->filters(['date_from' => 'wrong'])))
