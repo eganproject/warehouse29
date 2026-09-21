@@ -78,6 +78,18 @@ class StockPeriodReportTest extends TestCase
         $this->assertSame([0, 0, 5, 0], $trend['qty_out']);
     }
 
+    public function test_item_search_matches_the_complete_sku_only(): void
+    {
+        $this->item('TRIP1');
+        $this->item('TRIP11');
+        $this->item('OTHER', ['name' => 'Barang TRIP1']);
+
+        $rows = app(StockPeriodReport::class)->query($this->filters(['q' => 'TRIP1']))->get();
+
+        $this->assertCount(1, $rows);
+        $this->assertSame('TRIP1', $rows->first()->sku);
+    }
+
     public function test_damaged_balances_are_separate_and_category_and_stock_filters_apply(): void
     {
         $item = $this->item('DAMAGED', ['safety_stock' => 10]);

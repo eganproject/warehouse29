@@ -58,12 +58,7 @@ class StockPeriodReport
         }
         $search = trim($filters['q'] ?? '');
         if ($search !== '') {
-            $items->where(function ($q) use ($search, $columns) {
-                $q->where('i.sku', 'like', "%{$search}%")->orWhere('i.name', 'like', "%{$search}%");
-                if (isset($columns['address'])) {
-                    $q->orWhere('i.address', 'like', "%{$search}%");
-                }
-            });
+            $items->where('i.sku', $search);
         }
 
         $query = DB::query()->fromSub($items, 'stock_report');
