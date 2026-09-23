@@ -300,7 +300,7 @@
                     Import Excel
                 </button>
             @endif
-            @if(!empty($exportUrl ?? null) && ($typeDefault ?? '') === 'return' && isset($routeMap['receipt']))
+            @if(!empty($exportUrl ?? null))
                 <button type="button" class="btn btn-light-success me-3" id="btn_export_flow">
                     Export Excel
                 </button>

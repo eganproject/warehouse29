@@ -11,6 +11,7 @@ use App\Models\DamagedGoodItem;
 use App\Models\Resi;
 use App\Models\ReturnReason;
 use App\Models\StockMutation;
+use App\Exports\InboundReceiptsExport;
 use App\Exports\InboundReturnsExport;
 use App\Exports\InboundReturnsTemplateExport;
 use App\Imports\InboundReceiptsImport;
@@ -208,6 +209,29 @@ class InboundController extends Controller
         );
 
         return Excel::download(new InboundReturnsExport($filters), $filename);
+    }
+
+    public function receiptsExport(Request $request)
+    {
+        $filters = [
+            'q' => trim((string) $request->input('q', '')),
+            'status' => trim((string) $request->input('status', '')),
+            'date_from' => $this->validDateFilter($request->input('date_from')),
+            'date_to' => $this->validDateFilter($request->input('date_to')),
+        ];
+
+        $period = $filters['date_from'] || $filters['date_to']
+            ? sprintf(
+                '%s-sd-%s',
+                $filters['date_from'] ? Carbon::parse($filters['date_from'])->format('Ymd') : 'awal',
+                $filters['date_to'] ? Carbon::parse($filters['date_to'])->format('Ymd') : 'akhir'
+            )
+            : now()->format('Ymd-His');
+
+        return Excel::download(
+            new InboundReceiptsExport($filters, $request->user()?->name ?? '-'),
+            "laporan-penerimaan-barang-{$period}.xlsx"
+        );
     }
 
     public function returnsImport(Request $request)
@@ -422,6 +446,7 @@ class InboundController extends Controller
                 default => null,
             },
             'exportUrl' => match ($type) {
+                'receipt' => route('admin.inbound.receipts.export'),
                 'return' => route('admin.inbound.returns.export'),
                 default => null,
             },
@@ -1169,6 +1194,19 @@ class InboundController extends Controller
             }
         } catch (\Throwable) {
             // ignore invalid date filters
+        }
+    }
+
+    private function validDateFilter(mixed $value): ?string
+    {
+        if (!is_string($value) || trim($value) === '') {
+            return null;
+        }
+
+        try {
+            return Carbon::parse(trim($value))->toDateString();
+        } catch (\Throwable) {
+            return null;
         }
     }
 
