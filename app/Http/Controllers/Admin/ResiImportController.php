@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Imports\ResiImport;
+use App\Models\Channel;
 use App\Models\Item;
 use App\Models\Kurir;
 use App\Models\PackerResiScan;
@@ -15,6 +16,7 @@ use App\Models\QcScanResi;
 use App\Models\Resi;
 use App\Models\ResiCancellation;
 use App\Models\ResiDetail;
+use App\Models\Toko;
 use App\Support\ResiCancellationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -83,7 +85,7 @@ class ResiImportController extends Controller
             ->count();
 
         $query = Resi::query()
-            ->select(['id', 'id_pesanan', 'no_resi', 'tanggal_pesanan', 'tanggal_upload', 'kurir_id', 'catatan_pembeli', 'status'])
+            ->select(['id', 'id_pesanan', 'no_resi', 'tanggal_pesanan', 'tanggal_upload', 'kurir_id', 'toko_id', 'channel_id', 'catatan_pembeli', 'status'])
             ->selectSub(function ($sub) {
                 $sub->from('packer_scan_outs')
                     ->selectRaw('count(1)')
@@ -96,7 +98,7 @@ class ResiImportController extends Controller
             }, 'qc_scan_count')
             ->with(['details' => function ($q) {
                 $q->select(['id', 'resi_id', 'sku', 'qty']);
-            }, 'kurir', 'cancellation'])
+            }, 'kurir', 'toko', 'channel', 'cancellation'])
             ->whereDate('tanggal_upload', $filterDate)
             ->orderByDesc('id');
 
@@ -127,6 +129,8 @@ class ResiImportController extends Controller
                 'no_resi' => $row->no_resi ?? '-',
                 'id_pesanan' => $row->id_pesanan ?? '-',
                 'kurir' => $row->kurir?->name ?? '-',
+                'toko' => $row->toko?->name ?? '-',
+                'channel' => $row->channel?->name ?? '-',
                 'sku' => $skuList,
                 'tanggal_pesanan' => $tanggalOrder,
                 'catatan_pembeli' => $row->catatan_pembeli ?? '',
@@ -260,6 +264,8 @@ class ResiImportController extends Controller
             $createdDetails = 0;
             $today = now()->toDateString();
             $defaultKurirId = $this->resolveDefaultKurirId();
+            $tokoCache = [];
+            $channelCache = [];
 
             foreach ($groups as $group) {
                 $existing = Resi::where('id_pesanan', $group['id_pesanan'])
@@ -303,6 +309,15 @@ class ResiImportController extends Controller
                 $kurirId = $this->resolveKurirId($group['kurir'] ?? null, $defaultKurirId);
                 if ($kurirId) {
                     $payload['kurir_id'] = $kurirId;
+                }
+                // Toko & channel opsional: hanya diisi bila ada di file, resi lama tidak diubah.
+                $tokoId = $this->resolveMasterId(Toko::class, $group['nama_toko'] ?? null, $tokoCache);
+                if ($tokoId) {
+                    $payload['toko_id'] = $tokoId;
+                }
+                $channelId = $this->resolveMasterId(Channel::class, $group['channel'] ?? null, $channelCache);
+                if ($channelId) {
+                    $payload['channel_id'] = $channelId;
                 }
                 $noResi = isset($group['no_resi']) ? trim((string) $group['no_resi']) : '';
                 if ($noResi !== '') {
@@ -594,6 +609,12 @@ class ResiImportController extends Controller
                 ->orWhereHas('kurir', function ($kurirQ) use ($search) {
                     $kurirQ->where('name', 'like', "%{$search}%");
                 })
+                ->orWhereHas('toko', function ($tokoQ) use ($search) {
+                    $tokoQ->where('name', 'like', "%{$search}%");
+                })
+                ->orWhereHas('channel', function ($channelQ) use ($search) {
+                    $channelQ->where('name', 'like', "%{$search}%");
+                })
                 ->orWhereHas('details', function ($detailQ) use ($search) {
                     $detailQ->where('sku', 'like', "%{$search}%");
                 });
@@ -663,5 +684,28 @@ class ResiImportController extends Controller
 
         $kurir = Kurir::firstOrCreate(['name' => $name]);
         return $kurir->id ?? $defaultId;
+    }
+
+    /**
+     * Cari master (toko/channel) berdasarkan nama, buat baru bila belum ada.
+     *
+     * @param class-string<\Illuminate\Database\Eloquent\Model> $modelClass
+     * @param array<string,int> $cache
+     */
+    private function resolveMasterId(string $modelClass, $rawName, array &$cache): ?int
+    {
+        $name = trim((string) preg_replace('/\s+/u', ' ', (string) $rawName));
+        if ($name === '') {
+            return null;
+        }
+
+        $cacheKey = mb_strtolower($name);
+        if (isset($cache[$cacheKey])) {
+            return $cache[$cacheKey];
+        }
+
+        $model = $modelClass::firstOrCreate(['name' => mb_substr($name, 0, 100)]);
+
+        return $cache[$cacheKey] = (int) $model->id;
     }
 }

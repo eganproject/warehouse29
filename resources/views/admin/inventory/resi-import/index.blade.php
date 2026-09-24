@@ -57,7 +57,7 @@
     <div class="card-body py-6">
         <div class="text-muted fs-7">
             Header wajib: <strong>ID Pesanan</strong>, <strong>SKU</strong>, <strong>Jumlah</strong>, <strong>Tanggal Pembuatan</strong>.
-            <strong>AWB/No. Tracking</strong>, <strong>Kurir</strong>, dan <strong>Catatan Pembeli</strong> opsional.
+            <strong>AWB/No. Tracking</strong>, <strong>Kurir</strong>, <strong>Catatan Pembeli</strong>, <strong>Nama Toko</strong>, dan <strong>Channel</strong> opsional.
         </div>
         <div class="text-muted fs-7 mt-2">
             Format tanggal akan dibaca otomatis (string atau tanggal Excel).
@@ -75,7 +75,7 @@
                         <path d="M11 19C6.55556 19 3 15.4444 3 11C3 6.55556 6.55556 3 11 3C15.4444 3 19 6.55556 19 11C19 15.4444 15.4444 19 11 19ZM11 5C7.53333 5 5 7.53333 5 11C5 14.4667 7.53333 17 11 17C14.4667 17 17 14.4667 17 11C17 7.53333 14.4667 5 11 5Z" fill="black" />
                     </svg>
                 </span>
-                <input type="text" class="form-control form-control-solid w-250px ps-14" id="filter_search" placeholder="Search no resi / SKU / ID Pesanan / Kurir" value="{{ $filterSearch ?? '' }}" />
+                <input type="text" class="form-control form-control-solid w-250px ps-14" id="filter_search" placeholder="Search no resi / SKU / ID Pesanan / Kurir / Toko / Channel" value="{{ $filterSearch ?? '' }}" />
             </div>
         </div>
         <div class="card-toolbar">
@@ -108,6 +108,7 @@
                         <th>No</th>
                         <th>No Resi</th>
                         <th>Kurir</th>
+                        <th>Toko / Channel</th>
                         <th>ID Pesanan</th>
                         <th>SKU</th>
                         <th>Tanggal Order</th>
@@ -147,8 +148,10 @@
                             <li><strong>AWB/No. Tracking</strong> (opsional)</li>
                             <li><strong>Kurir</strong> (opsional)</li>
                             <li><strong>Catatan Pembeli</strong> (opsional)</li>
+                            <li><strong>Nama Toko</strong> (opsional, otomatis ditambahkan ke master Toko bila belum ada)</li>
+                            <li><strong>Channel</strong> (opsional, otomatis ditambahkan ke master Channel bila belum ada)</li>
                         </ul>
-                        <p class="text-muted small mb-0">Header akan dibaca otomatis menjadi: <code>id_pesanan, awb_no_tracking, kurir, sku, jumlah, tanggal_pembuatan, catatan_pembeli</code></p>
+                        <p class="text-muted small mb-0">Header akan dibaca otomatis menjadi: <code>id_pesanan, awb_no_tracking, kurir, sku, jumlah, tanggal_pembuatan, catatan_pembeli, nama_toko, channel</code></p>
                     </div>
                     <div class="mb-10">
                         <label class="required fs-6 fw-bold form-label mb-2">File Excel</label>
@@ -420,6 +423,11 @@
                     }},
                     { data: 'no_resi' },
                     { data: 'kurir' },
+                    { data: 'toko', render: (data, type, row) => {
+                        const toko = escapeHtml(data || '-');
+                        const channel = row.channel && row.channel !== '-' ? escapeHtml(row.channel) : '';
+                        return channel ? `${toko}<div class="text-muted fs-8">${channel}</div>` : toko;
+                    }},
                         { data: 'id_pesanan' },
                         { data: 'sku' },
                         { data: 'tanggal_pesanan' },

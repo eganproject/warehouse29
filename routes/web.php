@@ -35,6 +35,7 @@ use App\Http\Controllers\Admin\MenuController;
 use App\Http\Controllers\Admin\PermissionController;
 use App\Http\Controllers\Admin\DivisiController;
 use App\Http\Controllers\Admin\KurirController;
+use App\Http\Controllers\Admin\TokoChannelController;
 use App\Http\Controllers\Admin\UnitOfMeasureController;
 use App\Http\Controllers\Admin\ApiIpAllowlistController;
 use App\Http\Controllers\Admin\QcScanInputController;
@@ -143,6 +144,15 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         // Kurir
         Route::get('/kurir/data', [KurirController::class, 'data'])->name('kurir.data');
         Route::resource('kurir', KurirController::class)->except(['create','show','edit'])->names('kurir');
+
+        // Toko & Channel (satu halaman, dua tab)
+        Route::get('/toko-channel', [TokoChannelController::class, 'index'])->name('toko-channel.index');
+        Route::prefix('toko-channel/{type}')->whereIn('type', ['toko', 'channel'])->group(function () {
+            Route::get('/data', [TokoChannelController::class, 'data'])->name('toko-channel.data');
+            Route::post('/', [TokoChannelController::class, 'store'])->name('toko-channel.store');
+            Route::put('/{id}', [TokoChannelController::class, 'update'])->whereNumber('id')->name('toko-channel.update');
+            Route::delete('/{id}', [TokoChannelController::class, 'destroy'])->whereNumber('id')->name('toko-channel.destroy');
+        });
 
         Route::get('/unit-of-measures/data', [UnitOfMeasureController::class, 'data'])->name('unit-of-measures.data');
         Route::resource('unit-of-measures', UnitOfMeasureController::class)->except(['create', 'show', 'edit'])->names('unit-of-measures');

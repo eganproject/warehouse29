@@ -10,7 +10,7 @@ use Maatwebsite\Excel\Concerns\WithHeadingRow;
 
 class ResiImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
 {
-    /** @var array<string,array{id_pesanan:string,no_resi:?string,kurir:?string,tanggal_pesanan:string,catatan_pembeli:?string,items:array<string,array{sku:string,qty:int}>}> */
+    /** @var array<string,array{id_pesanan:string,no_resi:?string,kurir:?string,nama_toko:?string,channel:?string,tanggal_pesanan:string,catatan_pembeli:?string,items:array<string,array{sku:string,qty:int}>}> */
     public array $groups = [];
     public bool $hasBuyerNotesHeader = false;
     /** @var array<int,string> */
@@ -38,7 +38,7 @@ class ResiImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
             $detected = implode(', ', array_filter($headers));
             throw ValidationException::withMessages([
                 'file' => 'Header wajib: ID Pesanan, SKU, Jumlah, Tanggal Pembuatan. '
-                    .'AWB/No. Tracking dan Kurir opsional. Pastikan header berada di baris pertama. '
+                    .'AWB/No. Tracking, Kurir, Nama Toko, dan Channel opsional. Pastikan header berada di baris pertama. '
                     .($detected !== '' ? 'Header terdeteksi: '.$detected : ''),
             ]);
         }
@@ -51,6 +51,8 @@ class ResiImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
             $idPesanan = trim((string) ($rowData['id_pesanan'] ?? ''));
             $noResi = trim((string) ($rowData['awb_no_tracking'] ?? ''));
             $kurir = trim((string) ($rowData['kurir'] ?? ''));
+            $namaToko = $this->cleanName($rowData['nama_toko'] ?? '');
+            $channel = $this->cleanName($rowData['channel'] ?? '');
             $catatanPembeli = $this->hasBuyerNotesHeader
                 ? trim((string) ($rowData['catatan_pembeli'] ?? ''))
                 : '';
@@ -74,6 +76,8 @@ class ResiImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
                     'id_pesanan' => $idPesanan,
                     'no_resi' => $noResi !== '' ? $noResi : null,
                     'kurir' => $kurir !== '' ? $kurir : null,
+                    'nama_toko' => $namaToko !== '' ? $namaToko : null,
+                    'channel' => $channel !== '' ? $channel : null,
                     'tanggal_pesanan' => $tanggalPesanan,
                     'items' => [],
                 ];
@@ -86,6 +90,12 @@ class ResiImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
             }
             if ($this->groups[$groupKey]['kurir'] === null && $kurir !== '') {
                 $this->groups[$groupKey]['kurir'] = $kurir;
+            }
+            if ($this->groups[$groupKey]['nama_toko'] === null && $namaToko !== '') {
+                $this->groups[$groupKey]['nama_toko'] = $namaToko;
+            }
+            if ($this->groups[$groupKey]['channel'] === null && $channel !== '') {
+                $this->groups[$groupKey]['channel'] = $channel;
             }
             if ($this->hasBuyerNotesHeader && ($this->groups[$groupKey]['catatan_pembeli'] ?? null) === null && $catatanPembeli !== '') {
                 $this->groups[$groupKey]['catatan_pembeli'] = $catatanPembeli;
@@ -132,6 +142,11 @@ class ResiImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
         return $value > 0 ? $value : 0;
     }
 
+    private function cleanName($raw): string
+    {
+        return trim((string) preg_replace('/\s+/u', ' ', (string) $raw));
+    }
+
     private function normalizeRow($row): array
     {
         $data = [];
@@ -163,6 +178,12 @@ class ResiImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
         }
         if (in_array($key, ['catatan_pembeli', 'buyer_note', 'buyer_notes', 'buyer_remark', 'buyer_remarks', 'customer_note', 'customer_notes'], true)) {
             return 'catatan_pembeli';
+        }
+        if (in_array($key, ['nama_toko', 'toko', 'store_name', 'shop_name', 'nama_store', 'nama_shop'], true)) {
+            return 'nama_toko';
+        }
+        if (in_array($key, ['channel', 'sales_channel', 'marketplace', 'platform'], true)) {
+            return 'channel';
         }
         return $key;
     }

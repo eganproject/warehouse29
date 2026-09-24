@@ -24,6 +24,7 @@ class MenuSeeder extends Seeder
             ['name' => 'Kurir', 'slug' => 'kurir', 'route' => 'admin.masterdata.kurir.index', 'icon' => 'fa-solid fa-truck', 'parent_slug' => 'master-data', 'sort_order' => 21.45],
             ['name' => 'Satuan (UOM)', 'slug' => 'unit-of-measures', 'route' => 'admin.masterdata.unit-of-measures.index', 'icon' => 'fa-solid fa-ruler-combined', 'parent_slug' => 'master-data', 'sort_order' => 21.46],
             ['name' => 'Akses API', 'slug' => 'api-ip-allowlists', 'route' => 'admin.masterdata.api-ip-allowlists.index', 'icon' => 'fa-solid fa-shield-halved', 'parent_slug' => 'master-data', 'sort_order' => 21.47],
+            ['name' => 'Toko & Channel', 'slug' => 'toko-channel', 'route' => 'admin.masterdata.toko-channel.index', 'icon' => 'fa-solid fa-shop', 'parent_slug' => 'master-data', 'sort_order' => 21.48],
             ['name' => 'Categories', 'slug' => 'categories', 'route' => 'admin.masterdata.categories.index', 'icon' => 'fa-solid fa-sitemap', 'parent_slug' => 'master-data', 'sort_order' => 21.5],
             ['name' => 'Items', 'slug' => 'items', 'route' => 'admin.masterdata.items.index', 'icon' => 'fa-solid fa-box', 'parent_slug' => 'master-data', 'sort_order' => 21.6],
             ['name' => 'Item Nonaktif', 'slug' => 'items-inactive', 'route' => 'admin.masterdata.items.inactive', 'icon' => 'fa-solid fa-box-archive', 'parent_slug' => 'master-data', 'sort_order' => 21.65],
@@ -209,6 +210,7 @@ class MenuSeeder extends Seeder
                 'operate' => [
                     'divisi',
                     'kurir',
+                    'toko-channel',
                     'unit-of-measures',
                     'categories',
                     'items',
@@ -234,6 +236,7 @@ class MenuSeeder extends Seeder
                     'roles',
                     'divisi',
                     'kurir',
+                    'toko-channel',
                     'unit-of-measures',
                     'categories',
                     'items',
