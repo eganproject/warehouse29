@@ -34,7 +34,7 @@ class StockAsOfReportExport extends DefaultValueBinder implements FromCollection
     public function headings(): array
     {
         return $this->filters['tab'] === 'movement'
-            ? ['SKU', 'Nama Barang', 'Kategori', 'Alamat', 'Satuan', 'Qty Out', 'Rata-rata Out / Hari', 'Hari Keluar', 'Klasifikasi', 'Stok Akhir', 'Keluar Terakhir']
+            ? ['SKU', 'Nama Barang', 'Kategori', 'Alamat', 'Satuan', 'Klasifikasi', 'Qty Keluar', 'Rata-rata / Hari', 'Kontribusi (%)', 'Frequency', 'Hari Aktif', 'Days Cover', 'Stok Akhir', 'Tanggal Terakhir Keluar']
             : ['SKU', 'Nama Barang', 'Kategori', 'Alamat', 'Satuan', 'Stok Awal', 'Qty In', 'Qty Out', 'Stok Akhir'];
     }
 
@@ -43,7 +43,7 @@ class StockAsOfReportExport extends DefaultValueBinder implements FromCollection
         $identity = [$row->sku, $row->name, $row->category, $row->address, $row->uom];
 
         return array_merge($identity, $this->filters['tab'] === 'movement'
-            ? [(int) $row->qty_out, round((float) $row->average_out, 2), (int) $row->outgoing_days, StockPeriodReport::MOVEMENTS[$row->movement], (int) $row->closing, $row->last_out_at ?? '-']
+            ? [StockPeriodReport::MOVEMENTS[$row->movement], (int) $row->qty_out, round((float) $row->average_out, 2), round((float) $row->contribution_percent, 2), (int) $row->outgoing_frequency, (int) $row->outgoing_days, $row->days_cover === null ? '-' : round((float) $row->days_cover, 1), (int) $row->closing, $row->last_out_at ?? '-']
             : [(int) $row->opening, (int) $row->qty_in, (int) $row->qty_out, (int) $row->closing]);
     }
 
@@ -62,7 +62,7 @@ class StockAsOfReportExport extends DefaultValueBinder implements FromCollection
     {
         return [AfterSheet::class => function (AfterSheet $event) {
             $sheet = $event->sheet->getDelegate();
-            $lastColumn = $this->filters['tab'] === 'movement' ? 'K' : 'I';
+            $lastColumn = $this->filters['tab'] === 'movement' ? 'N' : 'I';
             $sheet->mergeCells('A1:'.$lastColumn.'1');
             $sheet->setCellValue('A1', $this->filters['tab'] === 'movement' ? 'Analisis Pergerakan Stok' : 'Saldo Stok per Periode');
             $sheet->mergeCells('A2:'.$lastColumn.'2');
@@ -71,7 +71,7 @@ class StockAsOfReportExport extends DefaultValueBinder implements FromCollection
             $sheet->setCellValue('A3', 'SKU fisik aktif; berdasarkan mutasi tercatat. Stok akhir = stok awal + qty in - qty out.');
             $sheet->mergeCells('A4:'.$lastColumn.'4');
             $sheet->setCellValue('A4', $this->filters['tab'] === 'movement'
-                ? 'Fast: keluar pada >= 50% hari periode; slow: > 0 dan < 50%; non-moving: tidak ada mutasi keluar. Seluruh jenis mutasi keluar, bukan penjualan saja.'
+                ? 'Fast: lapisan kontribusi awal hingga 70%; medium: lapisan berikutnya hingga 90%; slow: sisa setelah 90%; non-moving: tidak ada barang keluar selama periode.'
                 : 'Stok awal: sebelum tanggal awal. Qty in/out: selama periode termasuk tanggal akhir.');
             $categoryId = $this->filters['category_id'] ?? '';
             $category = $categoryId === '' ? 'Semua' : ((int) $categoryId === 0 ? 'Tanpa kategori' : (Category::find($categoryId)?->name ?? $categoryId));

@@ -35,29 +35,37 @@ class StockPeriodReportTest extends TestCase
         $this->assertEquals(103, $summary->closing);
     }
 
-    public function test_movement_uses_distinct_outgoing_days_and_period_filter(): void
+    public function test_movement_uses_cumulative_contribution_frequency_and_period_filter(): void
     {
-        $fast = $this->item('FAST');
+        $fastOne = $this->item('FAST-1');
+        $fastTwo = $this->item('FAST-2');
+        $medium = $this->item('MEDIUM');
         $slow = $this->item('SLOW');
         $non = $this->item('NON');
-        $this->mutation($fast, 'out', 5, '2026-09-01 10:00:00');
-        $this->mutation($fast, 'out', 5, '2026-09-01 11:00:00');
-        $this->mutation($fast, 'out', 5, '2026-09-02 10:00:00');
-        $this->mutation($slow, 'out', 20, '2026-09-03 10:00:00');
+        $this->mutation($fastOne, 'in', 100, '2026-08-31 10:00:00');
+        $this->mutation($fastOne, 'out', 30, '2026-09-01 10:00:00');
+        $this->mutation($fastOne, 'out', 20, '2026-09-01 11:00:00');
+        $this->mutation($fastTwo, 'out', 20, '2026-09-02 10:00:00');
+        $this->mutation($medium, 'out', 20, '2026-09-03 10:00:00');
+        $this->mutation($slow, 'out', 10, '2026-09-04 10:00:00');
         $this->mutation($non, 'out', 4, '2026-08-30 10:00:00');
         $this->mutation($non, 'in', 10, '2026-09-02 10:00:00');
         $this->mutation($non, 'out', 100, '2026-09-05 10:00:00');
         $report = app(StockPeriodReport::class);
         $rows = $report->ordered($this->filters(['tab' => 'movement']))->get();
-        $this->assertSame(['SLOW', 'FAST', 'NON'], $rows->pluck('sku')->all());
-        $this->assertSame(['slow', 'fast', 'non'], $rows->pluck('movement')->all());
-        $this->assertEquals(2, $rows[1]->outgoing_days);
-        $this->assertEquals(3.75, $rows[1]->average_out);
-        $this->assertSame('2026-08-30 10:00:00', $rows[2]->last_out_at);
-        $filtered = $this->filters(['tab' => 'movement', 'movement' => 'fast']);
-        $this->assertSame('FAST', $report->query($filtered)->first()->sku);
+        $this->assertSame(['FAST-1', 'FAST-2', 'MEDIUM', 'SLOW', 'NON'], $rows->pluck('sku')->all());
+        $this->assertSame(['fast', 'fast', 'medium', 'slow', 'non'], $rows->pluck('movement')->all());
+        $this->assertEquals(50, $rows[0]->contribution_percent);
+        $this->assertEquals(70, $rows[1]->cumulative_percent);
+        $this->assertEquals(2, $rows[0]->outgoing_frequency);
+        $this->assertEquals(1, $rows[0]->outgoing_days);
+        $this->assertEquals(12.5, $rows[0]->average_out);
+        $this->assertEquals(4, $rows[0]->days_cover);
+        $this->assertSame('2026-08-30 10:00:00', $rows[4]->last_out_at);
+        $filtered = $this->filters(['tab' => 'movement', 'movement' => 'medium']);
+        $this->assertSame('MEDIUM', $report->query($filtered)->first()->sku);
         $this->assertEquals(1, $report->summary($filtered)->total_sku);
-        $this->assertEquals(3, $report->query($this->filters(['movement' => 'fast']))->count());
+        $this->assertEquals(1, $report->query($this->filters(['tab' => 'movement', 'movement' => 'medium']))->count());
     }
 
     public function test_daily_trend_contains_every_date_and_respects_item_filters(): void
@@ -145,7 +153,7 @@ class StockPeriodReportTest extends TestCase
             if ($tab === 'balance') {
                 $this->assertSame([10, 0, 2, 8], array_slice($mapped, 5));
             } else {
-                $this->assertSame('Slow moving', $mapped[8]);
+                $this->assertSame('Fast Moving', $mapped[5]);
             }
             $this->get(route('admin.reports.stock-as-of.export', $filters))
                 ->assertOk()->assertDownload('laporan-stok-'.$tab.'-2026-09-01-2026-09-04.xlsx');

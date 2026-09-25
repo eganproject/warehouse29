@@ -61,7 +61,7 @@ class StockAsOfReportController extends Controller
             'category_id' => ['nullable', 'integer', 'min:0'],
             'q' => ['nullable', 'string', 'max:200'],
             'status' => ['nullable', 'in:positive,zero,negative,low'],
-            'movement' => ['nullable', 'in:fast,slow,non'],
+            'movement' => ['nullable', 'in:fast,medium,slow,non'],
             'per_page' => ['nullable', 'integer', 'in:10,25,50,100'],
         ]);
         $end = $values['date_to'] ?? $values['as_of_date'] ?? now()->toDateString();

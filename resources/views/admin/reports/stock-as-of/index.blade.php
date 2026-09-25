@@ -29,12 +29,14 @@
     .stock-report .sr-export { color: #166534; background: #f0fdf4; border-color: #bbf7d0; }
     .stock-report :is(a, button, input, select):focus-visible { outline: 3px solid #93c5fd; outline-offset: 3px; }
     .stock-report .sr-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 20px; }
+    .stock-report .sr-stats-movement { grid-template-columns: repeat(5, minmax(0, 1fr)); }
     .stock-report .sr-stat { min-width: 0; border: 1px solid #e2e8f0; background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 3px 10px #0f172a06; }
     .stock-report .sr-label { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: #64748b; margin-bottom: 7px; }
     .stock-report .sr-value { font-size: 29px; font-weight: 800; line-height: 1.3; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
     .stock-report .sr-meta { font-size: 12px; color: #64748b; line-height: 1.5; margin-top: 5px; }
     .stock-report .sr-blue { color: #0369a1; }
     .stock-report .sr-green { color: #15803d; }
+    .stock-report .sr-orange { color: #c2410c; }
     .stock-report .sr-red { color: #be185d; }
     .stock-report .sr-amber { color: #a16207; }
     .stock-report .sr-chart-panel { padding-bottom: 18px; }
@@ -45,22 +47,28 @@
     .stock-report .sr-chart { min-height: 340px; }
     .stock-report .sr-chart-fallback { display: grid; place-items: center; min-height: 300px; color: #64748b; font-size: 13px; }
     .stock-report .sr-table-header { display: flex; align-items: start; justify-content: space-between; gap: 18px; margin-bottom: 18px; flex-wrap: wrap; }
-    .stock-report .sr-scroll { overflow-x: auto; }
+    .stock-report .sr-scroll { overflow-x: auto; border: 1px solid #e7edf3; border-radius: 9px; }
     .stock-report .sr-scroll-hint { display: none; color: #64748b; font-size: 12px; margin: 0 0 12px; }
     .stock-report .sr-table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
-    .stock-report .sr-table th { background: #f8fafc; color: #526077; font-size: 11px; text-transform: uppercase; letter-spacing: .02em; font-weight: 700; white-space: nowrap; }
+    .stock-report .sr-table th { position: sticky; top: 0; z-index: 1; background: #f8fafc; color: #526077; font-size: 11px; text-transform: uppercase; letter-spacing: .02em; font-weight: 700; white-space: nowrap; }
     .stock-report .sr-table th, .stock-report .sr-table td { padding: 14px 12px; border-bottom: 1px solid #edf1f5; text-align: left; vertical-align: middle; }
     .stock-report .sr-table .sr-num { text-align: right; white-space: nowrap; }
     .stock-report .sr-table tbody tr:hover { background: #fafcfe; }
+    .stock-report .sr-table-movement { min-width: 1080px; }
+    .stock-report .sr-index { width: 54px; text-align: center !important; color: #64748b; white-space: nowrap; }
     .stock-report .sr-product { min-width: 210px; max-width: 360px; overflow-wrap: anywhere; }
     .stock-report .sr-sku { display: block; font-weight: 700; color: #172b4d; margin-bottom: 4px; }
     .stock-report .sr-sub { display: block; color: #64748b; font-size: 12px; margin-top: 4px; }
     .stock-report .sr-badge { display: inline-block; border-radius: 6px; padding: 6px 9px; font-size: 11px; font-weight: 700; white-space: nowrap; background: #f1f5f9; color: #475569; }
     .stock-report .sr-badge-fast { background: #ecfdf5; color: #166534; }
+    .stock-report .sr-badge-medium { background: #fff7ed; color: #9a3412; }
     .stock-report .sr-badge-slow { background: #fffbeb; color: #92400e; }
+    .stock-report .sr-badge-non { background: #fef2f2; color: #b91c1c; }
+    .stock-report .sr-metric { display: block; font-weight: 700; color: #27364d; }
     .stock-report .sr-note { margin-top: 16px; padding: 14px 16px; border-radius: 8px; background: #f8fafc; color: #526077; font-size: 12px; line-height: 1.7; }
     .stock-report .sr-pagination { margin-top: 20px; display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
-    @media (max-width: 1100px) { .stock-report .sr-filter, .stock-report .sr-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } .stock-report .sr-scroll-hint { display: block; } }
+    @media (max-width: 1200px) { .stock-report .sr-stats-movement { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+    @media (max-width: 1100px) { .stock-report .sr-filter, .stock-report .sr-stats, .stock-report .sr-stats-movement { grid-template-columns: repeat(2, minmax(0, 1fr)); } .stock-report .sr-scroll-hint { display: block; } }
     @media (max-width: 575px) {
         .stock-report .sr-panel { padding: 18px 14px; }
         .stock-report .sr-filter { gap: 14px 10px; }
@@ -105,10 +113,10 @@
         </form>
     </section>
 
-    <div class="sr-stats">
+    <div class="sr-stats {{ $isMovement ? 'sr-stats-movement' : '' }}">
         @php
             $cards = $isMovement
-                ? [['SKU Dianalisis', $summary->total_sku, 'Sesuai filter yang diterapkan', 'blue'], ['Fast Moving', $summary->fast, 'Keluar pada ≥ 50% hari periode', 'green'], ['Slow Moving', $summary->slow, 'Keluar pada < 50% hari periode', 'amber'], ['Non-moving', $summary->non, 'Tidak ada mutasi keluar', 'red']]
+                ? [['SKU Dianalisis', $summary->total_sku, 'Sesuai filter yang diterapkan', 'blue'], ['Fast Moving', $summary->fast, 'Kontribusi kumulatif hingga 70%', 'green'], ['Medium Moving', $summary->medium, 'Lapisan kontribusi 70%–90%', 'orange'], ['Slow Moving', $summary->slow, 'Sisa kontribusi setelah 90%', 'amber'], ['Non Moving', $summary->non, 'Tidak ada barang keluar', 'red']]
                 : [['Stok Awal', $summary->opening, 'Sebelum '.$dateLabel($filters['date_from']), 'blue'], ['Qty In', $summary->qty_in, 'Total masuk selama periode', 'green'], ['Qty Out', $summary->qty_out, 'Total keluar selama periode', 'red'], ['Stok Akhir', $summary->closing, 'Sampai '.$dateLabel($filters['date_to']), 'blue']];
         @endphp
         @foreach ($cards as [$label, $value, $meta, $color])
@@ -139,30 +147,36 @@
         </div>
         <p class="sr-scroll-hint">Geser tabel ke samping untuk melihat seluruh kolom →</p>
         <div class="sr-scroll" role="region" aria-label="Tabel laporan stok, geser horizontal untuk melihat seluruh kolom" tabindex="0">
-            <table class="sr-table">
-                <thead><tr><th scope="col">Barang</th><th scope="col">Kategori / Satuan</th>
+            <table class="sr-table {{ $isMovement ? 'sr-table-movement' : '' }}">
+                <thead><tr>
                     @if ($isMovement)
-                        <th scope="col" class="sr-num">Qty Out</th><th scope="col" class="sr-num">Rata-rata / Hari</th><th scope="col" class="sr-num">Hari Keluar</th><th scope="col">Pergerakan</th><th scope="col" class="sr-num">Stok Akhir</th><th scope="col">Keluar Terakhir</th>
+                        <th scope="col" class="sr-index">No</th><th scope="col">SKU / Item</th><th scope="col">Klasifikasi</th><th scope="col" class="sr-num">Qty Keluar</th><th scope="col" class="sr-num">Rata-rata / Hari</th><th scope="col" class="sr-num">Kontribusi</th><th scope="col" class="sr-num">Frequency</th><th scope="col" class="sr-num">Days Cover</th><th scope="col">Tanggal Terakhir Keluar</th>
                     @else
+                        <th scope="col">Barang</th><th scope="col">Kategori / Satuan</th>
                         <th scope="col" class="sr-num">Stok Awal</th><th scope="col" class="sr-num">Qty In</th><th scope="col" class="sr-num">Qty Out</th><th scope="col" class="sr-num">Stok Akhir</th>
                     @endif
                 </tr></thead>
                 <tbody>
                     @forelse ($rows as $row)
                         <tr>
-                            <td class="sr-product"><span class="sr-sku">{{ $row->sku }}</span>{{ $row->name }}<span class="sr-sub">Alamat: {{ $row->address ?: '—' }}</span></td>
-                            <td>{{ $row->category }}<span class="sr-sub">{{ $row->uom ?: 'Satuan belum diatur' }}</span></td>
                             @if ($isMovement)
-                                <td class="sr-num"><strong>{{ $number($row->qty_out) }}</strong></td><td class="sr-num">{{ $number($row->average_out, 2) }}</td><td class="sr-num">{{ $row->outgoing_days }} / {{ $days }}</td>
+                                <td class="sr-index">{{ $rows->firstItem() + $loop->index }}</td>
+                                <td class="sr-product"><span class="sr-sku">{{ $row->sku }}</span>{{ $row->name }}<span class="sr-sub">{{ $row->category }}{{ $row->uom ? ' · '.$row->uom : '' }}</span></td>
                                 <td><span class="sr-badge sr-badge-{{ $row->movement }}">{{ $movements[$row->movement] }}</span></td>
-                                <td class="sr-num {{ $row->closing < 0 ? 'sr-red' : '' }}"><strong>{{ $number($row->closing) }}</strong></td>
+                                <td class="sr-num"><span class="sr-metric">{{ $number($row->qty_out) }}</span></td>
+                                <td class="sr-num">{{ $number($row->average_out, 2) }}</td>
+                                <td class="sr-num"><span class="sr-metric">{{ $number($row->contribution_percent, 2) }}%</span><span class="sr-sub">Kumulatif {{ $number($row->cumulative_percent, 2) }}%</span></td>
+                                <td class="sr-num"><span class="sr-metric">{{ $number($row->outgoing_frequency) }} kali</span><span class="sr-sub">{{ $number($row->outgoing_days) }} hari aktif</span></td>
+                                <td class="sr-num {{ $row->days_cover !== null && $row->days_cover < 0 ? 'sr-red' : '' }}">{{ $row->days_cover !== null ? $number($row->days_cover, 1).' hari' : '—' }}<span class="sr-sub">Stok: {{ $number($row->closing) }}</span></td>
                                 <td>{{ $row->last_out_at ? $dateLabel($row->last_out_at) : 'Belum ada' }}</td>
                             @else
+                                <td class="sr-product"><span class="sr-sku">{{ $row->sku }}</span>{{ $row->name }}<span class="sr-sub">Alamat: {{ $row->address ?: '—' }}</span></td>
+                                <td>{{ $row->category }}<span class="sr-sub">{{ $row->uom ?: 'Satuan belum diatur' }}</span></td>
                                 <td class="sr-num">{{ $number($row->opening) }}</td><td class="sr-num sr-green">{{ $number($row->qty_in) }}</td><td class="sr-num sr-red">{{ $number($row->qty_out) }}</td><td class="sr-num {{ $row->closing < 0 ? 'sr-red' : '' }}"><strong>{{ $number($row->closing) }}</strong></td>
                             @endif
                         </tr>
                     @empty
-                        <tr><td colspan="{{ $isMovement ? 8 : 6 }}" style="text-align: center; padding: 40px 16px; color: #64748b;">Tidak ada barang yang sesuai filter. Coba ubah pencarian, kategori, atau status.</td></tr>
+                        <tr><td colspan="{{ $isMovement ? 9 : 6 }}" style="text-align: center; padding: 40px 16px; color: #64748b;">Tidak ada barang yang sesuai filter. Coba ubah pencarian, kategori, atau status.</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -170,8 +184,8 @@
         <div class="sr-pagination"><span class="sr-muted">Menampilkan {{ $rows->firstItem() ?? 0 }}–{{ $rows->lastItem() ?? 0 }} dari {{ $number($rows->total()) }} SKU</span><div class="sr-buttons">@if ($rows->previousPageUrl())<a class="sr-button" href="{{ $rows->previousPageUrl() }}">Sebelumnya</a>@endif @if ($rows->hasMorePages())<a class="sr-button" href="{{ $rows->nextPageUrl() }}">Berikutnya</a>@endif</div></div>
         <div class="sr-note">
             @if ($isMovement)
-                <strong>Kriteria pergerakan:</strong> fast moving memiliki mutasi keluar pada minimal {{ (int) ceil($days / 2) }} dari {{ $days }} hari; slow moving memiliki mutasi keluar tetapi di bawah batas tersebut; non-moving tidak memiliki mutasi keluar selama periode.<br>
-                Rata-rata = qty out ÷ {{ $days }} hari kalender. Seluruh jenis mutasi keluar dihitung, termasuk penyesuaian dan retur; ini bukan laporan penjualan. Keluar terakhir dihitung sampai tanggal akhir, termasuk sebelum periode.<br>
+                <strong>Kriteria pergerakan:</strong> SKU berqty keluar diurutkan dari terbesar. Fast Moving menyusun lapisan kontribusi awal hingga 70%; Medium Moving menyusun lapisan berikutnya hingga 90%; Slow Moving mengisi sisa kontribusi setelah 90%; Non Moving tidak memiliki barang keluar selama periode.<br>
+                Kontribusi dihitung terhadap seluruh qty keluar SKU fisik aktif pada periode. Frequency adalah jumlah kejadian mutasi keluar; hari aktif menunjukkan jumlah tanggal unik terjadinya barang keluar. Rata-rata = qty keluar ÷ {{ $days }} hari kalender. Days Cover = stok akhir ÷ rata-rata per hari. Tanggal terakhir keluar dihitung sampai tanggal akhir, termasuk sebelum periode.<br>
             @endif
             Hanya SKU fisik aktif; bundle virtual tidak dijumlahkan agar komponennya tidak terhitung ganda. Saldo berasal dari mutasi yang tercatat, bukan stok saat ini. Total qty mengikuti satuan masing-masing barang. Rentang maksimal 366 hari.
         </div>
