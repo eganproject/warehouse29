@@ -11,7 +11,10 @@ use App\Models\StockApiSyncRecord;
 use App\Models\ItemBundle;
 use App\Models\ItemStock;
 use App\Models\UnitOfMeasure;
+use App\Exports\ItemUpdateTemplateExport;
+use App\Imports\ItemSelectiveUpdateImport;
 use App\Imports\ItemsImport;
+use App\Support\ItemBulkUpdateFields;
 use App\Support\StockService;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Http\Request;
@@ -392,6 +395,54 @@ class ItemController extends Controller
         ]);
     }
 
+    public function downloadUpdateTemplate(Request $request)
+    {
+        $validated = $request->validate([
+            'fields' => ['required', 'array', 'min:1'],
+            'fields.*' => ['required', 'string', 'distinct', Rule::in(ItemBulkUpdateFields::allowed())],
+        ]);
+        $fields = ItemBulkUpdateFields::normalize($validated['fields']);
+
+        return Excel::download(
+            new ItemUpdateTemplateExport($fields),
+            'template-update-items-'.now()->format('Ymd-His').'.xlsx'
+        );
+    }
+
+    public function bulkUpdate(Request $request)
+    {
+        $validated = $request->validate([
+            'fields' => ['required', 'array', 'min:1'],
+            'fields.*' => ['required', 'string', 'distinct', Rule::in(ItemBulkUpdateFields::allowed())],
+            'file' => ['required', 'file', 'mimes:xlsx,xls', 'max:5120'],
+        ]);
+        $fields = ItemBulkUpdateFields::normalize($validated['fields']);
+
+        DB::beginTransaction();
+        try {
+            $import = new ItemSelectiveUpdateImport($fields);
+            Excel::import($import, $request->file('file'));
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Update item berhasil diproses.',
+                'matched' => $import->matched,
+                'updated' => $import->updated,
+                'unchanged' => $import->unchanged,
+            ]);
+        } catch (ValidationException $e) {
+            DB::rollBack();
+            throw $e;
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            report($e);
+
+            return response()->json([
+                'message' => 'Gagal memproses update item. Pastikan file sesuai template yang diunduh.',
+            ], 500);
+        }
+    }
+
     /**
      * Sync bundle components: delete old entries then insert new ones.
      * Validates that components are not bundles themselves.
@@ -444,9 +495,10 @@ class ItemController extends Controller
             // Regular → Bundle: block if item has stock mutations or non-zero stock
             $hasMutations = DB::table('stock_mutations')->where('item_id', $item->id)->exists();
             $hasStock = (int) DB::table('item_stocks')->where('item_id', $item->id)->value('stock') > 0;
-            if ($hasMutations || $hasStock) {
+            $isUsedAsComponent = ItemBundle::where('component_item_id', $item->id)->exists();
+            if ($hasMutations || $hasStock || $isUsedAsComponent) {
                 throw ValidationException::withMessages([
-                    'is_bundle' => 'Item tidak bisa diubah menjadi bundle karena sudah memiliki riwayat mutasi stok.',
+                    'is_bundle' => 'Item tidak bisa diubah menjadi bundle karena memiliki riwayat mutasi stok atau dipakai sebagai komponen bundle.',
                 ]);
             }
         } else {
@@ -567,6 +619,7 @@ class ItemController extends Controller
         return view('admin.masterdata.items.index', [
             'categories' => $categories,
             'uoms' => $uoms,
+            'bulkUpdateFields' => ItemBulkUpdateFields::definitions(),
             'pageTitle' => $pageTitle,
             'defaultStatus' => $defaultStatus,
         ]);

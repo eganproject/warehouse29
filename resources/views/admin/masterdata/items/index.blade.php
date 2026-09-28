@@ -25,7 +25,7 @@
             </div>
         </div>
         <div class="card-toolbar">
-            <div class="d-flex justify-content-end align-items-center gap-2" data-kt-user-table-toolbar="base">
+            <div class="d-flex flex-wrap justify-content-end align-items-center gap-2" data-kt-user-table-toolbar="base">
                 <select class="form-select form-select-solid w-100px" id="filter_items_limit" aria-label="Limit">
                     <option value="10" selected>10</option>
                     <option value="25">25</option>
@@ -79,6 +79,9 @@
                         </div>
                     </div>
                 </div>
+                @if($canUpdate)
+                    <button type="button" class="btn btn-light-success me-3" id="btn_bulk_update_items" data-bs-toggle="modal" data-bs-target="#modal_bulk_update_items">Update via Excel</button>
+                @endif
                 @if($canCreate)
                     <button type="button" class="btn btn-light-primary me-3" id="btn_import_items" data-bs-toggle="modal" data-bs-target="#modal_import_items">Import Excel</button>
                     <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modal_item_form" id="btn_open_create_item">
@@ -269,6 +272,98 @@
     </div>
 </div>
 <!--end::Import Modal-->
+
+<!--begin::Bulk Update Modal-->
+<div class="modal fade" id="modal_bulk_update_items" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable mw-850px">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <h2 class="fw-bolder mb-1">Update Item via Excel</h2>
+                    <div class="text-muted fs-7">Pilih field, unduh template, lalu unggah hasil perubahannya.</div>
+                </div>
+                <div class="btn btn-icon btn-sm btn-active-icon-primary" data-bs-dismiss="modal" aria-label="Tutup">
+                    <span class="svg-icon svg-icon-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                            <rect opacity="0.5" x="6" y="17.3137" width="16" height="2" rx="1" transform="rotate(-45 6 17.3137)" fill="black" />
+                            <rect x="7.41422" y="6" width="16" height="2" rx="1" transform="rotate(45 7.41422 6)" fill="black" />
+                        </svg>
+                    </span>
+                </div>
+            </div>
+            <div class="modal-body px-8 py-7">
+                <div class="alert alert-dismissible bg-light-primary border border-primary border-dashed d-flex align-items-start p-5 mb-7">
+                    <span class="svg-icon svg-icon-2hx svg-icon-primary me-4 mt-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                            <path opacity="0.3" d="M2 2H22V22H2V2Z" fill="currentColor"/>
+                            <path d="M11 7H13V13H11V7ZM11 15H13V17H11V15Z" fill="currentColor"/>
+                        </svg>
+                    </span>
+                    <div>
+                        <div class="fw-bold text-gray-800 mb-1">SKU hanya sebagai kunci pencocokan</div>
+                        <div class="text-gray-700 fs-7">Kolom SKU dikunci di template dan tidak pernah diperbarui. Proses ini juga tidak membuat item baru. Jika satu baris tidak valid, seluruh update dibatalkan.</div>
+                    </div>
+                </div>
+
+                <div class="d-flex align-items-center mb-4">
+                    <span class="badge badge-circle badge-primary me-3">1</span>
+                    <div class="fw-bolder fs-5 flex-grow-1">Pilih field yang ingin diperbarui</div>
+                    <button type="button" class="btn btn-sm btn-light-primary" id="btn_bulk_fields_toggle">Pilih Semua</button>
+                </div>
+                <div class="row g-4 mb-5" id="bulk_update_fields">
+                    @foreach($bulkUpdateFields as $key => $field)
+                        <div class="col-md-6">
+                            <label class="d-flex align-items-start border border-gray-300 rounded p-4 h-100 cursor-pointer">
+                                <span class="form-check form-check-custom form-check-solid me-4 mt-1">
+                                    <input class="form-check-input bulk-update-field" type="checkbox" value="{{ $key }}" />
+                                </span>
+                                <span>
+                                    <span class="d-block fw-bold text-gray-800">{{ $field['label'] }}</span>
+                                    <span class="d-block text-muted fs-7 mt-1">{{ $field['description'] }}</span>
+                                </span>
+                            </label>
+                        </div>
+                    @endforeach
+                </div>
+                <div class="invalid-feedback d-block mb-7" id="error_bulk_update_fields"></div>
+
+                <div class="separator separator-dashed mb-7"></div>
+                <div class="d-flex align-items-center mb-4">
+                    <span class="badge badge-circle badge-primary me-3">2</span>
+                    <div class="fw-bolder fs-5 flex-grow-1">Unduh template sesuai pilihan</div>
+                    <span class="badge badge-light-primary" id="bulk_selected_count">0 field dipilih</span>
+                </div>
+                <div class="bg-light rounded p-5 mb-7 d-flex flex-wrap align-items-center justify-content-between gap-3">
+                    <div>
+                        <div class="fw-bold text-gray-800">Template berisi semua item saat ini</div>
+                        <div class="text-muted fs-7">Hapus baris yang tidak ingin diperbarui. Jangan mengganti nama header.</div>
+                    </div>
+                    <button type="button" class="btn btn-primary" id="btn_download_items_update_template" disabled>
+                        Unduh Template Excel
+                    </button>
+                </div>
+
+                <div class="separator separator-dashed mb-7"></div>
+                <div class="d-flex align-items-center mb-4">
+                    <span class="badge badge-circle badge-primary me-3">3</span>
+                    <div class="fw-bolder fs-5">Unggah file yang sudah diedit</div>
+                </div>
+                <div class="mb-3">
+                    <label class="required fs-6 fw-bold form-label mb-2">File Excel</label>
+                    <input type="file" class="form-control form-control-solid" id="bulk_update_items_file" accept=".xlsx,.xls" disabled />
+                    <div class="form-text">Maksimal 5 MB. Pilihan field saat upload harus sama dengan template.</div>
+                    <div class="invalid-feedback d-block" id="error_bulk_update_file"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
+                <button type="button" class="btn btn-success" id="btn_bulk_update_items_submit" disabled>Validasi & Update</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!--end::Bulk Update Modal-->
+
 @endsection
 
 @push('scripts')
@@ -280,6 +375,8 @@
     const deleteTpl  = '{{ route('admin.masterdata.items.destroy', ':id') }}';
     const showTpl    = '{{ route('admin.masterdata.items.show', ':id') }}';
     const importUrl  = '{{ route('admin.masterdata.items.import') }}';
+    const bulkUpdateTemplateUrl = '{{ route('admin.masterdata.items.update-template') }}';
+    const bulkUpdateUrl = '{{ route('admin.masterdata.items.bulk-update') }}';
     const itemSearchUrl = '{{ route('admin.masterdata.items.data') }}';
     const canUpdate  = {{ $canUpdate ? 'true' : 'false' }};
     const canDelete  = {{ $canDelete ? 'true' : 'false' }};
@@ -314,6 +411,10 @@
         const importInput    = document.getElementById('import_items_file');
         const importError    = document.getElementById('error_import_file');
         const importSubmit   = document.getElementById('btn_import_items_submit');
+        const bulkUpdateModalEl = document.getElementById('modal_bulk_update_items');
+        const bulkUpdateModal = bulkUpdateModalEl ? new bootstrap.Modal(bulkUpdateModalEl) : null;
+        const bulkUpdateInput = document.getElementById('bulk_update_items_file');
+        const bulkUpdateSubmit = document.getElementById('btn_bulk_update_items_submit');
 
         // ── Bundle component rows ──────────────────────────────────────────────
 
@@ -703,6 +804,202 @@
                 console.error(err);
                 closeSwal();
                 Swal?.fire('Error', 'Gagal import', 'error');
+            }
+        });
+
+        // Selective bulk update
+
+        const bulkFieldCheckboxes = Array.from(document.querySelectorAll('.bulk-update-field'));
+        const bulkFieldsError = document.getElementById('error_bulk_update_fields');
+        const bulkFileError = document.getElementById('error_bulk_update_file');
+        const bulkSelectedCount = document.getElementById('bulk_selected_count');
+        const bulkDownloadButton = document.getElementById('btn_download_items_update_template');
+        const bulkToggleButton = document.getElementById('btn_bulk_fields_toggle');
+
+        const selectedBulkFields = () => bulkFieldCheckboxes
+            .filter(checkbox => checkbox.checked)
+            .map(checkbox => checkbox.value);
+
+        const refreshBulkUpdateState = (clearFile = false) => {
+            const selected = selectedBulkFields();
+            const hasFields = selected.length > 0;
+            bulkFieldCheckboxes.forEach(checkbox => {
+                const card = checkbox.closest('label');
+                card?.classList.toggle('border-primary', checkbox.checked);
+                card?.classList.toggle('bg-light-primary', checkbox.checked);
+            });
+            if (bulkSelectedCount) bulkSelectedCount.textContent = `${selected.length} field dipilih`;
+            if (bulkDownloadButton) bulkDownloadButton.disabled = !hasFields;
+            if (bulkUpdateInput) {
+                bulkUpdateInput.disabled = !hasFields;
+                if (clearFile) bulkUpdateInput.value = '';
+            }
+            if (bulkUpdateSubmit) {
+                bulkUpdateSubmit.disabled = !hasFields || !bulkUpdateInput?.files?.length;
+            }
+            if (bulkToggleButton) {
+                bulkToggleButton.textContent = hasFields && selected.length === bulkFieldCheckboxes.length
+                    ? 'Batalkan Semua'
+                    : 'Pilih Semua';
+            }
+            if (bulkFieldsError && hasFields) bulkFieldsError.textContent = '';
+            if (clearFile && bulkFileError) bulkFileError.textContent = '';
+        };
+
+        const resetBulkUpdateModal = () => {
+            bulkFieldCheckboxes.forEach(checkbox => { checkbox.checked = false; });
+            if (bulkUpdateInput) bulkUpdateInput.value = '';
+            if (bulkFieldsError) bulkFieldsError.textContent = '';
+            if (bulkFileError) bulkFileError.textContent = '';
+            refreshBulkUpdateState();
+        };
+
+        document.getElementById('btn_bulk_update_items')?.addEventListener('click', resetBulkUpdateModal);
+        bulkFieldCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', () => refreshBulkUpdateState(true));
+        });
+        bulkToggleButton?.addEventListener('click', () => {
+            const shouldCheck = !bulkFieldCheckboxes.every(checkbox => checkbox.checked);
+            bulkFieldCheckboxes.forEach(checkbox => { checkbox.checked = shouldCheck; });
+            refreshBulkUpdateState(true);
+        });
+        bulkUpdateInput?.addEventListener('change', () => {
+            if (bulkFileError) bulkFileError.textContent = '';
+            refreshBulkUpdateState();
+        });
+
+        bulkDownloadButton?.addEventListener('click', async () => {
+            const fields = selectedBulkFields();
+            if (!fields.length) {
+                if (bulkFieldsError) bulkFieldsError.textContent = 'Pilih minimal satu field.';
+                return;
+            }
+
+            const originalText = bulkDownloadButton.textContent;
+            bulkDownloadButton.disabled = true;
+            bulkDownloadButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Menyiapkan...';
+
+            const body = new FormData();
+            fields.forEach(field => body.append('fields[]', field));
+
+            try {
+                const response = await fetch(bulkUpdateTemplateUrl, {
+                    method: 'POST',
+                    headers: { 'X-CSRF-TOKEN': csrfToken, Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/json' },
+                    body,
+                });
+
+                if (!response.ok) {
+                    const json = await response.json().catch(() => ({}));
+                    const message = json?.errors
+                        ? Object.values(json.errors).flat().join(', ')
+                        : (json.message || 'Gagal membuat template.');
+                    throw new Error(message);
+                }
+
+                const blob = await response.blob();
+                const disposition = response.headers.get('Content-Disposition') || '';
+                const filenameMatch = disposition.match(/filename\*?=(?:UTF-8''|")?([^";]+)/i);
+                const filename = filenameMatch ? decodeURIComponent(filenameMatch[1].replace(/"/g, '')) : 'template-update-items.xlsx';
+                const objectUrl = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = objectUrl;
+                link.download = filename;
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                URL.revokeObjectURL(objectUrl);
+
+                Swal?.fire({
+                    icon: 'success',
+                    title: 'Template siap',
+                    text: 'Edit hanya kolom yang tersedia, lalu unggah file dengan pilihan field yang sama.',
+                    confirmButtonText: 'Mengerti',
+                });
+            } catch (error) {
+                console.error(error);
+                Swal?.fire('Gagal', error.message || 'Gagal mengunduh template.', 'error');
+            } finally {
+                bulkDownloadButton.textContent = originalText;
+                refreshBulkUpdateState();
+            }
+        });
+
+        bulkUpdateSubmit?.addEventListener('click', async () => {
+            if (bulkFieldsError) bulkFieldsError.textContent = '';
+            if (bulkFileError) bulkFileError.textContent = '';
+
+            const fields = selectedBulkFields();
+            const file = bulkUpdateInput?.files?.[0];
+            if (!fields.length) {
+                if (bulkFieldsError) bulkFieldsError.textContent = 'Pilih minimal satu field.';
+                return;
+            }
+            if (!file) {
+                if (bulkFileError) bulkFileError.textContent = 'Pilih file Excel yang sudah diedit.';
+                return;
+            }
+
+            let confirmed = true;
+            if (typeof Swal !== 'undefined') {
+                const confirmation = await Swal.fire({
+                    title: 'Proses update item?',
+                    text: 'Semua baris akan divalidasi lebih dulu. SKU dan field yang tidak dipilih tidak akan diubah.',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Ya, validasi & update',
+                    cancelButtonText: 'Batal',
+                    buttonsStyling: false,
+                    customClass: { confirmButton: 'btn btn-success', cancelButton: 'btn btn-light' },
+                });
+                confirmed = confirmation.isConfirmed;
+            }
+            if (!confirmed) return;
+
+            const body = new FormData();
+            body.append('file', file);
+            fields.forEach(field => body.append('fields[]', field));
+
+            Swal?.fire({
+                title: 'Memvalidasi dan memperbarui...',
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                didOpen: () => Swal.showLoading(),
+            });
+
+            try {
+                const response = await fetch(bulkUpdateUrl, {
+                    method: 'POST',
+                    headers: { 'X-CSRF-TOKEN': csrfToken, Accept: 'application/json' },
+                    body,
+                });
+                const json = await response.json().catch(() => ({}));
+                closeSwal();
+
+                if (!response.ok) {
+                    const message = json?.errors
+                        ? Object.values(json.errors).flat().join(', ')
+                        : (json.message || 'Gagal memperbarui item.');
+                    Swal?.fire('Update dibatalkan', message, 'error');
+                    return;
+                }
+
+                Swal?.fire({
+                    icon: 'success',
+                    title: 'Update selesai',
+                    html: `<div class="text-start mx-auto" style="max-width:280px">
+                        <div class="d-flex justify-content-between mb-2"><span>SKU ditemukan</span><strong>${json.matched ?? 0}</strong></div>
+                        <div class="d-flex justify-content-between mb-2"><span>Item diperbarui</span><strong class="text-success">${json.updated ?? 0}</strong></div>
+                        <div class="d-flex justify-content-between"><span>Tanpa perubahan</span><strong>${json.unchanged ?? 0}</strong></div>
+                    </div>`,
+                });
+                bulkUpdateModal?.hide();
+                resetBulkUpdateModal();
+                reloadTable();
+            } catch (error) {
+                console.error(error);
+                closeSwal();
+                Swal?.fire('Error', 'Terjadi gangguan saat memproses file.', 'error');
             }
         });
     });
