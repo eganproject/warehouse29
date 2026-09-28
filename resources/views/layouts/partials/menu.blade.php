@@ -9,7 +9,8 @@
     $topMenus = MenuModel::whereNull('parent_id')->where('is_active', true)
         ->orderBy('sort_order')
         ->orderBy('name')
-        ->get();
+        ->get()
+        ->filter(fn ($m) => ! $m->route || RouteFacade::has($m->route));
     $currentRouteName = RouteFacade::currentRouteName();
     $currentBase = $currentRouteName ? Perm::resolveBaseRoute($currentRouteName) : null;
 
@@ -25,7 +26,7 @@
         @foreach($topMenus as $top)
             @php
                 $children = MenuModel::where('parent_id', $top->id)->where('is_active', true)->orderBy('sort_order')->orderBy('name')->get();
-                $children = $children->filter(fn($c)=> $allowed->contains($c->id));
+                $children = $children->filter(fn($c)=> $allowed->contains($c->id) && (! $c->route || RouteFacade::has($c->route)));
                 $showTop = $allowed->contains($top->id) || $children->isNotEmpty();
                 if (!$showTop) {
                     continue;

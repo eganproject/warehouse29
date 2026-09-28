@@ -38,35 +38,7 @@ class DashboardController extends Controller
             }
         }
 
-        $resiBase = Resi::query()->whereDate('tanggal_upload', $selectedDate);
-        $activeResiBase = (clone $resiBase)->where(function ($q) {
-            $q->whereNull('status')
-                ->orWhere('status', '!=', 'canceled');
-        });
-
-        $totalResiActive = (clone $activeResiBase)->count();
-        $totalResiCanceled = (clone $resiBase)->where('status', 'canceled')->count();
-        $totalResiUpdatedAt = (clone $activeResiBase)->max('updated_at');
-        $totalScanOut = PackerScanOut::query()
-            ->whereIn('resi_id', (clone $resiBase)->select('id'))
-            ->count();
-        $totalScanUpdatedAt = PackerScanOut::query()
-            ->whereIn('resi_id', (clone $resiBase)->select('id'))
-            ->max('scanned_at');
-        $totalQcScan = QcScanResi::query()
-            ->whereIn('resi_id', (clone $resiBase)->select('id'))
-            ->count();
-        $totalQcCompleted = QcScanResi::query()
-            ->whereIn('resi_id', (clone $resiBase)->select('id'))
-            ->where('status', 'completed')
-            ->count();
-        $totalQcUpdatedAt = QcScanResi::query()
-            ->whereIn('resi_id', (clone $resiBase)->select('id'))
-            ->selectRaw('MAX(COALESCE(completed_at, scanned_at)) as latest_at')
-            ->value('latest_at');
-        $totalResiUpdated = $totalResiUpdatedAt ? Carbon::parse($totalResiUpdatedAt)->format('H:i') : '-';
-        $totalScanUpdated = $totalScanUpdatedAt ? Carbon::parse($totalScanUpdatedAt)->format('H:i') : '-';
-        $totalQcUpdated = $totalQcUpdatedAt ? Carbon::parse($totalQcUpdatedAt)->format('H:i') : '-';
+        $resiOverview = $this->resiOverview($selectedDate);
 
         $selectedStart = Carbon::parse($selectedDate)->startOfDay();
         $selectedEnd = Carbon::parse($selectedDate)->endOfDay();
@@ -146,92 +118,101 @@ class DashboardController extends Controller
             'damaged_goods' => DB::table('damaged_goods')->where('status', 'pending')->count(),
         ];
 
-        $resiCounts = Resi::select('kurir_id', DB::raw('count(*) as total'))
-            ->whereDate('tanggal_upload', $selectedDate)
-            ->where(function ($q) {
-                $q->whereNull('status')
-                    ->orWhere('status', '!=', 'canceled');
-            })
-            ->groupBy('kurir_id')
-            ->pluck('total', 'kurir_id')
-            ->toArray();
-
-        $canceledCounts = Resi::select('kurir_id', DB::raw('count(*) as total'))
-            ->whereDate('tanggal_upload', $selectedDate)
-            ->where('status', 'canceled')
-            ->groupBy('kurir_id')
-            ->pluck('total', 'kurir_id')
-            ->toArray();
-
-        $scanCounts = PackerScanOut::query()
-            ->join('resis', 'resis.id', '=', 'packer_scan_outs.resi_id')
-            ->select('resis.kurir_id', DB::raw('count(*) as total'))
-            ->whereDate('resis.tanggal_upload', $selectedDate)
-            ->groupBy('resis.kurir_id')
-            ->pluck('total', 'resis.kurir_id')
-            ->toArray();
-
-        $resiLatest = Resi::select('kurir_id', DB::raw('max(updated_at) as latest'))
-            ->whereDate('tanggal_upload', $selectedDate)
-            ->where(function ($q) {
-                $q->whereNull('status')
-                    ->orWhere('status', '!=', 'canceled');
-            })
-            ->groupBy('kurir_id')
-            ->pluck('latest', 'kurir_id')
-            ->toArray();
-
-        $scanLatest = PackerScanOut::query()
-            ->join('resis', 'resis.id', '=', 'packer_scan_outs.resi_id')
-            ->select('resis.kurir_id', DB::raw('max(packer_scan_outs.scanned_at) as latest'))
-            ->whereDate('resis.tanggal_upload', $selectedDate)
-            ->groupBy('resis.kurir_id')
-            ->pluck('latest', 'resis.kurir_id')
-            ->toArray();
-
-        $kurirs = Kurir::orderBy('name')
-            ->get(['id', 'name'])
-            ->map(function ($kurir) use ($resiCounts, $canceledCounts, $scanCounts, $resiLatest, $scanLatest) {
-                $resiTotal = (int) ($resiCounts[$kurir->id] ?? 0);
-                $scanTotal = (int) ($scanCounts[$kurir->id] ?? 0);
-                $canceledTotal = (int) ($canceledCounts[$kurir->id] ?? 0);
-                $latestResi = $resiLatest[$kurir->id] ?? null;
-                $latestScan = $scanLatest[$kurir->id] ?? null;
-                $latestRaw = $latestResi && $latestScan
-                    ? (Carbon::parse($latestResi)->greaterThan(Carbon::parse($latestScan)) ? $latestResi : $latestScan)
-                    : ($latestResi ?: $latestScan);
-                $latestTime = $latestRaw ? Carbon::parse($latestRaw)->format('H:i') : '-';
-                return [
-                    'id' => $kurir->id,
-                    'name' => $kurir->name,
-                    'resi_total' => $resiTotal,
-                    'scan_total' => $scanTotal,
-                    'remaining' => max(0, $resiTotal - $scanTotal),
-                    'canceled_total' => $canceledTotal,
-                    'last_update' => $latestTime,
-                ];
-            });
-
         return view('admin.dashboard', [
             'report' => $report,
             'reportFilters' => $reportFilters,
             'today' => $selectedDate,
-            'totalResi' => $totalResiActive,
-            'totalResiCanceled' => $totalResiCanceled,
-            'totalScanOut' => $totalScanOut,
-            'totalQcScan' => $totalQcScan,
-            'totalQcCompleted' => $totalQcCompleted,
-            'totalResiUpdated' => $totalResiUpdated,
-            'totalScanUpdated' => $totalScanUpdated,
-            'totalQcUpdated' => $totalQcUpdated,
+            'resiSummary' => $resiOverview['summary'],
+            'kurirs' => $resiOverview['kurirs'],
             'inventorySummary' => $inventorySummary,
             'todayMovement' => $todayMovement,
             'topOutgoingItems' => $topOutgoingItems,
             'outOfStockItems' => $outOfStockItems,
             'lowStockItems' => $lowStockItems,
             'pendingApprovals' => $pendingApprovals,
-            'kurirs' => $kurirs,
         ]);
+    }
+
+    /**
+     * Resi pipeline for one upload date, grouped per kurir. Only kurirs that have
+     * resis on that date are returned; QC and scan out are counted for active resis only.
+     */
+    private function resiOverview(string $date): array
+    {
+        $active = "(r.status IS NULL OR r.status != 'canceled')";
+
+        $rows = DB::table('resis as r')
+            ->leftJoin('kurirs as k', 'k.id', '=', 'r.kurir_id')
+            ->leftJoin('qc_scan_resis as qs', 'qs.resi_id', '=', 'r.id')
+            ->leftJoin('packer_scan_outs as pso', 'pso.resi_id', '=', 'r.id')
+            ->whereDate('r.tanggal_upload', $date)
+            ->groupBy('r.kurir_id', 'k.name')
+            ->select('r.kurir_id', 'k.name')
+            ->selectRaw("SUM(CASE WHEN {$active} THEN 1 ELSE 0 END) as active_total")
+            ->selectRaw("SUM(CASE WHEN r.status = 'canceled' THEN 1 ELSE 0 END) as canceled_total")
+            ->selectRaw("SUM(CASE WHEN {$active} AND qs.id IS NOT NULL THEN 1 ELSE 0 END) as qc_total")
+            ->selectRaw("SUM(CASE WHEN {$active} AND qs.status = 'completed' THEN 1 ELSE 0 END) as qc_completed")
+            ->selectRaw("SUM(CASE WHEN {$active} AND pso.id IS NOT NULL THEN 1 ELSE 0 END) as scan_total")
+            ->selectRaw("SUM(CASE WHEN {$active} AND pso.id IS NULL AND qs.id IS NOT NULL THEN 1 ELSE 0 END) as waiting_scan")
+            ->selectRaw('MAX(r.updated_at) as resi_latest')
+            ->selectRaw('MAX(COALESCE(qs.completed_at, qs.scanned_at)) as qc_latest')
+            ->selectRaw('MAX(pso.scanned_at) as scan_latest')
+            ->get();
+
+        $latestOf = function (...$values) {
+            $values = array_filter($values);
+
+            return $values ? max(array_map(fn ($value) => Carbon::parse($value), $values)) : null;
+        };
+
+        $kurirs = $rows->map(function ($row) use ($latestOf) {
+            $activeTotal = (int) $row->active_total;
+            $scanTotal = (int) $row->scan_total;
+            $latest = $latestOf($row->resi_latest, $row->qc_latest, $row->scan_latest);
+
+            return [
+                'id' => $row->kurir_id ? (int) $row->kurir_id : null,
+                'name' => $row->kurir_id ? ($row->name ?? 'Kurir #'.$row->kurir_id) : 'Tanpa Kurir',
+                'resi_total' => $activeTotal,
+                'qc_total' => (int) $row->qc_total,
+                'qc_completed' => (int) $row->qc_completed,
+                'scan_total' => $scanTotal,
+                'waiting_scan' => (int) $row->waiting_scan,
+                'remaining' => max(0, $activeTotal - $scanTotal),
+                'canceled_total' => (int) $row->canceled_total,
+                'progress' => $activeTotal > 0 ? (int) floor($scanTotal / $activeTotal * 100) : 0,
+                'latest_at' => $latest,
+                'last_update' => $latest ? $latest->format('H:i') : '-',
+            ];
+        })
+            ->sortBy([
+                ['remaining', 'desc'],
+                ['resi_total', 'desc'],
+                ['name', 'asc'],
+            ])
+            ->values();
+
+        $activeTotal = (int) $kurirs->sum('resi_total');
+        $scanTotal = (int) $kurirs->sum('scan_total');
+        $waitingScan = (int) $kurirs->sum('waiting_scan');
+        $latest = $kurirs->pluck('latest_at')->filter()->max();
+
+        return [
+            'summary' => (object) [
+                'active' => $activeTotal,
+                'canceled' => (int) $kurirs->sum('canceled_total'),
+                'qc' => (int) $kurirs->sum('qc_total'),
+                'qc_completed' => (int) $kurirs->sum('qc_completed'),
+                'scan' => $scanTotal,
+                'remaining' => max(0, $activeTotal - $scanTotal),
+                'waiting_scan' => $waitingScan,
+                'not_started' => max(0, $activeTotal - $scanTotal - $waitingScan),
+                'kurir_count' => $kurirs->count(),
+                'kurir_done' => $kurirs->filter(fn ($k) => $k['resi_total'] > 0 && $k['remaining'] === 0)->count(),
+                'last_update' => $latest ? $latest->format('H:i') : '-',
+            ],
+            'kurirs' => $kurirs,
+        ];
     }
 
     public function kurirDetail(Request $request)

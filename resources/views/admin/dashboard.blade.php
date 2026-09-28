@@ -354,139 +354,283 @@
         margin-top: 6px;
     }
 
-    /* ---------- Kurir cards ---------- */
-    .kurir-grid {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 16px;
+    /* ---------- Operasional Resi: header ---------- */
+    .ops-date-nav {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
     }
-    @media (max-width: 991px) { .kurir-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-    @media (max-width: 575px) { .kurir-grid { grid-template-columns: 1fr; } }
-
-    .kurir-card {
-        display: flex;
-        flex-direction: column;
-        border: 1px solid #e9edf3;
-        border-radius: 16px;
-        padding: 18px;
+    .ops-date-nav .btn-icon {
+        width: 34px;
+        height: 34px;
+        border: 1px solid #e2e8f0;
         background: #fff;
-        transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+        color: #475569;
     }
-    .kurir-card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 14px 28px rgba(15, 23, 42, 0.09);
-        border-color: #dbe3ee;
+    .ops-date-nav .btn-icon:hover { color: var(--dash-blue); border-color: #bfdbfe; }
+    .ops-updated {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 12px;
+        color: #64748b;
+        margin-top: 4px;
     }
-    .kurir-card-top {
+
+    /* ---------- Operasional Resi: KPI strip ---------- */
+    .ops-kpis {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        border: 1px solid #e9edf3;
+        border-radius: 14px;
+        overflow: hidden;
+        background: #fff;
+    }
+    .ops-kpi {
+        padding: 16px 18px;
+        border-left: 1px solid #eef2f7;
+        min-width: 0;
+    }
+    .ops-kpi:first-child { border-left: 0; }
+    .ops-kpi-label {
         display: flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 11.5px;
+        font-weight: 700;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+    .ops-kpi-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: var(--kpi-color, #94a3b8);
+        flex-shrink: 0;
+    }
+    .ops-kpi-value {
+        margin-top: 6px;
+        font-size: 28px;
+        font-weight: 800;
+        line-height: 1.1;
+        color: #0f172a;
+        letter-spacing: -0.02em;
+        font-variant-numeric: tabular-nums;
+    }
+    .ops-kpi-meta {
+        margin-top: 4px;
+        font-size: 12px;
+        color: #64748b;
+    }
+    .ops-kpi--attention { background: #fffbeb; }
+    .ops-kpi--attention .ops-kpi-value { color: #b45309; }
+    .ops-kpi--done { background: #ecfdf5; }
+    .ops-kpi--done .ops-kpi-value { color: #047857; }
+
+    /* ---------- Operasional Resi: pipeline bar ---------- */
+    .ops-pipeline { margin-top: 18px; }
+    .ops-pipeline-head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 6px 16px;
+        margin-bottom: 8px;
+    }
+    .ops-pipeline-title {
+        font-size: 13px;
+        font-weight: 800;
+        color: #0f172a;
+    }
+    .ops-pipeline-percent {
+        font-size: 13px;
+        font-weight: 800;
+        color: var(--dash-green);
+    }
+    .ops-stack {
+        display: flex;
+        height: 12px;
+        border-radius: 999px;
+        overflow: hidden;
+        background: #eef2f7;
+    }
+    .ops-stack span { height: 100%; }
+    .ops-stack .seg-scan    { background: #059669; }
+    .ops-stack .seg-waiting { background: #60a5fa; }
+    .ops-stack .seg-new     { background: #fbbf24; }
+    .ops-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 18px;
+        margin-top: 10px;
+        font-size: 12px;
+        color: #475569;
+    }
+    .ops-legend-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .ops-legend-item b { color: #0f172a; font-variant-numeric: tabular-nums; }
+    .ops-legend-swatch {
+        width: 10px;
+        height: 10px;
+        border-radius: 3px;
+    }
+
+    /* ---------- Operasional Resi: kurir list ---------- */
+    .kl {
+        border: 1px solid #e9edf3;
+        border-radius: 14px;
+        overflow: hidden;
+    }
+    .kl-row {
+        display: grid;
+        grid-template-columns: minmax(170px, 1.7fr) repeat(5, minmax(72px, 0.75fr)) minmax(150px, 1.4fr) 104px;
         align-items: center;
         gap: 12px;
+        padding: 12px 16px;
+        border-top: 1px solid #eef2f7;
     }
-    .kurir-avatar {
-        flex-shrink: 0;
-        width: 44px;
-        height: 44px;
-        border-radius: 12px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 18px;
-        color: var(--dash-blue);
-        background: linear-gradient(135deg, rgba(37, 99, 235, 0.12), rgba(37, 99, 235, 0.05));
+    .kl-body .kl-row:first-child { border-top: 0; }
+    .kl-body .kl-row:hover { background: #f8fafc; }
+    .kl-head {
+        background: #f8fafc;
+        font-size: 10.5px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #64748b;
+        padding-top: 10px;
+        padding-bottom: 10px;
+        border-top: 0;
+        border-bottom: 1px solid #eef2f7;
     }
-    .kurir-info { min-width: 0; flex: 1; }
-    .kurir-name {
+    .kl-foot {
+        background: #f8fafc;
+        border-top: 1px solid #e2e8f0;
+    }
+    .kl-num {
+        text-align: right;
+        font-size: 14px;
+        font-weight: 700;
+        color: #0f172a;
+        font-variant-numeric: tabular-nums;
+    }
+    .kl-num.is-zero { color: #cbd5e1; font-weight: 600; }
+    .kl-num.is-cancel { color: #dc2626; }
+    .kl-name {
+        font-size: 14px;
         font-weight: 800;
-        font-size: 15px;
         color: #0f172a;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
     }
-    .kurir-updated {
-        font-size: 11px;
-        color: #94a3b8;
+    .kl-sub {
         display: flex;
         align-items: center;
         gap: 4px;
+        font-size: 11.5px;
+        color: #94a3b8;
         margin-top: 2px;
     }
-    .kurir-ratio {
-        display: flex;
-        align-items: baseline;
-        gap: 4px;
-        margin-top: 14px;
-    }
-    .ratio-resi { font-size: 30px; font-weight: 800; color: var(--dash-blue); letter-spacing: -0.02em; }
-    .ratio-scan { font-size: 30px; font-weight: 800; color: var(--dash-green); letter-spacing: -0.02em; }
-    .ratio-sep  { font-size: 22px; font-weight: 600; color: #cbd5e1; }
-    .ratio-caption {
-        font-size: 11px;
-        color: #94a3b8;
-        font-weight: 600;
-        margin-left: 4px;
-    }
-    .kurir-progress {
-        height: 7px;
-        border-radius: 999px;
-        background: #eef2f7;
-        overflow: hidden;
-        margin-top: 12px;
-    }
-    .kurir-progress-bar {
-        height: 100%;
-        border-radius: 999px;
-        background: linear-gradient(90deg, #10b981, #059669);
-        transition: width 0.4s ease;
-    }
-    .kurir-progress-text {
-        font-size: 11px;
-        color: #64748b;
-        font-weight: 600;
-        margin-top: 6px;
-    }
-    .kurir-chips {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        margin-top: 12px;
-    }
-    .chip {
+    .kl-badge {
         display: inline-flex;
         align-items: center;
         gap: 5px;
-        padding: 5px 10px;
+        padding: 3px 9px;
         border-radius: 999px;
-        font-size: 11px;
-        font-weight: 700;
+        font-size: 12.5px;
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
     }
-    .chip-amber  { background: rgba(217, 119, 6, 0.12);  color: #b45309; }
-    .chip-red    { background: rgba(220, 38, 38, 0.1);   color: #b91c1c; }
-    .chip-green  { background: rgba(5, 150, 105, 0.12);  color: #047857; }
-    .kurir-detail-btn {
-        margin-top: 16px;
-        width: 100%;
+    .kl-badge--pending { background: rgba(217, 119, 6, 0.12); color: #b45309; }
+    .kl-badge--done    { background: rgba(5, 150, 105, 0.12); color: #047857; font-weight: 700; }
+    .kl-progress {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .kl-bar {
+        flex: 1;
+        height: 8px;
+        border-radius: 999px;
+        background: #eef2f7;
+        overflow: hidden;
+    }
+    .kl-bar span {
+        display: block;
+        height: 100%;
+        border-radius: 999px;
+        background: #059669;
+    }
+    .kl-bar.is-low span { background: #f59e0b; }
+    .kl-percent {
+        width: 40px;
+        text-align: right;
+        font-size: 12.5px;
+        font-weight: 800;
+        color: #334155;
+        font-variant-numeric: tabular-nums;
+    }
+    .kl-action { text-align: right; }
+    .kl-detail-btn {
         display: inline-flex;
         align-items: center;
-        justify-content: center;
-        gap: 8px;
-        padding: 9px 14px;
-        border-radius: 10px;
-        border: 1px solid #e2e8f0;
-        background: #f8fafc;
+        gap: 6px;
+        padding: 6px 12px;
+        border-radius: 8px;
+        border: 1px solid #dbeafe;
+        background: #eff6ff;
         color: var(--dash-blue);
+        font-size: 12.5px;
         font-weight: 700;
-        font-size: 13px;
+        white-space: nowrap;
         cursor: pointer;
-        transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+        transition: background 0.15s ease, color 0.15s ease;
     }
-    .kurir-detail-btn:hover {
-        background: var(--dash-blue);
-        border-color: var(--dash-blue);
-        color: #fff;
+    .kl-detail-btn:hover { background: var(--dash-blue); border-color: var(--dash-blue); color: #fff; }
+    .kl-label { display: none; }
+
+    @media (max-width: 1199px) {
+        .ops-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .ops-kpi:nth-child(4) { border-left: 0; }
+        .ops-kpi:nth-child(n+4) { border-top: 1px solid #eef2f7; }
     }
-    .kurir-detail-btn i { transition: transform 0.15s ease; }
-    .kurir-detail-btn:hover i { transform: translateX(3px); }
+
+    @media (max-width: 991px) {
+        .kl-head { display: none; }
+        .kl-row {
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 10px 8px;
+            padding: 14px;
+        }
+        .kl-cell-name { grid-column: 1 / 4; min-width: 0; }
+        .kl-action { grid-column: 4 / 6; }
+        .kl-progress { grid-column: 1 / -1; order: 2; }
+        .kl-num {
+            order: 3;
+            text-align: left;
+            background: #f8fafc;
+            border-radius: 8px;
+            padding: 6px 8px;
+            font-size: 13px;
+        }
+        .kl-label {
+            display: block;
+            font-size: 10px;
+            font-weight: 700;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            margin-bottom: 2px;
+        }
+        .kl-foot .kl-num { background: #fff; }
+        .kl-foot .kl-action { display: none; }
+        .kl-foot .kl-cell-name { grid-column: 1 / -1; }
+    }
 
     /* ---------- Modal filter cards ---------- */
     .filter-card-grid {
@@ -650,13 +794,15 @@
             max-width: none;
             width: 100%;
         }
-        .kurir-ratio {
-            flex-wrap: wrap;
+        .ops-kpis {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
         }
-        .ratio-resi,
-        .ratio-scan {
-            font-size: 26px;
-        }
+        .ops-kpi { border-left: 0; border-top: 1px solid #eef2f7; padding: 14px; }
+        .ops-kpi:nth-child(-n+2) { border-top: 0; }
+        .ops-kpi:nth-child(even) { border-left: 1px solid #eef2f7; }
+        .ops-kpi-value { font-size: 24px; }
+        .ops-date-nav { flex: 1 1 100%; }
+        .ops-date-nav input { flex: 1 1 auto; }
     }
 
     @media (min-width: 768px) and (max-width: 1199px) {
@@ -789,119 +935,96 @@
             @include('admin.dashboards.resi-report')
         </div>
         <div class="tab-pane fade {{ request('tab') !== 'report' ? 'show active' : '' }}" id="pane-resi" role="tabpanel" aria-labelledby="tab-resi">
+    @php
+        $rs = $resiSummary;
+        $selectedCarbon = \Illuminate\Support\Carbon::parse($today);
+        $isToday = $selectedCarbon->isToday();
+        $grandTotal = $rs->active + $rs->canceled;
+        $pct = fn ($part, $whole) => $whole > 0 ? (int) floor($part / $whole * 100) : 0;
+        $scanPercent = $pct($rs->scan, $rs->active);
+        $qcPercent = $pct($rs->qc, $rs->active);
+        $segScan = $rs->active > 0 ? $rs->scan / $rs->active * 100 : 0;
+        $segWaiting = $rs->active > 0 ? $rs->waiting_scan / $rs->active * 100 : 0;
+        $segNew = $rs->active > 0 ? $rs->not_started / $rs->active * 100 : 0;
+        $dateUrl = fn ($date) => url()->current().'?'.http_build_query(['date' => $date]);
+    @endphp
+
     {{-- ============ Ringkasan Resi ============ --}}
     <div class="card mb-6">
         <div class="card-body">
             <div class="dash-section-head mb-5">
                 <div>
                     <div class="dash-section-title"><i class="fa-solid fa-chart-pie"></i> Ringkasan Resi</div>
-                    <div class="dash-section-sub">Performa scan out untuk tanggal {{ $today ?? '-' }}</div>
-                    <div class="dash-legend">
-                        Resi aktif = status selain cancel &nbsp;&middot;&nbsp; Rasio = resi aktif / scan out &nbsp;&middot;&nbsp; Resi cancel tidak dihitung sebagai resi aktif.
+                    <div class="dash-section-sub">
+                        Resi dengan tanggal upload <b class="text-gray-800">{{ $selectedCarbon->locale('id')->translatedFormat('l, d F Y') }}</b>
+                        @if($isToday) <span class="badge badge-light-primary ms-1">Hari ini</span> @endif
                     </div>
+                    <div class="ops-updated"><i class="fa-regular fa-clock"></i> Aktivitas terakhir {{ $rs->last_update }}</div>
                 </div>
                 <form class="dash-filter" method="GET" action="{{ url()->current() }}">
                     <span class="dash-filter-label"><i class="fa-regular fa-calendar"></i> Tanggal</span>
-                    <input type="text" name="date" id="filter_date" value="{{ $today ?? '' }}" autocomplete="off" />
+                    <div class="ops-date-nav">
+                        <a href="{{ $dateUrl($selectedCarbon->copy()->subDay()->toDateString()) }}" class="btn btn-icon btn-sm" title="Hari sebelumnya"><i class="fa-solid fa-chevron-left"></i></a>
+                        <input type="text" name="date" id="filter_date" value="{{ $today }}" autocomplete="off" />
+                        <a href="{{ $dateUrl($selectedCarbon->copy()->addDay()->toDateString()) }}" class="btn btn-icon btn-sm" title="Hari berikutnya"><i class="fa-solid fa-chevron-right"></i></a>
+                    </div>
                     <button type="submit" class="btn btn-sm btn-primary">Terapkan</button>
-                    @if(request()->has('date'))
-                        <a href="{{ url()->current() }}" class="btn btn-sm btn-light">Reset</a>
-                    @endif
+                    @unless($isToday)
+                        <a href="{{ url()->current() }}" class="btn btn-sm btn-light">Hari ini</a>
+                    @endunless
                 </form>
             </div>
 
-            @php
-                $totalResiVal = (int) ($totalResi ?? 0);
-                $totalScanVal = (int) ($totalScanOut ?? 0);
-                $totalQcVal = (int) ($totalQcScan ?? 0);
-                $totalQcCompletedVal = (int) ($totalQcCompleted ?? 0);
-                $totalCancelVal = (int) ($totalResiCanceled ?? 0);
-                $grandTotal = $totalResiVal + $totalCancelVal;
-                $activePercent = $grandTotal > 0 ? round($totalResiVal / $grandTotal * 100) : 0;
-                $qcPercent = $totalResiVal > 0 ? min(100, round($totalQcVal / $totalResiVal * 100)) : 0;
-                $scanPercent = $totalResiVal > 0 ? min(100, round($totalScanVal / $totalResiVal * 100)) : 0;
-                $cancelPercent = $grandTotal > 0 ? round($totalCancelVal / $grandTotal * 100) : 0;
-            @endphp
-            <div class="stats-grid">
-                <div class="stat-card stat-card--blue">
-                    <div class="stat-icon"><i class="fa-solid fa-boxes-stacked"></i></div>
-                    <div class="stat-body">
-                        <div class="stat-label">
-                            Total Resi Aktif
-                            <span class="info-tip" data-bs-toggle="tooltip" data-bs-placement="top" title="Jumlah resi dengan status selain cancel pada tanggal ini.">
-                                <i class="fa-solid fa-info"></i>
-                            </span>
-                        </div>
-                        <div class="stat-value-row">
-                            <span class="stat-value">{{ number_format($totalResiVal) }}</span>
-                            <span class="stat-percent">{{ $activePercent }}%</span>
-                        </div>
-                        <div class="stat-progress">
-                            <div class="stat-progress-bar" style="width: {{ $activePercent }}%"></div>
-                        </div>
-                        <div class="stat-progress-text">{{ $activePercent }}% dari {{ number_format($grandTotal) }} total resi</div>
-                        <div class="stat-meta"><i class="fa-regular fa-clock"></i> Update {{ $totalResiUpdated ?? '-' }}</div>
-                    </div>
+            <div class="ops-kpis">
+                <div class="ops-kpi" style="--kpi-color: var(--dash-blue)">
+                    <div class="ops-kpi-label"><span class="ops-kpi-dot"></span> Resi Aktif</div>
+                    <div class="ops-kpi-value">{{ number_format($rs->active) }}</div>
+                    <div class="ops-kpi-meta">dari {{ number_format($grandTotal) }} resi diupload</div>
                 </div>
-                <div class="stat-card stat-card--amber">
-                    <div class="stat-icon"><i class="fa-solid fa-clipboard-check"></i></div>
-                    <div class="stat-body">
-                        <div class="stat-label">
-                            Total QC Scan
-                            <span class="info-tip" data-bs-toggle="tooltip" data-bs-placement="top" title="Jumlah resi aktif pada tanggal upload ini yang sudah masuk proses QC scan.">
-                                <i class="fa-solid fa-info"></i>
-                            </span>
-                        </div>
-                        <div class="stat-value-row">
-                            <span class="stat-value">{{ number_format($totalQcVal) }}</span>
-                            <span class="stat-percent">{{ $qcPercent }}%</span>
-                        </div>
-                        <div class="stat-progress">
-                            <div class="stat-progress-bar" style="width: {{ $qcPercent }}%"></div>
-                        </div>
-                        <div class="stat-progress-text">{{ $qcPercent }}% resi aktif sudah QC scan &middot; {{ number_format($totalQcCompletedVal) }} completed</div>
-                        <div class="stat-meta"><i class="fa-regular fa-clock"></i> Update {{ $totalQcUpdated ?? '-' }}</div>
-                    </div>
+                <div class="ops-kpi" style="--kpi-color: #60a5fa">
+                    <div class="ops-kpi-label"><span class="ops-kpi-dot"></span> Sudah QC</div>
+                    <div class="ops-kpi-value">{{ number_format($rs->qc) }}</div>
+                    <div class="ops-kpi-meta">{{ $qcPercent }}% resi aktif &middot; {{ number_format($rs->qc_completed) }} QC selesai</div>
                 </div>
-                <div class="stat-card stat-card--green">
-                    <div class="stat-icon"><i class="fa-solid fa-barcode"></i></div>
-                    <div class="stat-body">
-                        <div class="stat-label">
-                            Total Scan Out
-                            <span class="info-tip" data-bs-toggle="tooltip" data-bs-placement="top" title="Jumlah resi (berdasarkan tanggal upload) yang sudah scan out.">
-                                <i class="fa-solid fa-info"></i>
-                            </span>
-                        </div>
-                        <div class="stat-value-row">
-                            <span class="stat-value">{{ number_format($totalScanVal) }}</span>
-                            <span class="stat-percent">{{ $scanPercent }}%</span>
-                        </div>
-                        <div class="stat-progress">
-                            <div class="stat-progress-bar" style="width: {{ $scanPercent }}%"></div>
-                        </div>
-                        <div class="stat-progress-text">{{ $scanPercent }}% resi aktif sudah scan out</div>
-                        <div class="stat-meta"><i class="fa-regular fa-clock"></i> Update {{ $totalScanUpdated ?? '-' }}</div>
-                    </div>
+                <div class="ops-kpi" style="--kpi-color: var(--dash-green)">
+                    <div class="ops-kpi-label"><span class="ops-kpi-dot"></span> Sudah Scan Out</div>
+                    <div class="ops-kpi-value">{{ number_format($rs->scan) }}</div>
+                    <div class="ops-kpi-meta">{{ $scanPercent }}% resi aktif</div>
                 </div>
-                <div class="stat-card stat-card--red">
-                    <div class="stat-icon"><i class="fa-solid fa-ban"></i></div>
-                    <div class="stat-body">
-                        <div class="stat-label">
-                            Total Resi Cancel
-                            <span class="info-tip" data-bs-toggle="tooltip" data-bs-placement="top" title="Jumlah resi yang dibatalkan pada tanggal ini.">
-                                <i class="fa-solid fa-info"></i>
-                            </span>
-                        </div>
-                        <div class="stat-value-row">
-                            <span class="stat-value text-danger">{{ number_format($totalCancelVal) }}</span>
-                            <span class="stat-percent">{{ $cancelPercent }}%</span>
-                        </div>
-                        <div class="stat-progress">
-                            <div class="stat-progress-bar" style="width: {{ $cancelPercent }}%"></div>
-                        </div>
-                        <div class="stat-progress-text">{{ $cancelPercent }}% dari {{ number_format($grandTotal) }} total resi</div>
-                        <div class="stat-meta">Tidak termasuk resi aktif</div>
+                @if($rs->active > 0 && $rs->remaining === 0)
+                    <div class="ops-kpi ops-kpi--done" style="--kpi-color: var(--dash-green)">
+                        <div class="ops-kpi-label"><span class="ops-kpi-dot"></span> Belum Scan Out</div>
+                        <div class="ops-kpi-value">0</div>
+                        <div class="ops-kpi-meta"><i class="fa-solid fa-circle-check text-success"></i> Semua resi sudah scan out</div>
                     </div>
+                @else
+                    <div class="ops-kpi {{ $rs->remaining > 0 ? 'ops-kpi--attention' : '' }}" style="--kpi-color: var(--dash-amber)">
+                        <div class="ops-kpi-label"><span class="ops-kpi-dot"></span> Belum Scan Out</div>
+                        <div class="ops-kpi-value">{{ number_format($rs->remaining) }}</div>
+                        <div class="ops-kpi-meta">{{ number_format($rs->waiting_scan) }} sudah QC &middot; {{ number_format($rs->not_started) }} belum QC</div>
+                    </div>
+                @endif
+                <div class="ops-kpi" style="--kpi-color: var(--dash-red)">
+                    <div class="ops-kpi-label"><span class="ops-kpi-dot"></span> Cancel</div>
+                    <div class="ops-kpi-value {{ $rs->canceled > 0 ? 'text-danger' : '' }}">{{ number_format($rs->canceled) }}</div>
+                    <div class="ops-kpi-meta">{{ $pct($rs->canceled, $grandTotal) }}% dari resi diupload</div>
+                </div>
+            </div>
+
+            <div class="ops-pipeline">
+                <div class="ops-pipeline-head">
+                    <div class="ops-pipeline-title">Progres Resi Aktif</div>
+                    <div class="ops-pipeline-percent">{{ $scanPercent }}% selesai scan out</div>
+                </div>
+                <div class="ops-stack" role="img" aria-label="{{ $scanPercent }}% resi aktif sudah scan out">
+                    <span class="seg-scan" style="width: {{ $segScan }}%"></span>
+                    <span class="seg-waiting" style="width: {{ $segWaiting }}%"></span>
+                    <span class="seg-new" style="width: {{ $segNew }}%"></span>
+                </div>
+                <div class="ops-legend">
+                    <span class="ops-legend-item"><span class="ops-legend-swatch" style="background:#059669"></span> Sudah scan out <b>{{ number_format($rs->scan) }}</b></span>
+                    <span class="ops-legend-item"><span class="ops-legend-swatch" style="background:#60a5fa"></span> Sudah QC, menunggu scan out <b>{{ number_format($rs->waiting_scan) }}</b></span>
+                    <span class="ops-legend-item"><span class="ops-legend-swatch" style="background:#fbbf24"></span> Belum diproses <b>{{ number_format($rs->not_started) }}</b></span>
                 </div>
             </div>
         </div>
@@ -913,67 +1036,91 @@
             <div class="dash-section-head mb-5">
                 <div>
                     <div class="dash-section-title"><i class="fa-solid fa-truck-fast"></i> Per Kurir</div>
-                    <div class="dash-section-sub">Jumlah resi &amp; hasil scan out per kurir &mdash; klik kartu untuk rincian resi tiap status</div>
+                    <div class="dash-section-sub">
+                        @if($kurirs->count())
+                            {{ $kurirs->count() }} kurir memiliki resi pada tanggal ini &middot; {{ $rs->kurir_done }} selesai &middot; diurutkan dari sisa terbanyak
+                        @else
+                            Kurir yang memiliki resi pada tanggal ini
+                        @endif
+                    </div>
                 </div>
             </div>
 
-            @if(isset($kurirs) && $kurirs->count())
-                <div class="kurir-grid">
-                    @foreach($kurirs as $kurir)
-                        @php
-                            $resiTotal = (int) $kurir['resi_total'];
-                            $scanTotal = (int) $kurir['scan_total'];
-                            $progress = $resiTotal > 0 ? min(100, round($scanTotal / $resiTotal * 100)) : 0;
-                            $remaining = (int) $kurir['remaining'];
-                            $canceled = (int) ($kurir['canceled_total'] ?? 0);
-                        @endphp
-                        <div class="kurir-card">
-                            <div class="kurir-card-top">
-                                <div class="kurir-avatar"><i class="fa-solid fa-truck-fast"></i></div>
-                                <div class="kurir-info">
-                                    <div class="kurir-name" title="{{ $kurir['name'] }}">{{ $kurir['name'] }}</div>
-                                    <div class="kurir-updated"><i class="fa-regular fa-clock"></i> Update {{ $kurir['last_update'] }}</div>
+            @if($kurirs->count())
+                <div class="kl">
+                    <div class="kl-row kl-head">
+                        <div>Kurir</div>
+                        <div class="text-end">Resi Aktif</div>
+                        <div class="text-end">Sudah QC</div>
+                        <div class="text-end">Scan Out</div>
+                        <div class="text-end">Belum Scan</div>
+                        <div class="text-end">Cancel</div>
+                        <div>Progres Scan Out</div>
+                        <div></div>
+                    </div>
+                    <div class="kl-body">
+                        @foreach($kurirs as $kurir)
+                            <div class="kl-row">
+                                <div class="kl-cell-name">
+                                    <div class="kl-name" title="{{ $kurir['name'] }}">{{ $kurir['name'] }}</div>
+                                    <div class="kl-sub"><i class="fa-regular fa-clock"></i> Update {{ $kurir['last_update'] }}</div>
+                                </div>
+                                <div class="kl-num {{ $kurir['resi_total'] ? '' : 'is-zero' }}"><span class="kl-label">Resi Aktif</span>{{ number_format($kurir['resi_total']) }}</div>
+                                <div class="kl-num {{ $kurir['qc_total'] ? '' : 'is-zero' }}"><span class="kl-label">Sudah QC</span>{{ number_format($kurir['qc_total']) }}</div>
+                                <div class="kl-num {{ $kurir['scan_total'] ? '' : 'is-zero' }}"><span class="kl-label">Scan Out</span>{{ number_format($kurir['scan_total']) }}</div>
+                                <div class="kl-num">
+                                    <span class="kl-label">Belum Scan</span>
+                                    @if($kurir['remaining'] > 0)
+                                        <span class="kl-badge kl-badge--pending">{{ number_format($kurir['remaining']) }}</span>
+                                    @elseif($kurir['resi_total'] > 0)
+                                        <span class="kl-badge kl-badge--done"><i class="fa-solid fa-check"></i> Selesai</span>
+                                    @else
+                                        <span class="text-gray-300">0</span>
+                                    @endif
+                                </div>
+                                <div class="kl-num {{ $kurir['canceled_total'] ? 'is-cancel' : 'is-zero' }}"><span class="kl-label">Cancel</span>{{ number_format($kurir['canceled_total']) }}</div>
+                                <div class="kl-progress">
+                                    <div class="kl-bar {{ $kurir['progress'] < 50 ? 'is-low' : '' }}"><span style="width: {{ $kurir['progress'] }}%"></span></div>
+                                    <div class="kl-percent">{{ $kurir['progress'] }}%</div>
+                                </div>
+                                <div class="kl-action">
+                                    @if($kurir['id'])
+                                        <button
+                                            type="button"
+                                            class="kl-detail-btn btn-kurir-detail"
+                                            data-kurir-id="{{ $kurir['id'] }}"
+                                            data-kurir-name="{{ $kurir['name'] }}"
+                                            data-date="{{ $today }}"
+                                        >
+                                            <i class="fa-solid fa-list-ul"></i> Detail
+                                        </button>
+                                    @else
+                                        <span class="text-muted fs-8">Kurir belum diisi</span>
+                                    @endif
                                 </div>
                             </div>
-
-                            <div class="kurir-ratio">
-                                <span class="ratio-resi">{{ number_format($resiTotal) }}</span>
-                                <span class="ratio-sep">/</span>
-                                <span class="ratio-scan">{{ number_format($scanTotal) }}</span>
-                                <span class="ratio-caption">resi&nbsp;/&nbsp;scan</span>
+                        @endforeach
+                    </div>
+                    @if($kurirs->count() > 1)
+                        <div class="kl-row kl-foot">
+                            <div class="kl-cell-name"><div class="kl-name">Total</div></div>
+                            <div class="kl-num"><span class="kl-label">Resi Aktif</span>{{ number_format($rs->active) }}</div>
+                            <div class="kl-num"><span class="kl-label">Sudah QC</span>{{ number_format($rs->qc) }}</div>
+                            <div class="kl-num"><span class="kl-label">Scan Out</span>{{ number_format($rs->scan) }}</div>
+                            <div class="kl-num"><span class="kl-label">Belum Scan</span>{{ number_format($rs->remaining) }}</div>
+                            <div class="kl-num {{ $rs->canceled ? 'is-cancel' : '' }}"><span class="kl-label">Cancel</span>{{ number_format($rs->canceled) }}</div>
+                            <div class="kl-progress">
+                                <div class="kl-bar {{ $scanPercent < 50 ? 'is-low' : '' }}"><span style="width: {{ $scanPercent }}%"></span></div>
+                                <div class="kl-percent">{{ $scanPercent }}%</div>
                             </div>
-
-                            <div class="kurir-progress">
-                                <div class="kurir-progress-bar" style="width: {{ $progress }}%"></div>
-                            </div>
-                            <div class="kurir-progress-text">{{ $progress }}% resi aktif sudah scan out</div>
-
-                            <div class="kurir-chips">
-                                @if($remaining > 0)
-                                    <span class="chip chip-amber"><i class="fa-solid fa-clock"></i> Sisa {{ number_format($remaining) }}</span>
-                                @else
-                                    <span class="chip chip-green"><i class="fa-solid fa-circle-check"></i> Selesai</span>
-                                @endif
-                                <span class="chip chip-red"><i class="fa-solid fa-ban"></i> Cancel {{ number_format($canceled) }}</span>
-                            </div>
-
-                            <button
-                                type="button"
-                                class="kurir-detail-btn btn-kurir-detail"
-                                data-kurir-id="{{ $kurir['id'] }}"
-                                data-kurir-name="{{ $kurir['name'] }}"
-                                data-date="{{ $today ?? '' }}"
-                            >
-                                <i class="fa-solid fa-list-ul"></i> Lihat Detail Resi
-                                <i class="fa-solid fa-arrow-right"></i>
-                            </button>
+                            <div class="kl-action"></div>
                         </div>
-                    @endforeach
+                    @endif
                 </div>
             @else
                 <div class="text-center text-muted py-10">
                     <i class="fa-solid fa-truck-fast fs-2x mb-3 d-block text-gray-300"></i>
-                    Belum ada data kurir.
+                    Tidak ada resi yang diupload pada tanggal ini.
                 </div>
             @endif
         </div>

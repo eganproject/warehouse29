@@ -12,7 +12,6 @@ class MenuSeeder extends Seeder
     {
         $menuRows = [
             ['name' => 'Dashboard', 'slug' => 'dashboard', 'route' => 'admin.dashboard', 'icon' => 'fa-solid fa-gauge-high', 'parent_slug' => null, 'sort_order' => 0],
-            ['name' => 'Operations Dashboard', 'slug' => 'operations-dashboard', 'route' => 'admin.operations-dashboard.index', 'icon' => 'fa-solid fa-chart-simple', 'parent_slug' => null, 'sort_order' => 1],
             ['name' => 'Master Data', 'slug' => 'master-data', 'route' => null, 'icon' => 'fa-solid fa-database', 'parent_slug' => null, 'sort_order' => 10],
             ['name' => 'Inventory', 'slug' => 'inventory', 'route' => null, 'icon' => 'fa-solid fa-warehouse', 'parent_slug' => null, 'sort_order' => 12],
             ['name' => 'Inbound', 'slug' => 'inbound', 'route' => null, 'icon' => 'fa-solid fa-arrow-down', 'parent_slug' => null, 'sort_order' => 13],
@@ -120,7 +119,6 @@ class MenuSeeder extends Seeder
             'captain' => [
                 'view' => [
                     'dashboard',
-                    'operations-dashboard',
                     'item-stocks',
                     'stock-mutations',
                     'stock-opname',
@@ -152,7 +150,6 @@ class MenuSeeder extends Seeder
             'admin-resi' => [
                 'view' => [
                     'dashboard',
-                    'operations-dashboard',
                     'item-stocks',
                     'stock-mutations',
                     'resi-import',
@@ -167,7 +164,6 @@ class MenuSeeder extends Seeder
             'admin-retur' => [
                 'view' => [
                     'dashboard',
-                    'operations-dashboard',
                     'item-stocks',
                     'stock-mutations',
                     'report-returns',
@@ -186,7 +182,6 @@ class MenuSeeder extends Seeder
             'admin-gudang' => [
                 'view' => [
                     'dashboard',
-                    'operations-dashboard',
                     'users',
                     'roles',
                     'item-stocks',
@@ -231,7 +226,6 @@ class MenuSeeder extends Seeder
             'kepala-gudang' => [
                 'view' => [
                     'dashboard',
-                    'operations-dashboard',
                     'users',
                     'roles',
                     'divisi',

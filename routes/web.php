@@ -2,7 +2,6 @@
 
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Admin\DashboardController;
-use App\Http\Controllers\Admin\OperationsDashboardController;
 use App\Http\Controllers\Admin\AnalyticsReportController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Admin\ItemStockController;
@@ -123,7 +122,6 @@ require __DIR__.'/auth.php';
 Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as('admin.')->group(function () {
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
     Route::get('/dashboard/kurir-detail', [DashboardController::class, 'kurirDetail'])->name('dashboard.kurir-detail');
-    Route::get('/operations-dashboard', [OperationsDashboardController::class, 'index'])->name('operations-dashboard.index');
 
     Route::prefix('masterdata')->as('masterdata.')->group(function () {
         // Users DataTables
