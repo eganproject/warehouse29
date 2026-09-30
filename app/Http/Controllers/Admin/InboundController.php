@@ -193,8 +193,8 @@ class InboundController extends Controller
 
     public function returnsExport(Request $request)
     {
-        $dateTo = $request->input('date_to') ?: now()->toDateString();
-        $dateFrom = $request->input('date_from') ?: now()->subDays(6)->toDateString();
+        $dateTo = $this->validDateFilter($request->input('date_to')) ?? now()->toDateString();
+        $dateFrom = $this->validDateFilter($request->input('date_from')) ?? now()->subDays(6)->toDateString();
         $filters = [
             'q' => trim((string) $request->input('q', '')),
             'status' => trim((string) $request->input('status', '')),
@@ -208,7 +208,10 @@ class InboundController extends Controller
             Carbon::parse($dateTo)->format('Ymd')
         );
 
-        return Excel::download(new InboundReturnsExport($filters), $filename);
+        return Excel::download(
+            new InboundReturnsExport($filters, $request->user()?->name ?? '-'),
+            $filename
+        );
     }
 
     public function receiptsExport(Request $request)
@@ -511,13 +514,20 @@ class InboundController extends Controller
                 $q->where('inbound_transactions.code', 'like', "%{$search}%")
                     ->orWhere('inbound_transactions.ref_no', 'like', "%{$search}%")
                     ->orWhere('inbound_transactions.return_resi_no', 'like', "%{$search}%")
+                    ->orWhere('inbound_transactions.note', 'like', "%{$search}%")
                     ->orWhereHas('resi', function ($resiQ) use ($search) {
                         $resiQ->where('no_resi', 'like', "%{$search}%")
                             ->orWhere('id_pesanan', 'like', "%{$search}%");
                     })
-                    ->orWhereHas('items.item', function ($itemQ) use ($search) {
-                        $itemQ->where('sku', 'like', "%{$search}%")
-                            ->orWhere('name', 'like', "%{$search}%");
+                    ->orWhereHas('creator', fn ($userQ) => $userQ->where('name', 'like', "%{$search}%"))
+                    ->orWhereHas('items', function ($itemLineQ) use ($search) {
+                        $itemLineQ->where('note', 'like', "%{$search}%")
+                            ->orWhere('return_reason_note', 'like', "%{$search}%")
+                            ->orWhereHas('item', function ($itemQ) use ($search) {
+                                $itemQ->where('sku', 'like', "%{$search}%")
+                                    ->orWhere('name', 'like', "%{$search}%");
+                            })
+                            ->orWhereHas('returnReason', fn ($reasonQ) => $reasonQ->where('name', 'like', "%{$search}%"));
                     });
             });
         }

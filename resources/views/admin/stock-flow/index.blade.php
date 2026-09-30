@@ -301,8 +301,8 @@
                 </button>
             @endif
             @if(!empty($exportUrl ?? null))
-                <button type="button" class="btn btn-light-success me-3" id="btn_export_flow">
-                    Export Excel
+                <button type="button" class="btn btn-light-success me-3" id="btn_export_flow" @if($isInboundReturnList) title="Unduh KPI, detail, analisis SKU, penyebab, tren harian, dan kurir sesuai filter" @endif>
+                    {{ $isInboundReturnList ? 'Export Laporan' : 'Export Excel' }}
                 </button>
             @endif
             @if($canCreateDefault)
@@ -324,7 +324,7 @@
             <div class="return-list-period">
                 <div>
                     <div class="fw-bold text-gray-800">Daftar retur inbound</div>
-                    <div class="text-muted fs-7">Filter default menampilkan 7 hari terakhir. Gunakan pencarian untuk kode retur, resi, SKU, atau catatan.</div>
+                    <div class="text-muted fs-7">Filter default menampilkan 7 hari terakhir. Export laporan mengikuti filter dan berisi 6 sheet analitik.</div>
                 </div>
                 <span class="period-chip" id="return_period_chip">7 hari terakhir</span>
             </div>
