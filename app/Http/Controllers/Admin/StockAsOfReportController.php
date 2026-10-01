@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Exports\StockAsOfReportExport;
+use App\Exports\StockMovementAnalysisExport;
 use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Support\StockPeriodReport;
@@ -46,6 +47,13 @@ class StockAsOfReportController extends Controller
     public function export(Request $request)
     {
         $filters = $this->filters($request);
+
+        if ($filters['tab'] === 'movement') {
+            return Excel::download(
+                new StockMovementAnalysisExport($filters, (string) ($request->user()?->name ?? '-')),
+                'laporan-stok-'.$filters['tab'].'-'.$filters['date_from'].'-'.$filters['date_to'].'.xlsx'
+            );
+        }
 
         return Excel::download(new StockAsOfReportExport($filters), 'laporan-stok-'.$filters['tab'].'-'.$filters['date_from'].'-'.$filters['date_to'].'.xlsx');
     }
