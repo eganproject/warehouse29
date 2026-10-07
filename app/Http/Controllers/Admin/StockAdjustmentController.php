@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Support\BundleService;
 use App\Models\Item;
 use App\Models\StockAdjustment;
 use App\Models\StockAdjustmentItem;
@@ -21,7 +22,8 @@ class StockAdjustmentController extends Controller
 {
     public function index()
     {
-        $items = Item::active()->orderBy('name')->get(['id', 'sku', 'name']);
+        // Bundle hanya punya stok virtual, tidak bisa dipakai di transaksi stok fisik.
+        $items = Item::active()->where('is_bundle', false)->orderBy('name')->get(['id', 'sku', 'name']);
 
         return view('admin.inventory.stock-adjustments.index', [
             'items' => $items,
@@ -422,6 +424,8 @@ class StockAdjustmentController extends Controller
         } else {
             $validated['transacted_at'] = null;
         }
+
+        BundleService::assertNotBundle(collect($validated['items'])->pluck('item_id'), 'penyesuaian stok');
 
         return $validated;
     }

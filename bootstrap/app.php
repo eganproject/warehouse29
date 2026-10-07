@@ -8,6 +8,7 @@ use App\Console\Commands\MovePickingDate;
 use App\Console\Commands\MovePackerScanDates;
 use App\Console\Commands\MovePackerTransitDate;
 use App\Console\Commands\BackfillStockApiSyncRecords;
+use App\Console\Commands\AuditBundleStock;
 use Illuminate\Http\Request;
 use Illuminate\Session\TokenMismatchException;
 
@@ -24,6 +25,7 @@ return Application::configure(basePath: dirname(__DIR__))
         MovePackerScanDates::class,
         MovePackerTransitDate::class,
         BackfillStockApiSyncRecords::class,
+        AuditBundleStock::class,
     ])
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([

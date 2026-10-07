@@ -7,6 +7,7 @@ use App\Models\PackerScanOut;
 use App\Models\PickingList;
 use App\Models\PickingListException;
 use App\Models\QcScanResi;
+use App\Models\QcScanResiBundleComponent;
 use App\Models\QcScanResiItem;
 use App\Models\QcTransitItem;
 use App\Models\Resi;
@@ -59,7 +60,14 @@ class ResiCancellationService
             $requiredQty = $qcResi
                 ? (int) QcScanResiItem::where('qc_scan_resi_id', $qcResi->id)->sum('required_qty')
                 : 0;
-            $stage = self::resolveStage($qcResi, $scanOut, $scannedQty, $requiredQty);
+            // Komponen bundle yang sudah discan (stoknya sudah terpotong) walau bundle belum lengkap.
+            $componentScannedQty = $qcResi
+                ? (int) QcScanResiBundleComponent::whereIn(
+                    'qc_scan_resi_item_id',
+                    QcScanResiItem::where('qc_scan_resi_id', $qcResi->id)->select('id')
+                )->sum('scanned_qty')
+                : 0;
+            $stage = self::resolveStage($qcResi, $scanOut, $scannedQty, $requiredQty, $componentScannedQty);
             $reason = trim((string) $reason);
 
             if ($stage !== 'before_qc' && $reason === '') {
@@ -104,12 +112,10 @@ class ResiCancellationService
             }
 
             $returnedStockQty = 0;
-            if ($qcResi && $scannedQty > 0) {
+            if ($qcResi && ($scannedQty > 0 || $componentScannedQty > 0)) {
                 $returnedStockQty = self::reverseQcStock($resi, $qcResi, $cancellation, $userId, $canceledAt);
                 self::reverseQcTransit($qcResi, $scanOut);
             }
-
-            self::removePickingDemand($resi);
 
             $resi->status = 'canceled';
             $resi->canceled_at = $canceledAt;
@@ -118,6 +124,10 @@ class ResiCancellationService
             $resi->uncanceled_at = null;
             $resi->uncanceled_by = null;
             $resi->save();
+
+            // Setelah status batal tersimpan, agar komponen bundle resi ini tidak lagi
+            // terhitung "sudah diambil" saat sisa picking list dihitung ulang.
+            self::removePickingDemand($resi);
 
             $cancellation->returned_stock_qty = $returnedStockQty;
             $cancellation->stock_returned_at = $stage !== 'before_qc' ? $canceledAt : null;
@@ -131,7 +141,8 @@ class ResiCancellationService
         ?QcScanResi $qcResi,
         ?PackerScanOut $scanOut,
         int $scannedQty,
-        int $requiredQty
+        int $requiredQty,
+        int $componentScannedQty = 0
     ): string {
         if ($scanOut) {
             return 'after_scan_out';
@@ -139,7 +150,7 @@ class ResiCancellationService
         if (!$qcResi) {
             return 'before_qc';
         }
-        if ($scannedQty > 0 && $requiredQty > $scannedQty) {
+        if (($scannedQty > 0 || $componentScannedQty > 0) && $requiredQty > $scannedQty) {
             return 'after_partial_qc';
         }
 
@@ -293,19 +304,13 @@ class ResiCancellationService
     private static function removePickingDemand(Resi $resi): void
     {
         $date = $resi->tanggal_upload?->toDateString() ?? now()->toDateString();
-        $grouped = DB::table('resi_details')
+        $details = DB::table('resi_details')
             ->where('resi_id', $resi->id)
             ->where('qty', '>', 0)
-            ->select('sku', DB::raw('SUM(qty) as qty'))
-            ->groupBy('sku')
-            ->get();
+            ->get(['sku', 'qty']);
 
-        foreach ($grouped as $row) {
-            $sku = trim((string) ($row->sku ?? ''));
-            $qty = (int) ($row->qty ?? 0);
-            if ($sku === '' || $qty <= 0) {
-                continue;
-            }
+        // Picking list berisi barang fisik: SKU bundle diterjemahkan ke komponennya.
+        foreach (PickingDemand::physicalTotals($details) as $sku => $qty) {
             self::adjustPickingList($date, $sku, -$qty);
         }
     }
@@ -353,13 +358,6 @@ class ResiCancellationService
 
     private static function getPickedQty(string $date, string $sku): int
     {
-        $itemId = Item::where('sku', $sku)->value('id');
-        if (!$itemId) {
-            return 0;
-        }
-
-        return (int) QcTransitItem::where('item_id', $itemId)
-            ->whereDate('transit_date', $date)
-            ->value('qty');
+        return PickingDemand::pickedQty($date, $sku);
     }
 }

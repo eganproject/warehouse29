@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Exports\DamagedGoodsTemplateExport;
 use App\Http\Controllers\Controller;
+use App\Support\BundleService;
 use App\Imports\DamagedGoodsImport;
 use App\Models\DamagedGood;
 use App\Models\DamagedGoodItem;
@@ -26,7 +27,8 @@ class DamagedGoodsController extends Controller
 {
     public function index()
     {
-        $items = Item::active()->orderBy('name')->get(['id', 'sku', 'name']);
+        // Bundle hanya punya stok virtual, tidak bisa dipakai di transaksi stok fisik.
+        $items = Item::active()->where('is_bundle', false)->orderBy('name')->get(['id', 'sku', 'name']);
 
         return view('admin.inventory.damaged-goods.index', [
             'items' => $items,
@@ -648,6 +650,8 @@ class DamagedGoodsController extends Controller
         } else {
             $validated['transacted_at'] = null;
         }
+
+        BundleService::assertNotBundle(collect($validated['items'])->pluck('item_id'), 'barang rusak');
 
         return $validated;
     }

@@ -1052,6 +1052,12 @@ class OutboundController extends Controller
                 ];
             })->values()->all();
 
+        // Bundle reguler dipotong dari komponennya; stok gudang rusak tidak punya bundle.
+        BundleService::assertNotBundle(
+            collect($normalized)->where('stock_source', 'damaged')->pluck('item_id'),
+            'barang keluar dari stok gudang rusak'
+        );
+
         $validated['items'] = $normalized;
         if (!empty($validated['transacted_at'])) {
             $validated['transacted_at'] = Carbon::parse($validated['transacted_at']);

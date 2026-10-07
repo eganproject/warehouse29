@@ -35,6 +35,12 @@ class DamagedStockService
                     ]);
                 }
 
+                if (BundleService::isBundle($itemId)) {
+                    throw ValidationException::withMessages([
+                        'items' => 'Item bundle tidak memiliki stok fisik. Stok barang rusak harus dicatat pada komponennya.',
+                    ]);
+                }
+
                 $stock = DamagedItemStock::where('item_id', $itemId)->lockForUpdate()->first();
                 if (!$stock) {
                     $stock = DamagedItemStock::create(['item_id' => $itemId, 'stock' => 0]);
@@ -97,6 +103,12 @@ class DamagedStockService
         DB::transaction(function () use ($itemId, $qty) {
             if ($itemId <= 0 || $qty <= 0) {
                 throw ValidationException::withMessages(['qty' => 'Qty reservasi tidak valid']);
+            }
+
+            if (BundleService::isBundle($itemId)) {
+                throw ValidationException::withMessages([
+                    'items' => 'Item bundle tidak memiliki stok barang rusak. Gunakan SKU komponennya.',
+                ]);
             }
 
             $stock = DamagedItemStock::where('item_id', $itemId)->lockForUpdate()->first();

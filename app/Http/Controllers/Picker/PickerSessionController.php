@@ -10,6 +10,7 @@ use App\Models\PickerTransitItem;
 use App\Models\PickingList;
 use App\Models\PickingListException;
 use App\Models\StockMutation;
+use App\Support\BundleService;
 use App\Support\StockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -345,7 +346,7 @@ class PickerSessionController extends Controller
     public function searchItems(Request $request)
     {
         $search = trim((string) $request->input('q', ''));
-        $query = Item::active();
+        $query = Item::active()->where('is_bundle', false);
         if ($search !== '') {
             $query->where('sku', 'like', "%{$search}%");
         }
@@ -440,6 +441,9 @@ class PickerSessionController extends Controller
                 'qty' => 'Qty harus lebih dari 0',
             ]);
         }
+
+        // Alur sesi picker memotong stok item langsung, jadi bundle tidak bisa dipakai di sini.
+        BundleService::assertNotBundle([$itemId], 'sesi picker', 'code');
 
         $session = $this->ensureDraftSession();
         $idempotencyKey = $this->requestIdempotencyKey('picker.add-item', $requestId);

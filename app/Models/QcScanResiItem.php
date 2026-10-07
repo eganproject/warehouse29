@@ -23,4 +23,10 @@ class QcScanResiItem extends Model
     {
         return $this->belongsTo(Item::class, 'item_id');
     }
+
+    /** Progres scan komponen (hanya terisi bila SKU baris ini adalah bundle). */
+    public function bundleComponents()
+    {
+        return $this->hasMany(QcScanResiBundleComponent::class, 'qc_scan_resi_item_id');
+    }
 }

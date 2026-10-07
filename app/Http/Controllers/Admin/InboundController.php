@@ -17,6 +17,7 @@ use App\Exports\InboundReturnsTemplateExport;
 use App\Imports\InboundReceiptsImport;
 use App\Imports\InboundReturnsImport;
 use App\Support\DamagedStockService;
+use App\Support\BundleService;
 use App\Support\StockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -82,8 +83,50 @@ class InboundController extends Controller
         $skus = $resi->details->pluck('sku')->filter()->unique()->values();
         $itemMap = Item::active()
             ->whereIn('sku', $skus)
-            ->get(['id', 'sku', 'name'])
+            ->get(['id', 'sku', 'name', 'is_bundle'])
             ->keyBy('sku');
+        $composition = BundleService::compositionFor($itemMap->where('is_bundle', true)->pluck('id')->all());
+        $componentItems = Item::whereIn(
+            'sku',
+            collect($composition)->flatMap(fn ($row) => collect($row['components'])->pluck('sku'))->unique()->values()
+        )->get(['id', 'sku', 'name'])->keyBy('sku');
+
+        // Barang yang kembali secara fisik adalah komponen bundle, jadi baris bundle dipecah
+        // ke komponennya. Baris dengan item yang sama digabung (item tidak boleh duplikat).
+        $returnItems = [];
+        foreach ($resi->details as $detail) {
+            $item = $itemMap->get($detail->sku);
+            $qtyResi = (int) $detail->qty;
+
+            if ($item && $item->is_bundle && !empty($composition[$item->id]['components'])) {
+                foreach ($composition[$item->id]['components'] as $component) {
+                    $componentItem = $componentItems->get($component['sku']);
+                    $key = $componentItem ? 'item-'.$componentItem->id : 'sku-'.$component['sku'];
+                    $returnItems[$key] ??= [
+                        'item_id' => $componentItem?->id,
+                        'sku' => $component['sku'],
+                        'name' => $componentItem?->name ?? $component['name'],
+                        'qty_resi' => 0,
+                        'item_found' => (bool) $componentItem,
+                        'from_bundles' => [],
+                    ];
+                    $returnItems[$key]['qty_resi'] += $qtyResi * (int) $component['qty'];
+                    $returnItems[$key]['from_bundles'][] = "{$item->sku} x{$qtyResi}";
+                }
+                continue;
+            }
+
+            $key = $item ? 'item-'.$item->id : 'sku-'.$detail->sku;
+            $returnItems[$key] ??= [
+                'item_id' => $item?->id,
+                'sku' => $detail->sku,
+                'name' => $item?->name,
+                'qty_resi' => 0,
+                'item_found' => (bool) $item,
+                'from_bundles' => [],
+            ];
+            $returnItems[$key]['qty_resi'] += $qtyResi;
+        }
 
         return response()->json([
             'found' => true,
@@ -95,16 +138,10 @@ class InboundController extends Controller
                 'tanggal_pesanan' => $resi->tanggal_pesanan?->format('Y-m-d'),
                 'tanggal_upload' => $resi->tanggal_upload?->format('Y-m-d'),
             ],
-            'items' => $resi->details->map(function ($detail) use ($itemMap) {
-                $item = $itemMap->get($detail->sku);
-                return [
-                    'item_id' => $item?->id,
-                    'sku' => $detail->sku,
-                    'name' => $item?->name,
-                    'qty_resi' => (int) $detail->qty,
-                    'item_found' => (bool) $item,
-                ];
-            })->values(),
+            'items' => collect($returnItems)->map(fn ($row) => [
+                ...$row,
+                'from_bundle' => empty($row['from_bundles']) ? null : implode(', ', array_unique($row['from_bundles'])),
+            ])->values(),
         ]);
     }
 
@@ -397,7 +434,8 @@ class InboundController extends Controller
 
     private function index(string $type, string $pageTitle, string $routeBase)
     {
-        $items = Item::active()->orderBy('name')->get(['id', 'sku', 'name']);
+        // Bundle hanya punya stok virtual, tidak bisa dipakai di transaksi stok fisik.
+        $items = Item::active()->where('is_bundle', false)->orderBy('name')->get(['id', 'sku', 'name']);
         $baseOptions = $this->typeOptions();
         $typeOptions = ['all' => 'Semua'] + $baseOptions;
         $routeMap = [
@@ -460,7 +498,8 @@ class InboundController extends Controller
 
     private function returnForm(string $mode, ?InboundTransaction $transaction = null)
     {
-        $items = Item::active()->orderBy('name')->get(['id', 'sku', 'name']);
+        // Bundle hanya punya stok virtual, tidak bisa dipakai di transaksi stok fisik.
+        $items = Item::active()->where('is_bundle', false)->orderBy('name')->get(['id', 'sku', 'name']);
         $returnReasons = ReturnReason::active()->orderBy('name')->get(['id', 'name']);
 
         return view('admin.inbound.returns.form', [
@@ -972,7 +1011,18 @@ class InboundController extends Controller
     {
         $tx->loadMissing('items');
 
-        $hasDamagedItems = $tx->items->contains(fn ($row) => (int) ($row->qty_damaged ?? 0) > 0);
+        // Retur lama bisa saja tercatat dengan SKU bundle; stoknya didistribusikan ke komponen.
+        $rows = collect(BundleService::explodeLines(
+            $tx->items->map(fn ($row) => [
+                'item_id' => (int) $row->item_id,
+                'qty_good' => (int) ($row->qty_good ?? 0),
+                'qty_damaged' => (int) ($row->qty_damaged ?? 0),
+                'note' => $row->note,
+            ])->all(),
+            ['qty_good', 'qty_damaged']
+        ))->map(fn ($row) => (object) $row);
+
+        $hasDamagedItems = $rows->contains(fn ($row) => (int) ($row->qty_damaged ?? 0) > 0);
         $damage = null;
 
         if ($hasDamagedItems) {
@@ -995,7 +1045,7 @@ class InboundController extends Controller
                     'approved_by' => auth()->id(),
                 ]);
 
-                foreach ($tx->items as $row) {
+                foreach ($rows as $row) {
                     $damagedQty = (int) ($row->qty_damaged ?? 0);
                     if ($damagedQty <= 0) {
                         continue;
@@ -1016,7 +1066,7 @@ class InboundController extends Controller
             }
         }
 
-        foreach ($tx->items as $row) {
+        foreach ($rows as $row) {
             $goodQty = (int) ($row->qty_good ?? 0);
             if ($goodQty > 0) {
                 StockService::mutate([
@@ -1140,6 +1190,8 @@ class InboundController extends Controller
                 'items' => 'Item tidak boleh duplikat pada inbound',
             ]);
         }
+
+        BundleService::assertNotBundle($items->pluck('item_id'), $isReturn ? 'retur inbound' : 'penerimaan barang');
 
         $normalized = $items->groupBy('item_id')->map(function ($rows, $itemId) {
             $qty = $rows->sum('qty');

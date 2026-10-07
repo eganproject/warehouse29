@@ -5,18 +5,17 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Imports\ResiImport;
 use App\Models\Channel;
-use App\Models\Item;
 use App\Models\Kurir;
 use App\Models\PackerResiScan;
 use App\Models\PackerScanOut;
 use App\Models\PickingList;
 use App\Models\PickingListException;
-use App\Models\QcTransitItem;
 use App\Models\QcScanResi;
 use App\Models\Resi;
 use App\Models\ResiCancellation;
 use App\Models\ResiDetail;
 use App\Models\Toko;
+use App\Support\PickingDemand;
 use App\Support\ResiCancellationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -492,15 +491,8 @@ class ResiImportController extends Controller
 
     private function adjustPickingList(string $date, $items, int $direction): void
     {
-        $grouped = [];
-        foreach ($items as $row) {
-            $sku = trim((string) ($row['sku'] ?? $row->sku ?? ''));
-            $qty = (int) ($row['qty'] ?? $row->qty ?? 0);
-            if ($sku === '' || $qty <= 0) {
-                continue;
-            }
-            $grouped[$sku] = ($grouped[$sku] ?? 0) + $qty;
-        }
+        // Picking list berisi barang fisik: SKU bundle diterjemahkan ke komponennya.
+        $grouped = PickingDemand::physicalTotals($items);
 
         foreach ($grouped as $sku => $qty) {
             $delta = $direction * $qty;
@@ -561,14 +553,7 @@ class ResiImportController extends Controller
 
     private function getPickedQty(string $date, string $sku): int
     {
-        $itemId = Item::active()->where('sku', $sku)->value('id');
-        if (!$itemId) {
-            return 0;
-        }
-
-        return (int) QcTransitItem::where('item_id', $itemId)
-            ->where('transit_date', $date)
-            ->value('qty');
+        return PickingDemand::pickedQty($date, $sku);
     }
 
     private function syncPickingException(string $date, string $sku, int $exceptionQty): void

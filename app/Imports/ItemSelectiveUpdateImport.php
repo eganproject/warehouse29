@@ -339,12 +339,18 @@ class ItemSelectiveUpdateImport implements SkipsEmptyRows, ToCollection, WithHea
         if ($toBundle) {
             $hasMutations = DB::table('stock_mutations')->where('item_id', $item->id)->exists();
             $hasStock = (int) DB::table('item_stocks')->where('item_id', $item->id)->value('stock') > 0;
+            $hasDamagedStock = DB::table('damaged_item_stocks')->where('item_id', $item->id)->where('stock', '>', 0)->exists()
+                || DB::table('damaged_stock_mutations')->where('item_id', $item->id)->exists();
             $isUsedAsComponent = ItemBundle::query()->where('component_item_id', $item->id)->exists();
-            if ($hasMutations || $hasStock || $isUsedAsComponent) {
+            if ($hasMutations || $hasStock || $hasDamagedStock || $isUsedAsComponent) {
                 $this->fail($rowNumber, 'Item tidak dapat dijadikan bundle karena memiliki stok/riwayat stok atau dipakai sebagai komponen bundle.');
             }
-        } elseif (DB::table('qc_transit_items')->where('item_id', $item->id)->exists()) {
-            $this->fail($rowNumber, 'Item bundle tidak dapat dijadikan item biasa karena memiliki riwayat transit QC.');
+        } elseif (
+            DB::table('qc_transit_items')->where('item_id', $item->id)->exists()
+            || DB::table('qc_scan_resi_items')->where('item_id', $item->id)->exists()
+            || DB::table('outbound_items')->where('item_id', $item->id)->exists()
+        ) {
+            $this->fail($rowNumber, 'Item bundle tidak dapat dijadikan item biasa karena memiliki riwayat QC atau barang keluar.');
         }
     }
 

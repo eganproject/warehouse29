@@ -25,6 +25,8 @@ class LowStockReportController extends Controller
             ->leftJoin('item_stocks as s', 's.item_id', '=', 'i.id')
             ->leftJoin('categories as c', 'c.id', '=', 'i.category_id')
             ->where('i.is_active', true)
+            // Bundle hanya stok virtual; stok fisiknya ada di komponen.
+            ->where('i.is_bundle', false)
             ->where('i.safety_stock', '>', 0)
             ->whereRaw('COALESCE(s.stock, 0) < i.safety_stock');
 

@@ -371,6 +371,7 @@
                             <div class="fw-bold text-gray-800">Item Retur</div>
                             <div class="text-muted fs-8">Pilih item, cek jumlah resi, lalu isi kondisi barang yang diterima.</div>
                             ${data.item_found === false ? '<div class="text-danger fs-8 mt-1">SKU resi belum ada di master item. Pilih item master yang sesuai.</div>' : ''}
+                            ${data.from_bundle ? `<div class="text-primary fs-8 mt-1">Komponen dari bundle ${esc(data.from_bundle)} — qty resi sudah dikonversi ke barang fisik.</div>` : ''}
                             <div class="return-item-summary"></div>
                         </div>
                     </div>
@@ -489,6 +490,7 @@
                         qty_good: item.qty_resi,
                         qty_damaged: 0,
                         item_found: item.item_found,
+                        from_bundle: item.from_bundle,
                     });
                 });
                 if (!json.items || json.items.length === 0) addRow();

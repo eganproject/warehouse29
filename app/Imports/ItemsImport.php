@@ -92,11 +92,20 @@ class ItemsImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
                 $payload['is_active'] = $activeStatus;
             }
 
+            $existingIsBundle = (bool) Item::where('sku', $sku)->value('is_bundle');
+            if ($existingIsBundle && $stock > 0) {
+                throw ValidationException::withMessages([
+                    'file' => "SKU {$sku} adalah item bundle (stok virtual) sehingga kolom stok harus kosong/0. Isi stok pada SKU komponennya.",
+                ]);
+            }
+
             $item = Item::updateOrCreate(
                 ['sku' => $sku],
                 $payload
             );
-            ItemStock::firstOrCreate(['item_id' => $item->id], ['stock' => 0]);
+            if (!$item->is_bundle) {
+                ItemStock::firstOrCreate(['item_id' => $item->id], ['stock' => 0]);
+            }
             $item->wasRecentlyCreated ? $this->created++ : $this->updated++;
 
             if ($stock > 0) {

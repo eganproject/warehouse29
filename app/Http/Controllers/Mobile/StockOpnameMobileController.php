@@ -9,6 +9,7 @@ use App\Models\ItemStock;
 use App\Models\StockOpname;
 use App\Models\StockOpnameItem;
 use App\Models\StockMutation;
+use App\Support\BundleService;
 use App\Support\StockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -64,7 +65,9 @@ class StockOpnameMobileController extends Controller
             return response()->json(['items' => []]);
         }
 
+        // Bundle tidak dihitung fisik; yang di-opname adalah komponennya.
         $query = Item::active()
+            ->where('is_bundle', false)
             ->where(function ($query) use ($q) {
                 $query->where('sku', 'like', "%{$q}%")
                     ->orWhere('name', 'like', "%{$q}%");
@@ -108,6 +111,7 @@ class StockOpnameMobileController extends Controller
             'counted_qty' => ['required', 'integer', 'min:0'],
             'note' => ['nullable', 'string'],
         ]);
+        BundleService::assertNotBundle([$validated['item_id']], 'stock opname', 'item_id');
 
         DB::beginTransaction();
         try {

@@ -4,6 +4,7 @@ namespace App\Exports;
 
 use App\Models\PackerScanException;
 use App\Models\PickingList;
+use App\Support\PickingDemand;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Carbon;
 use Maatwebsite\Excel\Concerns\FromCollection;
@@ -13,6 +14,9 @@ use Maatwebsite\Excel\Concerns\WithMapping;
 
 class PickingListExport implements FromCollection, WithHeadings, WithMapping, ShouldAutoSize
 {
+    /** @var array<string, array> [tanggal => sumber bundle per SKU] */
+    private array $sourcesByDate = [];
+
     public function __construct(private array $filters = [])
     {
     }
@@ -53,12 +57,17 @@ class PickingListExport implements FromCollection, WithHeadings, WithMapping, Sh
             $query->where('remaining_qty', '<=', 0);
         }
 
-        return $query->get();
+        $rows = $query->get();
+        foreach ($rows->map(fn ($row) => $row->list_date?->format('Y-m-d'))->filter()->unique() as $date) {
+            $this->sourcesByDate[$date] = PickingDemand::bundleSources($date);
+        }
+
+        return $rows;
     }
 
     public function headings(): array
     {
-        return ['Tanggal', 'SKU', 'Nama', 'Qty', 'Remaining'];
+        return ['Tanggal', 'SKU', 'Nama', 'Qty', 'Remaining', 'Termasuk dari Bundle'];
     }
 
     public function map($row): array
@@ -69,6 +78,7 @@ class PickingListExport implements FromCollection, WithHeadings, WithMapping, Sh
             $row->item?->name ?? '-',
             (int) $row->qty,
             (int) $row->remaining_qty,
+            PickingDemand::sourcesLabel($this->sourcesByDate[$row->list_date?->format('Y-m-d')][$row->sku] ?? []) ?? '',
         ];
     }
 }

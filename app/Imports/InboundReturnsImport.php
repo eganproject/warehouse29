@@ -5,6 +5,7 @@ namespace App\Imports;
 use App\Models\Item;
 use App\Models\Resi;
 use App\Models\ReturnReason;
+use App\Support\BundleService;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 use Maatwebsite\Excel\Concerns\SkipsEmptyRows;
@@ -53,6 +54,7 @@ class InboundReturnsImport implements ToCollection, WithHeadingRow, SkipsEmptyRo
 
         $items = Item::active()->whereIn('sku', $skus)->get(['id', 'sku']);
         $skuMap = $items->pluck('id', 'sku')->all();
+        BundleService::assertNotBundle(array_values($skuMap), 'import retur inbound', 'file');
         $reasonMap = ReturnReason::active()
             ->get(['id', 'code', 'name'])
             ->flatMap(function ($reason) {

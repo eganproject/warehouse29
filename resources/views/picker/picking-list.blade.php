@@ -115,14 +115,20 @@
             return;
         }
         el.empty.style.display = 'none';
+        const escPick = (value) => String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
         el.list.innerHTML = items.map((row) => {
             const qty = row.qty ?? 0;
             const remaining = row.remaining_qty ?? 0;
+            // Picking list berisi barang fisik; tampilkan bagian qty yang berasal dari bundle.
+            const bundleInfo = row.bundle_sources
+                ? `<small style="color:#6d28d9;font-weight:700;">Termasuk dari bundle: ${escPick(row.bundle_sources)}</small>`
+                : '';
             return `
                 <div class="list-row">
                     <div>
-                        <strong>${row.sku || '-'} • ${row.name || '-'}</strong>
+                        <strong>${escPick(row.sku || '-')} • ${escPick(row.name || '-')}</strong>
                         <small>Total: ${qty} | Sisa: ${remaining}</small>
+                        ${bundleInfo}
                     </div>
                     <div class="qty-badge">${remaining}</div>
                 </div>

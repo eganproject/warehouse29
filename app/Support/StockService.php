@@ -35,6 +35,13 @@ class StockService
                     ]);
                 }
 
+                // Bundle hanya punya stok virtual; mutasi fisik harus ke komponennya.
+                if (BundleService::isBundle($itemId)) {
+                    throw ValidationException::withMessages([
+                        'items' => 'Item bundle tidak memiliki stok fisik. Mutasi stok harus dilakukan pada komponennya.',
+                    ]);
+                }
+
                 $stock = ItemStock::where('item_id', $itemId)->lockForUpdate()->first();
                 if (!$stock) {
                     $stock = ItemStock::create(['item_id' => $itemId, 'stock' => 0]);

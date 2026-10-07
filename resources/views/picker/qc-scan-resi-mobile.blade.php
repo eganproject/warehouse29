@@ -181,6 +181,34 @@
         background: #dcfce7;
         color: #15803d;
     }
+    .bundle-badge {
+        display: inline-block;
+        margin-left: 6px;
+        border-radius: 6px;
+        padding: 1px 6px;
+        background: #ede9fe;
+        color: #6d28d9;
+        font-size: 10px;
+        font-weight: 800;
+        vertical-align: middle;
+    }
+    .bundle-components {
+        grid-column: 1 / -1;
+        display: grid;
+        gap: 4px;
+        margin-top: 2px;
+        padding-top: 6px;
+        border-top: 1px dashed var(--border);
+    }
+    .bundle-component {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        font-size: 12px;
+    }
+    .bundle-component.done {
+        color: #15803d;
+    }
     .history-list {
         display: grid;
         gap: 8px;
@@ -533,13 +561,65 @@
         return state.checklist.find(item => Number(item.scanned_qty || 0) < Number(item.qty || 0)) || null;
     }
 
+    // Baris resi dari server. Baris bundle membawa komponen fisik yang harus discan.
+    function normalizeChecklist(items, qtyKey = 'qty') {
+        return (items || []).map(item => {
+            if (item.sku && item.name) state.itemNames[String(item.sku).toLowerCase()] = item.name;
+            return {
+                sku: item.sku,
+                qty: Number(item[qtyKey] || 0),
+                scanned_qty: Number(item.scanned_qty || 0),
+                is_bundle: !!item.is_bundle,
+                bundle_label: item.bundle_label || '',
+                components: (item.components || []).map(component => ({
+                    sku: component.sku,
+                    name: component.name || '',
+                    qty_per_bundle: Number(component.qty_per_bundle || 0),
+                    required_qty: Number(component.required_qty || 0),
+                    scanned_qty: Number(component.scanned_qty || 0),
+                })),
+            };
+        });
+    }
+
+    function nextBundleComponent(item) {
+        return (item.components || []).find(component => component.scanned_qty < component.required_qty) || null;
+    }
+
+    // Cocokkan kode scan dengan baris SKU langsung atau komponen bundle. SKU bundle sendiri ditolak.
+    function findScanTarget(code) {
+        const key = String(code || '').toLowerCase();
+        const bundle = state.checklist.find(row => row.is_bundle && String(row.sku).toLowerCase() === key);
+        if (bundle) return { error: 'bundle', bundle };
+
+        const direct = state.checklist.find(row => !row.is_bundle && String(row.sku).toLowerCase() === key) || null;
+        const components = [];
+        state.checklist.filter(row => row.is_bundle).forEach(row => {
+            row.components.forEach(component => {
+                if (String(component.sku).toLowerCase() === key) components.push({ bundle: row, component });
+            });
+        });
+        if (!direct && !components.length) return { error: 'missing' };
+
+        const remaining = (direct ? Math.max(0, direct.qty - direct.scanned_qty) : 0)
+            + components.reduce((sum, row) => sum + Math.max(0, row.component.required_qty - row.component.scanned_qty), 0);
+        if (remaining <= 0) return { error: 'complete', direct, components };
+
+        return { direct, components, remaining };
+    }
+
     function renderProgress() {
         const { total, done, pct } = progress();
         el.progressText.textContent = `${done} / ${total} SKU selesai`;
         el.progressPct.textContent = `${pct}%`;
         el.progressBar.style.width = `${pct}%`;
         const next = nextItem();
-        if (next) {
+        const nextComponent = next?.is_bundle ? nextBundleComponent(next) : null;
+        if (nextComponent) {
+            el.nextSku.textContent = nextComponent.sku || '-';
+            el.nextName.textContent = `Komponen bundle ${next.sku} (${next.bundle_label}). Jangan scan SKU bundle.`;
+            el.nextQty.textContent = `${nextComponent.scanned_qty}/${nextComponent.required_qty}`;
+        } else if (next) {
             const scanned = Number(next.scanned_qty || 0);
             const qty = Number(next.qty || 0);
             el.nextSku.textContent = next.sku || '-';
@@ -557,12 +637,26 @@
             const doneItem = scanned >= qty;
             const isNext = next && next.sku === item.sku;
             const name = state.itemNames[String(item.sku || '').toLowerCase()] || '';
+            const bundleInfo = item.is_bundle
+                ? `<div class="check-name">Isi per bundle: ${esc(item.bundle_label || '-')} — scan barang fisiknya</div>`
+                : '';
+            const components = item.is_bundle && item.components.length
+                ? `<div class="bundle-components">${item.components.map(component => {
+                    const componentDone = component.scanned_qty >= component.required_qty;
+                    return `<div class="bundle-component ${componentDone ? 'done' : ''}">
+                        <span>↳ ${esc(component.sku)}${component.name ? ' · ' + esc(component.name) : ''}</span>
+                        <strong>${component.scanned_qty}/${component.required_qty}</strong>
+                    </div>`;
+                }).join('')}</div>`
+                : '';
             return `<div class="check-row ${doneItem ? 'done' : ''} ${isNext ? 'next' : ''}">
                 <div>
-                    <div class="check-sku">${esc(item.sku)}</div>
+                    <div class="check-sku">${esc(item.sku)}${item.is_bundle ? '<span class="bundle-badge">BUNDLE</span>' : ''}</div>
                     <div class="check-name">${esc(name)}</div>
+                    ${bundleInfo}
                 </div>
                 <span class="qty-pill ${doneItem ? 'done' : ''}">${scanned}/${qty}</span>
+                ${components}
             </div>`;
         }).join('');
     }
@@ -611,11 +705,7 @@
             const params = new URLSearchParams({ type, code });
             const json = await fetchJson(`${routes.qcResiLookup}?${params}`);
             state.resi = json.resi;
-            state.checklist = (json.items || []).map(item => ({
-                sku: item.sku,
-                qty: Number(item.qty || 0),
-                scanned_qty: Number(item.scanned_qty || 0),
-            }));
+            state.checklist = normalizeChecklist(json.items);
             el.dispNoResi.textContent = state.resi.no_resi || '-';
             el.dispIdPesanan.textContent = `ID Pesanan: ${state.resi.id_pesanan || '-'}`;
             el.dispMeta.textContent = `${state.resi.tanggal_pesanan || '-'} • ${state.resi.kurir_name || '-'}`;
@@ -659,8 +749,17 @@
             focusActive();
             return;
         }
-        const item = state.checklist.find(row => String(row.sku).toLowerCase() === code.toLowerCase());
-        if (!item) {
+        const target = findScanTarget(code);
+        if (target.error === 'bundle') {
+            const msg = `${target.bundle.sku} adalah SKU bundle. Scan barang fisiknya: ${target.bundle.bundle_label || 'komponen bundle'} per bundle.`;
+            setStatus(el.skuStatus, msg, 'err');
+            toast('error', 'SKU Bundle Tidak Bisa Discan', msg, 5200);
+            await beep('err');
+            el.skuCode.value = '';
+            focusActive();
+            return;
+        }
+        if (target.error === 'missing') {
             setStatus(el.skuStatus, `SKU ${code} tidak ada dalam resi ini.`, 'err');
             toast('error', 'SKU Tidak Sesuai Resi', `SKU ${code} tidak ada dalam resi ini.`, 4800);
             await beep('err');
@@ -668,7 +767,7 @@
             focusActive();
             return;
         }
-        if (Number(item.scanned_qty || 0) >= Number(item.qty || 0)) {
+        if (target.error === 'complete') {
             setStatus(el.skuStatus, `SKU ${code} sudah lengkap.`, 'warn');
             toast('warning', 'SKU Sudah Lengkap', 'Jangan scan ulang. Lanjut ke SKU lain.');
             await beep('err');
@@ -686,7 +785,11 @@
             form.append('resi_id', String(state.resi.id));
             const json = await fetchJson(routes.qcScanItem, { method: 'POST', body: form });
             state.session = json.session || null;
-            item.scanned_qty = Math.min(Number(item.qty || 0), Number(item.scanned_qty || 0) + qty);
+            if (Array.isArray(json.items)) {
+                state.checklist = normalizeChecklist(json.items);
+            } else if (target.direct) {
+                target.direct.scanned_qty = Math.min(target.direct.qty, target.direct.scanned_qty + qty);
+            }
             const sessionItem = state.session?.items?.find(row => String(row.sku || '').toLowerCase() === code.toLowerCase());
             if (sessionItem?.name) state.itemNames[code.toLowerCase()] = sessionItem.name;
             renderSession();
@@ -701,7 +804,15 @@
                 state.completionTimer = setTimeout(() => goPhase('resi'), 900);
                 return;
             }
-            setStatus(el.skuStatus, `OK: ${code} +${qty}.`, 'ok');
+            const scan = json.scan || null;
+            if (scan?.target === 'bundle') {
+                const bundleMsg = scan.bundle_completed > 0
+                    ? ` Bundle ${scan.bundle_sku} lengkap ${scan.bundle_scanned_qty}/${scan.bundle_required_qty}.`
+                    : ` Komponen bundle ${scan.bundle_sku}: ${scan.component_scanned_qty}/${scan.component_required_qty}.`;
+                setStatus(el.skuStatus, `OK: ${code} +${qty}.${bundleMsg}`, 'ok');
+            } else {
+                setStatus(el.skuStatus, `OK: ${code} +${qty}.`, 'ok');
+            }
             await beep('ok');
         } catch (error) {
             setStatus(el.skuStatus, error.message || 'Gagal memproses scan.', 'err');

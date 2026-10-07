@@ -4,11 +4,11 @@ namespace App\Http\Controllers\Qc;
 
 use App\Http\Controllers\Controller;
 use App\Models\Item;
-use App\Models\ItemBundle;
 use App\Models\PickingList;
 use App\Models\PickingListException;
 use App\Models\PackerScanException;
 use App\Models\QcScanResi;
+use App\Models\QcScanResiBundleComponent;
 use App\Models\QcScanResiItem;
 use App\Models\QcTransitItem;
 use App\Models\Resi;
@@ -69,11 +69,10 @@ class QcScanController extends Controller
             return response()->json(['message' => 'Resi tidak memiliki detail SKU valid.'], 422);
         }
 
-        $ledgerQty = [];
         $alreadyScanned = false;
         $isComplete = false;
         $qcResi = QcScanResi::where('resi_id', $resi->id)
-            ->with(['items', 'scanner'])
+            ->with(['scanner'])
             ->first();
         if ($qcResi) {
             if ((int) $qcResi->scanned_by !== (int) auth()->id()) {
@@ -85,16 +84,9 @@ class QcScanController extends Controller
 
             $alreadyScanned = true;
             $isComplete = ($qcResi->status === 'completed');
-            foreach ($qcResi->items as $item) {
-                $ledgerQty[$item->sku] = (int) $item->scanned_qty;
-            }
         }
 
-        $items = collect($skuTotals)->map(fn ($qty, $sku) => [
-            'sku' => $sku,
-            'qty' => $qty,
-            'scanned_qty' => min((int) ($ledgerQty[$sku] ?? 0), (int) $qty),
-        ])->values();
+        $items = $this->buildChecklist($skuTotals, $qcResi);
 
         return response()->json([
             'resi' => [
@@ -146,16 +138,31 @@ class QcScanController extends Controller
         $idempotencyKey = $this->requestIdempotencyKey('qc.scan-item', $validated['request_id'] ?? null);
 
         try {
-            $summary = DB::transaction(function () use ($validated, $code, $qty, $idempotencyKey) {
-                // Idempotency check: if any mutation with this key (or derived key) exists, skip.
-                // For bundle scans the first component uses $idempotencyKey directly.
+            $result = DB::transaction(function () use ($validated, $code, $qty, $idempotencyKey) {
+                // Idempotency: a retried request whose stock mutation already exists is a no-op.
                 if ($idempotencyKey && StockMutation::where('idempotency_key', $idempotencyKey)->lockForUpdate()->exists()) {
-                    return $this->serializeDailyScanSummary();
+                    $resi = Resi::with('details')->findOrFail((int) $validated['resi_id']);
+                    $qcResi = QcScanResi::where('resi_id', $resi->id)->first();
+
+                    return [
+                        'summary' => $this->serializeDailyScanSummary(),
+                        'items' => $this->buildChecklist($this->buildResiSkuTotals($resi), $qcResi),
+                        'scan' => null,
+                    ];
                 }
 
                 $item = Item::active()->where('sku', $code)->lockForUpdate()->first();
                 if (!$item) {
                     throw ValidationException::withMessages(['code' => 'SKU tidak ditemukan pada master item.']);
+                }
+
+                // QC hanya menerima barang fisik. SKU bundle tidak punya barcode fisik sendiri.
+                if ($item->is_bundle) {
+                    $label = BundleService::compositionFor([$item->id])[$item->id]['label'] ?? '';
+                    throw ValidationException::withMessages([
+                        'code' => "SKU {$item->sku} adalah item bundle dan tidak bisa discan langsung."
+                            .($label !== '' ? " Scan barang fisiknya: {$label} per bundle." : ' Scan barang fisik komponennya.'),
+                    ]);
                 }
 
                 $resi = Resi::with('details')->lockForUpdate()->findOrFail((int) $validated['resi_id']);
@@ -168,77 +175,46 @@ class QcScanController extends Controller
                     throw ValidationException::withMessages(['resi' => 'Resi sudah selesai di-QC.']);
                 }
 
+                $scanAt = now();
+                $date = $qcResi->scanned_at?->toDateString() ?? $scanAt->toDateString();
+
+                // 1) Baris SKU langsung pada resi (item biasa).
                 $ledger = QcScanResiItem::where('qc_scan_resi_id', $qcResi->id)
                     ->where('sku', $item->sku)
                     ->lockForUpdate()
                     ->first();
+                $directRemaining = $ledger ? max(0, (int) $ledger->required_qty - (int) $ledger->scanned_qty) : 0;
 
-                if (!$ledger) {
-                    throw ValidationException::withMessages([
-                        'code' => "SKU {$item->sku} tidak ditemukan dalam resi tersebut.",
-                    ]);
-                }
-
-                $remaining = max(0, (int) $ledger->required_qty - (int) $ledger->scanned_qty);
-                if ($qty > $remaining) {
-                    throw ValidationException::withMessages([
-                        'qty' => "Qty scan ({$qty}) melebihi sisa resi untuk SKU {$item->sku} ({$remaining}).",
-                    ]);
-                }
-
-                $scanAt = now();
-                $date = $qcResi->scanned_at?->toDateString() ?? $scanAt->toDateString();
-
-                $this->ensurePickingListCapacity($date, $item->sku, $qty);
-
-                $ledger->scanned_qty = (int) $ledger->scanned_qty + $qty;
-                $ledger->item_id = $item->id;
-                $ledger->save();
-
-                // Transit is always recorded against the scanned item's item_id
-                // (for bundles this is the bundle's item_id, which scan-out will look up by SKU)
-                $transit = QcTransitItem::where('item_id', $item->id)
-                    ->where('transit_date', $date)
-                    ->lockForUpdate()
-                    ->first();
-
-                if ($transit) {
-                    $transit->qty += $qty;
-                    $transit->remaining_qty += $qty;
-                    $transit->last_qc_at = $scanAt;
-                    $transit->save();
+                if ($ledger && $qty <= $directRemaining) {
+                    $this->scanDirectItem($item, $qty, $ledger, $qcResi, $resi, $date, $scanAt, $idempotencyKey);
+                    $scan = ['target' => 'item', 'sku' => $item->sku];
                 } else {
-                    QcTransitItem::create([
-                        'item_id' => $item->id,
-                        'transit_date' => $date,
-                        'qty' => $qty,
-                        'remaining_qty' => $qty,
-                        'last_qc_at' => $scanAt,
-                    ]);
+                    // 2) Komponen dari bundle yang ada pada resi.
+                    $target = $this->findBundleTarget($qcResi, $item, $qty);
+                    if (!$target) {
+                        $this->throwScanNotAccepted($qcResi, $item, $qty, $ledger, $directRemaining);
+                    }
+
+                    $scan = $this->scanBundleComponent(
+                        $item,
+                        $qty,
+                        $target['ledger'],
+                        $target['component'],
+                        $qcResi,
+                        $resi,
+                        $date,
+                        $scanAt,
+                        $idempotencyKey
+                    );
                 }
 
-                if ($item->is_bundle) {
-                    $this->deductBundleComponents($item, $qty, $qcResi, $resi, $scanAt, $idempotencyKey);
-                } else {
-                    StockService::mutate([
-                        'item_id' => $item->id,
-                        'direction' => 'out',
-                        'qty' => $qty,
-                        'source_type' => 'qc_resi',
-                        'source_subtype' => 'scan',
-                        'source_id' => $qcResi->id,
-                        'source_code' => $resi->no_resi ?: $resi->id_pesanan,
-                        'note' => 'QC scan resi',
-                        'occurred_at' => $scanAt,
-                        'created_by' => auth()->id(),
-                        'idempotency_key' => $idempotencyKey,
-                    ]);
-                }
-
-                $this->adjustPickingRemaining($date, $item->sku, $qty);
                 $this->markCompletedIfReady($qcResi);
 
-                return $this->serializeDailyScanSummary();
+                return [
+                    'summary' => $this->serializeDailyScanSummary(),
+                    'items' => $this->buildChecklist($this->buildResiSkuTotals($resi), $qcResi),
+                    'scan' => $scan,
+                ];
             });
         } catch (ValidationException $e) {
             return response()->json([
@@ -254,64 +230,221 @@ class QcScanController extends Controller
 
         return response()->json([
             'message' => 'Item berhasil discan.',
-            'session' => $summary,
+            'session' => $result['summary'],
+            'items' => $result['items'],
+            'scan' => $result['scan'],
         ]);
     }
 
-    /**
-     * Deduct stock from each bundle component.
-     * The first component uses $baseIdempotencyKey so the top-level idempotency check
-     * can detect a completed bundle scan on retry. Subsequent components use derived keys.
-     * Transit was already recorded against the bundle item_id — this only handles stock deduction.
-     */
-    private function deductBundleComponents(
+    private function scanDirectItem(
         Item $item,
-        int $bundleQty,
+        int $qty,
+        QcScanResiItem $ledger,
         QcScanResi $qcResi,
         Resi $resi,
+        string $date,
         \DateTimeInterface $scanAt,
-        ?string $baseIdempotencyKey
+        ?string $idempotencyKey
     ): void {
-        $components = ItemBundle::where('bundle_item_id', $item->id)
+        $this->ensurePickingListCapacity($date, $item->sku, $qty);
+
+        $ledger->scanned_qty = (int) $ledger->scanned_qty + $qty;
+        $ledger->item_id = $item->id;
+        $ledger->save();
+
+        $this->addQcTransit($item->id, $date, $qty, $scanAt);
+
+        StockService::mutate([
+            'item_id' => $item->id,
+            'direction' => 'out',
+            'qty' => $qty,
+            'source_type' => 'qc_resi',
+            'source_subtype' => 'scan',
+            'source_id' => $qcResi->id,
+            'source_code' => $resi->no_resi ?: $resi->id_pesanan,
+            'note' => 'QC scan resi',
+            'occurred_at' => $scanAt,
+            'created_by' => auth()->id(),
+            'idempotency_key' => $idempotencyKey,
+        ]);
+
+        $this->adjustPickingRemaining($date, $item->sku, $qty);
+    }
+
+    /**
+     * Scan komponen fisik untuk baris bundle. Stok komponen dipotong saat discan;
+     * baris bundle (ledger, transit, picking list) baru bertambah ketika satu set bundle lengkap.
+     */
+    private function scanBundleComponent(
+        Item $item,
+        int $qty,
+        QcScanResiItem $ledger,
+        QcScanResiBundleComponent $component,
+        QcScanResi $qcResi,
+        Resi $resi,
+        string $date,
+        \DateTimeInterface $scanAt,
+        ?string $idempotencyKey
+    ): array {
+        $components = QcScanResiBundleComponent::where('qc_scan_resi_item_id', $ledger->id)
             ->lockForUpdate()
             ->get();
 
-        if ($components->isEmpty()) {
+        $completed = PHP_INT_MAX;
+        foreach ($components as $row) {
+            $scanned = (int) $row->scanned_qty + ((int) $row->id === (int) $component->id ? $qty : 0);
+            $completed = min($completed, intdiv($scanned, max(1, (int) $row->qty_per_bundle)));
+        }
+        $completed = min((int) $ledger->required_qty, $completed === PHP_INT_MAX ? 0 : $completed);
+        $newlyCompleted = max(0, $completed - (int) $ledger->scanned_qty);
+
+        // Picking list berisi barang fisik: komponen memotong picking list SKU-nya sendiri
+        // di setiap scan, sama seperti item biasa.
+        $this->ensurePickingListCapacity($date, $item->sku, $qty);
+
+        $component->scanned_qty = (int) $component->scanned_qty + $qty;
+        $component->save();
+
+        StockService::mutate([
+            'item_id' => $item->id,
+            'direction' => 'out',
+            'qty' => $qty,
+            'source_type' => 'qc_resi',
+            'source_subtype' => 'scan_bundle',
+            'source_id' => $qcResi->id,
+            'source_code' => $resi->no_resi ?: $resi->id_pesanan,
+            'note' => "QC scan komponen {$item->sku} untuk bundle {$ledger->sku}",
+            'occurred_at' => $scanAt,
+            'created_by' => auth()->id(),
+            'idempotency_key' => $idempotencyKey,
+        ]);
+
+        $this->adjustPickingRemaining($date, $item->sku, $qty);
+
+        if ($newlyCompleted > 0) {
+            $ledger->scanned_qty = $completed;
+            $ledger->save();
+
+            // Transit tetap dicatat per SKU bundle pada resi karena dipakai scan out.
+            $this->addQcTransit((int) $ledger->item_id, $date, $newlyCompleted, $scanAt);
+        }
+
+        return [
+            'target' => 'bundle',
+            'sku' => $item->sku,
+            'bundle_sku' => $ledger->sku,
+            'bundle_completed' => $newlyCompleted,
+            'bundle_scanned_qty' => (int) $ledger->scanned_qty,
+            'bundle_required_qty' => (int) $ledger->required_qty,
+            'component_scanned_qty' => (int) $component->scanned_qty,
+            'component_required_qty' => (int) $ledger->required_qty * (int) $component->qty_per_bundle,
+        ];
+    }
+
+    /**
+     * Cari baris bundle pada resi yang masih membutuhkan komponen ini sebanyak $qty.
+     *
+     * @return array{ledger: QcScanResiItem, component: QcScanResiBundleComponent}|null
+     */
+    private function findBundleTarget(QcScanResi $qcResi, Item $item, int $qty): ?array
+    {
+        $candidates = QcScanResiBundleComponent::query()
+            ->join('qc_scan_resi_items as qri', 'qri.id', '=', 'qc_scan_resi_bundle_components.qc_scan_resi_item_id')
+            ->where('qri.qc_scan_resi_id', $qcResi->id)
+            ->where('qc_scan_resi_bundle_components.component_item_id', $item->id)
+            ->orderBy('qri.id')
+            ->select('qc_scan_resi_bundle_components.*')
+            ->lockForUpdate()
+            ->get();
+
+        foreach ($candidates as $component) {
+            $ledger = QcScanResiItem::whereKey($component->qc_scan_resi_item_id)->lockForUpdate()->first();
+            if (!$ledger || $this->isPackerException($ledger->sku)) {
+                continue;
+            }
+
+            $required = (int) $ledger->required_qty * (int) $component->qty_per_bundle;
+            if ($qty <= $required - (int) $component->scanned_qty) {
+                return ['ledger' => $ledger, 'component' => $component];
+            }
+        }
+
+        return null;
+    }
+
+    private function throwScanNotAccepted(
+        QcScanResi $qcResi,
+        Item $item,
+        int $qty,
+        ?QcScanResiItem $ledger,
+        int $directRemaining
+    ): never {
+        $bundleRows = QcScanResiBundleComponent::query()
+            ->join('qc_scan_resi_items as qri', 'qri.id', '=', 'qc_scan_resi_bundle_components.qc_scan_resi_item_id')
+            ->where('qri.qc_scan_resi_id', $qcResi->id)
+            ->where('qc_scan_resi_bundle_components.component_item_id', $item->id)
+            ->get([
+                'qri.sku as bundle_sku',
+                'qri.required_qty',
+                'qc_scan_resi_bundle_components.qty_per_bundle',
+                'qc_scan_resi_bundle_components.scanned_qty',
+            ]);
+
+        $bundleRemaining = (int) $bundleRows->sum(
+            fn ($row) => max(0, (int) $row->required_qty * (int) $row->qty_per_bundle - (int) $row->scanned_qty)
+        );
+
+        if (!$ledger && $bundleRows->isEmpty()) {
             throw ValidationException::withMessages([
-                'code' => "Bundle {$item->sku} tidak memiliki komponen. Hubungi administrator.",
+                'code' => "SKU {$item->sku} tidak ditemukan dalam resi tersebut.",
             ]);
         }
 
-        // Pre-check virtual stock before acquiring individual component locks
-        BundleService::assertVirtualStockSufficient($item->id, $bundleQty);
-
-        $sourceCode = $resi->no_resi ?: $resi->id_pesanan;
-
-        foreach ($components as $index => $component) {
-            $componentQty = $bundleQty * (int) $component->qty;
-
-            // First component uses the base key so the outer idempotency check catches retries.
-            // Subsequent components use a derived key so each mutation is independently idempotent.
-            $compKey = $index === 0
-                ? $baseIdempotencyKey
-                : ($baseIdempotencyKey
-                    ? StockService::idempotencyKey([$baseIdempotencyKey, 'comp', $component->component_item_id])
-                    : null);
-
-            StockService::mutate([
-                'item_id' => $component->component_item_id,
-                'direction' => 'out',
-                'qty' => $componentQty,
-                'source_type' => 'qc_resi',
-                'source_subtype' => 'scan_bundle',
-                'source_id' => $qcResi->id,
-                'source_code' => $sourceCode,
-                'note' => "QC scan bundle {$item->sku}",
-                'occurred_at' => $scanAt,
-                'created_by' => auth()->id(),
-                'idempotency_key' => $compKey,
+        $totalRemaining = $directRemaining + $bundleRemaining;
+        if ($totalRemaining <= 0) {
+            throw ValidationException::withMessages([
+                'qty' => "SKU {$item->sku} sudah lengkap untuk resi ini.",
             ]);
         }
+
+        $parts = [];
+        if ($ledger) {
+            $parts[] = "langsung {$directRemaining}";
+        }
+        foreach ($bundleRows as $row) {
+            $remaining = max(0, (int) $row->required_qty * (int) $row->qty_per_bundle - (int) $row->scanned_qty);
+            $parts[] = "bundle {$row->bundle_sku} {$remaining}";
+        }
+
+        throw ValidationException::withMessages([
+            'qty' => "Qty scan ({$qty}) melebihi sisa resi untuk SKU {$item->sku} (".implode(', ', $parts).'). '
+                .'Scan dengan qty lebih kecil.',
+        ]);
+    }
+
+    private function addQcTransit(int $itemId, string $date, int $qty, \DateTimeInterface $scanAt): void
+    {
+        $transit = QcTransitItem::where('item_id', $itemId)
+            ->whereDate('transit_date', $date)
+            ->lockForUpdate()
+            ->first();
+
+        if ($transit) {
+            $transit->qty += $qty;
+            $transit->remaining_qty += $qty;
+            $transit->last_qc_at = $scanAt;
+            $transit->save();
+
+            return;
+        }
+
+        QcTransitItem::create([
+            'item_id' => $itemId,
+            'transit_date' => $date,
+            'qty' => $qty,
+            'remaining_qty' => $qty,
+            'last_qc_at' => $scanAt,
+        ]);
     }
 
     private function requestIdempotencyKey(string $action, ?string $requestId): ?string
@@ -327,7 +460,8 @@ class QcScanController extends Controller
     public function searchItems(Request $request)
     {
         $search = trim((string) $request->input('q', ''));
-        $query = Item::active();
+        // SKU bundle tidak bisa discan di QC, jadi tidak ditawarkan.
+        $query = Item::active()->where('is_bundle', false);
         if ($search !== '') {
             $query->where('sku', 'like', "%{$search}%");
         }
@@ -364,6 +498,7 @@ class QcScanController extends Controller
             if (!empty($skuBuckets['excluded'])) {
                 QcScanResiItem::where('qc_scan_resi_id', $qcResi->id)
                     ->where('scanned_qty', 0)
+                    ->whereDoesntHave('bundleComponents', fn ($q) => $q->where('scanned_qty', '>', 0))
                     ->delete();
 
                 $qcResi->status = 'completed';
@@ -381,6 +516,8 @@ class QcScanController extends Controller
         QcScanResiItem::where('qc_scan_resi_id', $qcResi->id)
             ->whereNotIn('sku', array_keys($skuTotals))
             ->where('scanned_qty', 0)
+            // Komponen bundle yang sudah discan sudah memotong stok; jangan hilangkan jejaknya.
+            ->whereDoesntHave('bundleComponents', fn ($q) => $q->where('scanned_qty', '>', 0))
             ->delete();
 
         foreach ($skuTotals as $sku => $requiredQty) {
@@ -390,9 +527,145 @@ class QcScanController extends Controller
             );
         }
 
+        $this->ensureBundleComponentRows($qcResi);
         $this->markCompletedIfReady($qcResi);
 
         return $qcResi->fresh(['resi', 'items.item']);
+    }
+
+    /**
+     * Snapshot komposisi bundle untuk setiap baris bundle pada QC resi, sehingga perubahan
+     * master bundle di tengah proses QC tidak mengubah kebutuhan scan resi yang sedang berjalan.
+     * Baris bundle lama (sebelum fitur scan komponen) yang sudah ter-scan dianggap komponennya
+     * sudah lengkap sesuai jumlah bundle yang ter-scan, karena stok komponennya sudah dipotong.
+     */
+    private function ensureBundleComponentRows(QcScanResi $qcResi): void
+    {
+        $ledgers = QcScanResiItem::where('qc_scan_resi_id', $qcResi->id)
+            ->whereNotNull('item_id')
+            ->lockForUpdate()
+            ->get();
+        if ($ledgers->isEmpty()) {
+            return;
+        }
+
+        $bundleIds = Item::whereIn('id', $ledgers->pluck('item_id'))
+            ->where('is_bundle', true)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+        if (empty($bundleIds)) {
+            return;
+        }
+
+        $initialized = QcScanResiBundleComponent::whereIn('qc_scan_resi_item_id', $ledgers->pluck('id'))
+            ->pluck('qc_scan_resi_item_id')
+            ->map(fn ($id) => (int) $id)
+            ->flip();
+        $componentsByBundle = BundleService::componentsFor($bundleIds);
+
+        foreach ($ledgers as $ledger) {
+            $bundleId = (int) $ledger->item_id;
+            if (!isset($componentsByBundle[$bundleId]) || isset($initialized[(int) $ledger->id])) {
+                continue;
+            }
+
+            foreach ($componentsByBundle[$bundleId] as $component) {
+                $perBundle = max(1, (int) $component->qty);
+                QcScanResiBundleComponent::create([
+                    'qc_scan_resi_item_id' => $ledger->id,
+                    'component_item_id' => $component->component_item_id,
+                    'component_sku' => (string) ($component->componentItem?->sku ?? ''),
+                    'qty_per_bundle' => $perBundle,
+                    'scanned_qty' => (int) $ledger->scanned_qty * $perBundle,
+                ]);
+            }
+        }
+    }
+
+    /**
+     * Checklist resi untuk layar QC. Baris bundle membawa daftar komponen yang harus discan.
+     */
+    private function buildChecklist(array $skuTotals, ?QcScanResi $qcResi): array
+    {
+        if (empty($skuTotals)) {
+            return [];
+        }
+
+        $ledgers = $qcResi
+            ? QcScanResiItem::with('bundleComponents.componentItem:id,sku,name')
+                ->where('qc_scan_resi_id', $qcResi->id)
+                ->get()
+                ->keyBy(fn ($row) => strtolower((string) $row->sku))
+            : collect();
+
+        $items = Item::active()
+            ->whereIn('sku', array_keys($skuTotals))
+            ->get(['id', 'sku', 'name', 'is_bundle'])
+            ->keyBy(fn ($row) => strtolower((string) $row->sku));
+        $composition = BundleService::compositionFor(
+            $items->where('is_bundle', true)->pluck('id')->all()
+        );
+
+        $rows = [];
+        foreach ($skuTotals as $sku => $qty) {
+            $key = strtolower((string) $sku);
+            $ledger = $ledgers->get($key);
+            $item = $items->get($key);
+            $scanned = min((int) ($ledger?->scanned_qty ?? 0), (int) $qty);
+            $rows[] = [
+                'sku' => $sku,
+                'name' => $item?->name,
+                'qty' => (int) $qty,
+                'scanned_qty' => $scanned,
+                ...$this->bundlePayload($item, $ledger, (int) $qty, $scanned, $composition),
+            ];
+        }
+
+        return $rows;
+    }
+
+    private function bundlePayload(?Item $item, ?QcScanResiItem $ledger, int $requiredQty, int $scannedQty, array $composition): array
+    {
+        if (!$item || !$item->is_bundle) {
+            return ['is_bundle' => false, 'bundle_label' => null, 'components' => []];
+        }
+
+        $progress = $ledger?->relationLoaded('bundleComponents') ? $ledger->bundleComponents : collect();
+        if ($progress->isNotEmpty()) {
+            $components = $progress->map(function (QcScanResiBundleComponent $row) use ($requiredQty) {
+                $perBundle = max(1, (int) $row->qty_per_bundle);
+                $required = $requiredQty * $perBundle;
+
+                return [
+                    'sku' => $row->component_sku ?: ($row->componentItem?->sku ?? ''),
+                    'name' => $row->componentItem?->name,
+                    'qty_per_bundle' => $perBundle,
+                    'required_qty' => $required,
+                    'scanned_qty' => min((int) $row->scanned_qty, $required),
+                ];
+            })->values()->all();
+        } else {
+            $components = collect($composition[$item->id]['components'] ?? [])
+                ->map(fn ($row) => [
+                    'sku' => $row['sku'],
+                    'name' => $row['name'],
+                    'qty_per_bundle' => $row['qty'],
+                    'required_qty' => $requiredQty * $row['qty'],
+                    'scanned_qty' => $scannedQty * $row['qty'],
+                ])->values()->all();
+        }
+
+        return [
+            'is_bundle' => true,
+            'bundle_label' => collect($components)->map(fn ($row) => "{$row['sku']} x{$row['qty_per_bundle']}")->implode(' + '),
+            'components' => $components,
+        ];
+    }
+
+    private function isPackerException(string $sku): bool
+    {
+        return isset($this->packerScanExceptionLookup()[strtolower(trim($sku))]);
     }
 
     private function buildResiSkuTotals(Resi $resi): array
@@ -456,12 +729,19 @@ class QcScanController extends Controller
     private function serializeDailyScanSummary(): array
     {
         $exceptionLookup = $this->packerScanExceptionLookup();
-        $resis = QcScanResi::with(['resi.kurir', 'items.item'])
+        $resis = QcScanResi::with(['resi.kurir', 'items.item', 'items.bundleComponents.componentItem:id,sku,name'])
             ->where('scanned_by', auth()->id())
             ->whereDate('scanned_at', now()->toDateString())
             ->orderByDesc('scanned_at')
             ->orderByDesc('id')
             ->get();
+        $composition = BundleService::compositionFor(
+            $resis->flatMap(fn ($row) => $row->items)
+                ->filter(fn ($item) => (bool) $item->item?->is_bundle)
+                ->pluck('item_id')
+                ->unique()
+                ->all()
+        );
 
         $items = $resis
             ->flatMap(fn ($resi) => $resi->items)
@@ -488,7 +768,7 @@ class QcScanController extends Controller
             'started_at' => $firstScanAt ? Carbon::parse($firstScanAt)->format('Y-m-d H:i') : null,
             'last_scan_at' => $lastScanAt ? Carbon::parse($lastScanAt)->format('Y-m-d H:i') : null,
             'items' => $items,
-            'resis' => $resis->map(function ($row) use ($exceptionLookup) {
+            'resis' => $resis->map(function ($row) use ($exceptionLookup, $composition) {
                 $items = $row->items->reject(fn ($item) => isset($exceptionLookup[strtolower((string) $item->sku)]));
                 $requiredQty = (int) $items->sum('required_qty');
                 $scannedQty = (int) $items->sum('scanned_qty');
@@ -510,6 +790,13 @@ class QcScanController extends Controller
                         'name' => $item->item?->name ?? '-',
                         'required_qty' => (int) $item->required_qty,
                         'scanned_qty' => (int) $item->scanned_qty,
+                        ...$this->bundlePayload(
+                            $item->item,
+                            $item,
+                            (int) $item->required_qty,
+                            min((int) $item->scanned_qty, (int) $item->required_qty),
+                            $composition
+                        ),
                     ])->values(),
                 ];
             })->values(),

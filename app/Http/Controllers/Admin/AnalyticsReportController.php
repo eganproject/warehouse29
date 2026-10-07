@@ -234,7 +234,9 @@ class AnalyticsReportController extends Controller
             ->leftJoin('item_stocks as s', 's.item_id', '=', 'i.id')
             ->leftJoin('categories as c', 'c.id', '=', 'i.category_id')
             ->leftJoinSub($movementAgg, 'ma', 'ma.item_id', '=', 'i.id')
-            ->where('i.is_active', true);
+            ->where('i.is_active', true)
+            // Bundle hanya stok virtual; stok fisiknya ada di komponen.
+            ->where('i.is_bundle', false);
 
         $categoryId = $request->input('category_id');
         if ($categoryId !== null && $categoryId !== '') {

@@ -135,12 +135,19 @@
             },
             columns: [
                 { data: 'date' },
-                { data: 'sku' },
-                { data: 'name' },
+                { data: 'sku', render: v => escPick(v) },
+                { data: 'name', render: (v, t, row) => row.bundle_sources
+                    // Picking list berisi barang fisik; tampilkan bagian qty yang berasal dari bundle.
+                    ? `${escPick(v)}<div class="fs-8 mt-1 text-primary">Termasuk dari bundle: ${escPick(row.bundle_sources)}</div>`
+                    : escPick(v) },
                 { data: 'qty', className: 'text-end' },
                 { data: 'remaining_qty', className: 'text-end' },
             ]
         });
+
+        function escPick(value) {
+            return String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+        }
 
         const reloadAll = () => {
             dtList?.ajax?.reload();

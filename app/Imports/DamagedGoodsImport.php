@@ -3,6 +3,7 @@
 namespace App\Imports;
 
 use App\Models\Item;
+use App\Support\BundleService;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 use Maatwebsite\Excel\Concerns\SkipsEmptyRows;
@@ -45,6 +46,7 @@ class DamagedGoodsImport implements ToCollection, WithHeadingRow, SkipsEmptyRows
 
         $items = Item::active()->whereIn('sku', $skus)->get(['id', 'sku']);
         $skuMap = $items->pluck('id', 'sku')->all();
+        BundleService::assertNotBundle(array_values($skuMap), 'import barang rusak', 'file');
 
         $missing = [];
         $errors = [];

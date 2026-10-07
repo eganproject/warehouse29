@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Support\BundleService;
 use App\Exports\StockOpnameDetailExport;
 use App\Models\Item;
 use App\Models\ItemStock;
@@ -27,6 +28,8 @@ class StockOpnameController extends Controller
         $items = Item::leftJoin('item_stocks', 'item_stocks.item_id', '=', 'items.id')
             ->leftJoin('damaged_item_stocks', 'damaged_item_stocks.item_id', '=', 'items.id')
             ->where('items.is_active', true)
+            // Bundle tidak dihitung fisik; yang di-opname adalah komponennya.
+            ->where('items.is_bundle', false)
             ->orderBy('items.name')
             ->get([
                 'items.id',
@@ -320,6 +323,8 @@ class StockOpnameController extends Controller
         } else {
             $validated['transacted_at'] = null;
         }
+
+        BundleService::assertNotBundle(collect($validated['items'])->pluck('item_id'), 'stock opname');
 
         return $validated;
     }

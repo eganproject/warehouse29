@@ -495,18 +495,23 @@ class ItemController extends Controller
             // Regular → Bundle: block if item has stock mutations or non-zero stock
             $hasMutations = DB::table('stock_mutations')->where('item_id', $item->id)->exists();
             $hasStock = (int) DB::table('item_stocks')->where('item_id', $item->id)->value('stock') > 0;
+            $hasDamagedStock = DB::table('damaged_item_stocks')->where('item_id', $item->id)->where('stock', '>', 0)->exists()
+                || DB::table('damaged_stock_mutations')->where('item_id', $item->id)->exists();
             $isUsedAsComponent = ItemBundle::where('component_item_id', $item->id)->exists();
-            if ($hasMutations || $hasStock || $isUsedAsComponent) {
+            if ($hasMutations || $hasStock || $hasDamagedStock || $isUsedAsComponent) {
                 throw ValidationException::withMessages([
                     'is_bundle' => 'Item tidak bisa diubah menjadi bundle karena memiliki riwayat mutasi stok atau dipakai sebagai komponen bundle.',
                 ]);
             }
         } else {
-            // Bundle → Regular: block if bundle has been QC-scanned (transit exists)
+            // Bundle → Regular: block once the bundle has been used in QC or outbound, because
+            // those records were posted against the bundle's components.
             $hasTransit = DB::table('qc_transit_items')->where('item_id', $item->id)->exists();
-            if ($hasTransit) {
+            $hasQc = DB::table('qc_scan_resi_items')->where('item_id', $item->id)->exists();
+            $hasOutbound = DB::table('outbound_items')->where('item_id', $item->id)->exists();
+            if ($hasTransit || $hasQc || $hasOutbound) {
                 throw ValidationException::withMessages([
-                    'is_bundle' => 'Item bundle tidak bisa diubah menjadi item biasa karena sudah memiliki riwayat transit QC.',
+                    'is_bundle' => 'Item bundle tidak bisa diubah menjadi item biasa karena sudah memiliki riwayat QC atau barang keluar.',
                 ]);
             }
         }
@@ -545,6 +550,10 @@ class ItemController extends Controller
             if (DB::table('item_bundles')->where('component_item_id', $item->id)->exists()) {
                 $references[] = 'komponen bundle';
             }
+        }
+        if (Schema::hasTable('qc_scan_resi_bundle_components')
+            && DB::table('qc_scan_resi_bundle_components')->where('component_item_id', $item->id)->exists()) {
+            $references[] = 'QC scan komponen bundle';
         }
 
         $itemTables = [

@@ -47,6 +47,8 @@ class DashboardController extends Controller
         $inventorySummary = DB::table('items as i')
             ->leftJoin('item_stocks as s', 's.item_id', '=', 'i.id')
             ->where('i.is_active', true)
+            // Bundle hanya stok virtual; stok fisiknya ada di komponen.
+            ->where('i.is_bundle', false)
             ->selectRaw('COUNT(*) as total_sku')
             ->selectRaw('COALESCE(SUM(COALESCE(s.stock, 0)), 0) as total_stock')
             ->selectRaw('COUNT(CASE WHEN COALESCE(s.stock, 0) <= 0 THEN 1 END) as out_of_stock')
@@ -80,6 +82,8 @@ class DashboardController extends Controller
         $outOfStockItems = DB::table('items as i')
             ->leftJoin('item_stocks as s', 's.item_id', '=', 'i.id')
             ->where('i.is_active', true)
+            // Bundle hanya stok virtual; stok fisiknya ada di komponen.
+            ->where('i.is_bundle', false)
             ->whereRaw('COALESCE(s.stock, 0) <= 0')
             ->select([
                 'i.sku',
@@ -95,6 +99,8 @@ class DashboardController extends Controller
         $lowStockItems = DB::table('items as i')
             ->leftJoin('item_stocks as s', 's.item_id', '=', 'i.id')
             ->where('i.is_active', true)
+            // Bundle hanya stok virtual; stok fisiknya ada di komponen.
+            ->where('i.is_bundle', false)
             ->where('i.safety_stock', '>', 0)
             ->whereRaw('COALESCE(s.stock, 0) > 0')
             ->whereRaw('COALESCE(s.stock, 0) < i.safety_stock')

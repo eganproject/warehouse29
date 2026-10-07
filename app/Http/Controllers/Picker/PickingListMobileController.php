@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Picker;
 use App\Http\Controllers\Controller;
 use App\Models\PackerScanException;
 use App\Models\PickingList;
+use App\Support\PickingDemand;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
@@ -47,12 +48,14 @@ class PickingListMobileController extends Controller
             });
         }
 
-        $items = $query->get()->map(function ($row) {
+        $sources = PickingDemand::bundleSources($date);
+        $items = $query->get()->map(function ($row) use ($sources) {
             return [
                 'sku' => $row->sku ?? '-',
                 'name' => $row->item?->name ?? '-',
                 'qty' => (int) $row->qty,
                 'remaining_qty' => (int) $row->remaining_qty,
+                'bundle_sources' => PickingDemand::sourcesLabel($sources[$row->sku] ?? []),
             ];
         })->values();
 

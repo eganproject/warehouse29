@@ -3,6 +3,7 @@
 namespace App\Exports;
 
 use App\Models\Item;
+use App\Support\BundleService;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
@@ -11,6 +12,9 @@ use Maatwebsite\Excel\Concerns\WithMapping;
 
 class ItemStocksExport implements FromCollection, WithHeadings, WithMapping, ShouldAutoSize
 {
+    /** @var array<int,int> */
+    private array $virtualStocks = [];
+
     public function __construct(private string $search = '', private string $searchMode = 'like')
     {
     }
@@ -21,21 +25,29 @@ class ItemStocksExport implements FromCollection, WithHeadings, WithMapping, Sho
         $search = trim($this->search);
         $this->applySearch($query, $search, $this->searchMode === 'exact' ? 'exact' : 'like');
 
-        return $query->get();
+        $items = $query->get();
+        $this->virtualStocks = BundleService::getVirtualStockBatch($items->where('is_bundle', true)->pluck('id')->all());
+
+        return $items;
     }
 
     public function headings(): array
     {
-        return ['ID', 'SKU', 'Nama', 'Stok'];
+        return ['ID', 'SKU', 'Nama', 'Stok', 'Tipe'];
     }
 
     public function map($row): array
     {
+        $isBundle = (bool) $row->is_bundle;
+
         return [
             $row->id,
             $row->sku,
             $row->name,
-            (int) ($row->stock?->stock ?? 0),
+            $isBundle
+                ? (int) ($this->virtualStocks[$row->id] ?? 0)
+                : (int) ($row->stock?->stock ?? 0),
+            $isBundle ? 'Bundle (stok virtual)' : 'Biasa',
         ];
     }
 

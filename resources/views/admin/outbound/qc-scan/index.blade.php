@@ -129,6 +129,26 @@
     .qc-checklist-item.scanned { background: #f0fdf4; border: 1px solid #bbf7d0; margin-bottom: 4px; opacity: 0.85; }
     .qc-checklist-item.active  { background: #eff6ff; border: 1.5px solid #93c5fd; margin-bottom: 4px; }
     .qc-checklist-item.next { background: #ecfeff; border: 1.5px solid #67e8f9; margin-bottom: 4px; }
+    .qc-checklist-item.has-components { flex-wrap: wrap; }
+    .qc-bundle-badge {
+        font-size: 10px;
+        font-weight: 700;
+        padding: 1px 6px;
+        border-radius: 6px;
+        background: #ede9fe;
+        color: #6d28d9;
+        flex: 0 0 auto;
+    }
+    .qc-bundle-components {
+        flex: 1 0 100%;
+        margin: 4px 0 0 26px;
+        padding-top: 4px;
+        border-top: 1px dashed #e5e7eb;
+        font-size: 12px;
+    }
+    .qc-bundle-components .qc-bundle-hint { color: #6d28d9; margin-bottom: 2px; }
+    .qc-bundle-component { display: flex; justify-content: space-between; gap: 8px; color: #334155; }
+    .qc-bundle-component.done { color: #15803d; }
     .qc-check-icon { font-size: 16px; flex: 0 0 auto; }
     .qc-sku-label { font-weight: 700; font-size: 13px; min-width: 90px; }
     .qc-sku-name  { font-size: 12px; color: #64748b; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -862,6 +882,54 @@
         return state.checklist.find(i => Number(i.scanned_qty || 0) < Number(i.qty || 0)) || null;
     }
 
+    // Baris resi dari server. Baris bundle membawa komponen fisik yang harus discan.
+    function normalizeChecklist(items, qtyKey = 'qty') {
+        return (items || []).map(i => {
+            if (i.sku && i.name) state.itemNames[String(i.sku).toLowerCase()] = i.name;
+            return {
+                sku: i.sku,
+                qty: Number(i[qtyKey] || 0),
+                scanned_qty: Number(i.scanned_qty || 0),
+                is_bundle: !!i.is_bundle,
+                bundle_label: i.bundle_label || '',
+                components: (i.components || []).map(c => ({
+                    sku: c.sku,
+                    name: c.name || '',
+                    qty_per_bundle: Number(c.qty_per_bundle || 0),
+                    required_qty: Number(c.required_qty || 0),
+                    scanned_qty: Number(c.scanned_qty || 0),
+                })),
+            };
+        });
+    }
+
+    function nextBundleComponent(item) {
+        return (item.components || []).find(c => c.scanned_qty < c.required_qty) || null;
+    }
+
+    // Cocokkan kode scan dengan baris SKU langsung atau komponen bundle. SKU bundle sendiri ditolak.
+    function findScanTarget(code) {
+        const key = String(code || '').toLowerCase();
+        const bundle = state.checklist.find(i => i.is_bundle && String(i.sku).toLowerCase() === key);
+        if (bundle) return { error: 'bundle', bundle };
+
+        const direct = state.checklist.find(i => !i.is_bundle && String(i.sku).toLowerCase() === key) || null;
+        const components = [];
+        state.checklist.filter(i => i.is_bundle).forEach(row => {
+            row.components.forEach(c => {
+                if (String(c.sku).toLowerCase() === key) components.push({ bundle: row, component: c });
+            });
+        });
+        if (!direct && !components.length) return { error: 'missing' };
+
+        const directRemaining = direct ? Math.max(0, direct.qty - direct.scanned_qty) : 0;
+        const componentRemaining = components.reduce((sum, row) => sum + Math.max(0, row.component.required_qty - row.component.scanned_qty), 0);
+        const remaining = directRemaining + componentRemaining;
+        if (remaining <= 0) return { error: 'complete', direct, components };
+
+        return { direct, components, remaining };
+    }
+
     function updateNextBox() {
         const next = nextChecklistItem();
         if (!el.nextBox) return;
@@ -870,6 +938,14 @@
             el.nextSku.textContent = 'SELESAI';
             el.nextName.textContent = 'Semua SKU pada resi ini sudah lengkap.';
             el.nextQty.textContent = '';
+            return;
+        }
+
+        const nextComponent = next.is_bundle ? nextBundleComponent(next) : null;
+        if (nextComponent) {
+            el.nextSku.textContent = nextComponent.sku || '-';
+            el.nextName.textContent = `Komponen bundle ${next.sku} (${next.bundle_label}). Jangan scan SKU bundle.`;
+            el.nextQty.textContent = `${nextComponent.scanned_qty} / ${nextComponent.required_qty} | sisa ${Math.max(0, nextComponent.required_qty - nextComponent.scanned_qty)}`;
             return;
         }
 
@@ -897,12 +973,23 @@
                 ? `${item.qty} / ${item.qty}`
                 : (isPartial ? `${item.scanned_qty} / ${item.qty}` : `0 / ${item.qty}`);
             const name = state.itemNames[item.sku.toLowerCase()] || '';
+            const components = item.is_bundle
+                ? `<div class="qc-bundle-components">
+                    <div class="qc-bundle-hint">Isi per bundle: ${esc(item.bundle_label || '-')} — scan barang fisiknya, bukan SKU bundle.</div>
+                    ${item.components.map(c => `<div class="qc-bundle-component ${c.scanned_qty >= c.required_qty ? 'done' : ''}">
+                        <span class="qc-mono">↳ ${esc(c.sku)}${c.name ? ' · ' + esc(c.name) : ''}</span>
+                        <strong>${c.scanned_qty} / ${c.required_qty}</strong>
+                    </div>`).join('')}
+                </div>`
+                : '';
 
-            return `<li class="qc-checklist-item ${cls}" data-sku="${esc(item.sku)}">
+            return `<li class="qc-checklist-item ${cls} ${item.is_bundle ? 'has-components' : ''}" data-sku="${esc(item.sku)}">
                 <span class="qc-check-icon">${icon}</span>
                 <span class="qc-sku-label qc-mono">${esc(item.sku)}</span>
+                ${item.is_bundle ? '<span class="qc-bundle-badge">BUNDLE</span>' : ''}
                 <span class="qc-sku-name">${esc(name)}</span>
                 <span class="qc-qty-badge ${badgeCls}">${qtyLabel}</span>
+                ${components}
             </li>`;
         }).join('');
     }
@@ -1193,11 +1280,7 @@
 
 
             state.resi      = json.resi;
-            state.checklist = (json.items || []).map(i => ({
-                sku: i.sku,
-                qty: i.qty,
-                scanned_qty: i.scanned_qty || 0,
-            }));
+            state.checklist = normalizeChecklist(json.items);
 
             // Load item names from current session
             if (state.session?.items) {
@@ -1344,9 +1427,25 @@
             return;
         }
 
-        // ── Validasi 1: SKU harus ada di checklist resi ──
-        const checkItem = state.checklist.find(i => i.sku.toLowerCase() === code.toLowerCase());
-        if (!checkItem) {
+        // ── Validasi 0: SKU bundle tidak bisa discan, yang discan barang fisiknya ──
+        const target = findScanTarget(code);
+        if (target.error === 'bundle') {
+            beep('err');
+            if (el.skuCode) el.skuCode.value = '';
+            notifyScanIssue({
+                target: el.skuStatus,
+                title: 'SKU Bundle Tidak Bisa Discan',
+                code,
+                detail: `${target.bundle.sku} adalah SKU bundle. Isi per bundle: ${target.bundle.bundle_label || '-'}.`,
+                action: 'Scan barang fisik komponennya satu per satu (atau isi qty).',
+                timer: 5600,
+            });
+            focusSku();
+            return;
+        }
+
+        // ── Validasi 1: SKU harus ada di checklist resi (langsung atau sebagai komponen bundle) ──
+        if (target.error === 'missing') {
             beep('err');
             if (el.skuCode) el.skuCode.value = '';
             notifyScanIssue({
@@ -1362,7 +1461,7 @@
         }
 
         // ── Validasi 2: SKU sudah selesai di-scan ──
-        if (checkItem.scanned_qty >= checkItem.qty) {
+        if (target.error === 'complete') {
             beep('err');
             if (el.skuCode) el.skuCode.value = '';
             notifyScanIssue({
@@ -1370,7 +1469,7 @@
                 icon: 'warning',
                 title: 'SKU Sudah Lengkap',
                 code,
-                detail: `Qty SKU ini sudah terpenuhi (${checkItem.qty}/${checkItem.qty}).`,
+                detail: 'Qty SKU ini sudah terpenuhi untuk resi ini.',
                 action: 'Jangan scan ulang. Lanjut ke SKU lain yang belum lengkap.',
                 timer: 4200,
             });
@@ -1398,32 +1497,48 @@
             state.session = json.session || null;
             renderSession();
 
-            // Update checklist scanned qty
-            checkItem.scanned_qty = Math.min(checkItem.qty, checkItem.scanned_qty + qty);
+            // Checklist terbaru dari server (termasuk progres komponen bundle)
+            if (Array.isArray(json.items)) {
+                state.checklist = normalizeChecklist(json.items);
+            } else if (target.direct) {
+                target.direct.scanned_qty = Math.min(target.direct.qty, target.direct.scanned_qty + qty);
+            }
             const sessionItem = state.session?.items?.find(i => i.sku?.toLowerCase() === code.toLowerCase());
             if (sessionItem?.name) state.itemNames[code.toLowerCase()] = sessionItem.name;
 
             updateProgress();
 
-            const sisaSetelahScan = checkItem.qty - checkItem.scanned_qty;
-            const skuSelesai      = sisaSetelahScan <= 0;
+            const scan = json.scan || null;
+            const isBundleScan = scan?.target === 'bundle';
+            const line = isBundleScan
+                ? state.checklist.find(i => String(i.sku).toLowerCase() === String(scan.bundle_sku || '').toLowerCase())
+                : state.checklist.find(i => !i.is_bundle && String(i.sku).toLowerCase() === code.toLowerCase());
+            const sisaSetelahScan = line ? Math.max(0, line.qty - line.scanned_qty) : 0;
+            const { total, done } = checklistProgress();
 
-            if (skuSelesai) {
+            if (total > 0 && done === total) {
+                // ── Notifikasi: Semua SKU di resi selesai ──
+                setStatus(el.skuStatus, `Resi ${state.resi?.no_resi || '-'} selesai. Siapkan resi berikutnya.`, 'ok');
+                beep('ok');
+                swalToast('success', 'Resi Selesai', 'Halaman kembali ke scan resi berikutnya.', 2200);
+                state.completionTimer = setTimeout(() => {
+                    goToPhase('scan-resi');
+                }, 900);
+            } else if (isBundleScan) {
+                const msg = scan.bundle_completed > 0
+                    ? `OK: ${code} +${qty} ✓  Bundle ${scan.bundle_sku} lengkap ${scan.bundle_scanned_qty}/${scan.bundle_required_qty}.`
+                    : `OK: ${code} +${qty} ✓  Komponen bundle ${scan.bundle_sku}: ${scan.component_scanned_qty}/${scan.component_required_qty}.`;
+                setStatus(el.skuStatus, msg, 'ok');
+                beep('ok');
+                if (scan.bundle_completed > 0 && sisaSetelahScan <= 0) {
+                    swalToast('success', 'Bundle Selesai', `Bundle "${scan.bundle_sku}" sudah lengkap.`, 2000);
+                }
+            } else if (line && sisaSetelahScan <= 0) {
                 // ── Notifikasi: SKU selesai ──
-                const doneMsg = `SKU "${code}" sudah selesai di-scan (${checkItem.qty} dari ${checkItem.qty} qty).`;
+                const doneMsg = `SKU "${code}" sudah selesai di-scan (${line.qty} dari ${line.qty} qty).`;
                 setStatus(el.skuStatus, doneMsg, 'ok');
                 beep('ok');
                 swalToast('success', 'SKU Selesai', doneMsg, 2000);
-
-                // ── Notifikasi: Semua SKU di resi selesai ──
-                const { total, done } = checklistProgress();
-                if (total > 0 && done === total) {
-                    setStatus(el.skuStatus, `Resi ${state.resi?.no_resi || '-'} selesai. Siapkan resi berikutnya.`, 'ok');
-                    swalToast('success', 'Resi Selesai', 'Halaman kembali ke scan resi berikutnya.', 2200);
-                    state.completionTimer = setTimeout(() => {
-                        goToPhase('scan-resi');
-                    }, 900);
-                }
             } else {
                 const msg = `OK: ${code} +${qty} ✓  (sisa perlu: ${sisaSetelahScan})`;
                 setStatus(el.skuStatus, msg, 'ok');
@@ -1460,16 +1575,18 @@
                 if (el.skuHint) el.skuHint.textContent = 'Scan 1 item fisik per kali scan. Qty default: 1.';
                 return;
             }
-            const item = state.checklist.find(i => i.sku.toLowerCase() === code.toLowerCase());
-            if (item) {
-                const remaining = item.qty - item.scanned_qty;
-                if (item.scanned_qty >= item.qty) {
-                    if (el.skuHint) el.skuHint.textContent = `✅ SKU ini sudah selesai (${item.qty}/${item.qty} qty).`;
-                } else {
-                    if (el.skuHint) el.skuHint.textContent = `SKU ada di resi — terscan: ${item.scanned_qty}/${item.qty}, sisa: ${remaining}. Max qty per scan: ${remaining}.`;
-                }
+            const target = findScanTarget(code);
+            if (!el.skuHint) return;
+            if (target.error === 'bundle') {
+                el.skuHint.textContent = `⚠ ${target.bundle.sku} adalah SKU bundle — scan barang fisiknya: ${target.bundle.bundle_label || 'komponen bundle'}.`;
+            } else if (target.error === 'missing') {
+                el.skuHint.textContent = '⚠ SKU ini tidak ada dalam resi yang dimuat — scan akan ditolak.';
+            } else if (target.error === 'complete') {
+                el.skuHint.textContent = '✅ SKU ini sudah selesai untuk resi ini.';
             } else {
-                if (el.skuHint) el.skuHint.textContent = '⚠ SKU ini tidak ada dalam resi yang dimuat — scan akan ditolak.';
+                const forBundles = target.components.map(row => row.bundle.sku);
+                const info = forBundles.length ? ` (komponen bundle ${[...new Set(forBundles)].join(', ')})` : '';
+                el.skuHint.textContent = `SKU ada di resi${info} — sisa perlu: ${target.remaining}.`;
             }
         }, 120);
     }
@@ -1485,14 +1602,7 @@
             tanggal_pesanan: row.tanggal_pesanan,
             kurir_name: row.kurir_name,
         };
-        state.checklist = (row.items || []).map(item => ({
-            sku: item.sku,
-            qty: Number(item.required_qty || 0),
-            scanned_qty: Number(item.scanned_qty || 0),
-        }));
-        (row.items || []).forEach(item => {
-            if (item.sku && item.name) state.itemNames[item.sku.toLowerCase()] = item.name;
-        });
+        state.checklist = normalizeChecklist(row.items, 'required_qty');
 
         el.dispNoResi.textContent = state.resi.no_resi || '-';
         el.dispIdPesanan.textContent = `ID Pesanan: ${state.resi.id_pesanan || '-'}`;

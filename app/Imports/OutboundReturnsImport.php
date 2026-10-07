@@ -3,6 +3,7 @@
 namespace App\Imports;
 
 use App\Models\Item;
+use App\Support\BundleService;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 use Maatwebsite\Excel\Concerns\SkipsEmptyRows;
@@ -117,6 +118,13 @@ class OutboundReturnsImport implements ToCollection, WithHeadingRow, SkipsEmptyR
                 'file' => implode(' | ', array_slice($errors, 0, 5)),
             ]);
         }
+
+        // Bundle reguler dipotong dari komponennya; stok gudang rusak tidak punya bundle.
+        BundleService::assertNotBundle(
+            collect($this->groups)->flatMap(fn ($group) => $group['items'])->where('stock_source', 'damaged')->pluck('item_id'),
+            'retur dari stok gudang rusak',
+            'file'
+        );
 
         foreach ($this->groups as $key => $group) {
             $items = array_values($group['items'] ?? []);

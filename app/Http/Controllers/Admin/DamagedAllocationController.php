@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Support\BundleService;
 use App\Models\DamagedAllocation;
 use App\Models\DamagedAllocationItem;
 use App\Models\Item;
@@ -403,6 +404,8 @@ class DamagedAllocationController extends Controller
 
         $validated['items'] = $items->all();
         $validated['transacted_at'] = Carbon::parse($validated['transacted_at']);
+
+        BundleService::assertNotBundle(collect($validated['items'])->pluck('item_id'), 'alokasi barang rusak');
 
         return $validated;
     }

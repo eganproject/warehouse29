@@ -10,6 +10,8 @@ use App\Models\PickingListException;
 use App\Models\PackerScanException;
 use App\Models\QcTransitItem;
 use App\Models\StockMutation;
+use App\Support\BundleService;
+use App\Support\PickingDemand;
 use App\Support\StockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -66,14 +68,21 @@ class PickingListController extends Controller
             $query->skip($start)->take($length);
         }
 
-        $data = $query->get()->map(function ($row) {
+        $rows = $query->get();
+        $sourcesByDate = [];
+        $data = $rows->map(function ($row) use (&$sourcesByDate) {
             $item = $row->item;
+            $date = $row->list_date?->format('Y-m-d');
+            if ($date && !isset($sourcesByDate[$date])) {
+                $sourcesByDate[$date] = PickingDemand::bundleSources($date);
+            }
             return [
-                'date' => $row->list_date?->format('Y-m-d') ?? '-',
+                'date' => $date ?? '-',
                 'sku' => $row->sku ?? '-',
                 'name' => $item?->name ?? '-',
                 'qty' => (int) $row->qty,
                 'remaining_qty' => (int) $row->remaining_qty,
+                'bundle_sources' => PickingDemand::sourcesLabel($sourcesByDate[$date][$row->sku] ?? []),
             ];
         });
 
@@ -212,7 +221,8 @@ class PickingListController extends Controller
                 $transit->save();
             }
 
-            StockService::mutate([
+            // Bundle: stok dikembalikan ke komponennya (bundle tidak punya stok fisik).
+            BundleService::mutateStock([
                 'item_id' => $item->id,
                 'direction' => 'in',
                 'qty' => $qty,
@@ -280,32 +290,9 @@ class PickingListController extends Controller
                 ->groupBy('rd.sku')
                 ->get();
 
-            $required = [];
-            foreach ($requiredRows as $row) {
-                $sku = trim((string) ($row->sku ?? ''));
-                $qty = (int) ($row->qty ?? 0);
-                if ($sku === '' || $qty <= 0) {
-                    continue;
-                }
-                $required[$sku] = $qty;
-            }
-
-            $pickedRows = DB::table('qc_transit_items as pt')
-                ->join('items as i', 'i.id', '=', 'pt.item_id')
-                ->whereDate('pt.transit_date', $listDate)
-                ->select('i.sku', DB::raw('SUM(pt.qty) as qty'))
-                ->groupBy('i.sku')
-                ->get();
-
-            $picked = [];
-            foreach ($pickedRows as $row) {
-                $sku = trim((string) ($row->sku ?? ''));
-                $qty = (int) ($row->qty ?? 0);
-                if ($sku === '' || $qty <= 0) {
-                    continue;
-                }
-                $picked[$sku] = $qty;
-            }
+            // Picking list berisi barang fisik: SKU bundle diterjemahkan ke komponennya.
+            $required = PickingDemand::physicalTotals($requiredRows);
+            $picked = PickingDemand::pickedTotals($listDate);
 
             $existingListSkus = PickingList::where('list_date', $listDate)->pluck('sku')->all();
             $existingExceptionSkus = PickingListException::where('list_date', $listDate)->pluck('sku')->all();
@@ -427,6 +414,13 @@ class PickingListController extends Controller
         $mode = $validated['mode'];
         $delta = $mode === 'reduce' ? -$qty : $qty;
 
+        $bundleId = Item::where('sku', $sku)->where('is_bundle', true)->value('id');
+        if ($bundleId) {
+            throw ValidationException::withMessages([
+                'sku' => "SKU {$sku} adalah item bundle. Picking list berisi barang fisik, gunakan SKU komponennya.",
+            ]);
+        }
+
         try {
             $row = DB::transaction(function () use ($listDate, $sku, $delta) {
                 $existing = PickingList::where('list_date', $listDate)
@@ -517,14 +511,7 @@ class PickingListController extends Controller
 
     private function getPickedQty(string $date, string $sku): int
     {
-        $itemId = Item::active()->where('sku', $sku)->value('id');
-        if (!$itemId) {
-            return 0;
-        }
-
-        return (int) QcTransitItem::where('item_id', $itemId)
-            ->where('transit_date', $date)
-            ->value('qty');
+        return PickingDemand::pickedQty($date, $sku);
     }
 
     private function syncPickingException(string $date, string $sku, int $exceptionQty): void
