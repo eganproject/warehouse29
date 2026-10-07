@@ -140,14 +140,18 @@
         flex: 0 0 auto;
     }
     .qc-bundle-components {
-        flex: 1 0 100%;
-        margin: 4px 0 0 26px;
-        padding-top: 4px;
+        flex: 1 1 100%;
+        min-width: 0;
+        box-sizing: border-box;
+        margin-top: 4px;
+        padding: 4px 0 0 26px;
         border-top: 1px dashed #e5e7eb;
         font-size: 12px;
     }
     .qc-bundle-components .qc-bundle-hint { color: #6d28d9; margin-bottom: 2px; }
-    .qc-bundle-component { display: flex; justify-content: space-between; gap: 8px; color: #334155; }
+    .qc-bundle-component { display: flex; justify-content: space-between; align-items: center; gap: 8px; color: #334155; }
+    .qc-bundle-component > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .qc-bundle-component > strong { flex: 0 0 auto; white-space: nowrap; }
     .qc-bundle-component.done { color: #15803d; }
     .qc-check-icon { font-size: 16px; flex: 0 0 auto; }
     .qc-sku-label { font-weight: 700; font-size: 13px; min-width: 90px; }
@@ -214,6 +218,10 @@
         padding: 14px 16px;
         margin-bottom: 16px;
     }
+
+    /* Kolom kiri boleh menyusut agar qty di kanan selalu terlihat. */
+    .qc-next-box > div:first-child { flex: 1 1 auto; min-width: 0; }
+    .qc-next-box .qty { flex: 0 0 auto; }
 
     .qc-next-box .label {
         color: #94a3b8;
@@ -933,6 +941,7 @@
     function updateNextBox() {
         const next = nextChecklistItem();
         if (!el.nextBox) return;
+        el.nextName.title = '';
 
         if (!next) {
             el.nextSku.textContent = 'SELESAI';
@@ -944,7 +953,8 @@
         const nextComponent = next.is_bundle ? nextBundleComponent(next) : null;
         if (nextComponent) {
             el.nextSku.textContent = nextComponent.sku || '-';
-            el.nextName.textContent = `Komponen bundle ${next.sku} (${next.bundle_label}). Jangan scan SKU bundle.`;
+            el.nextName.textContent = `Komponen bundle ${next.sku} (${next.bundle_label})`;
+            el.nextName.title = `Komponen bundle ${next.sku} (${next.bundle_label}). Jangan scan SKU bundle.`;
             el.nextQty.textContent = `${nextComponent.scanned_qty} / ${nextComponent.required_qty} | sisa ${Math.max(0, nextComponent.required_qty - nextComponent.scanned_qty)}`;
             return;
         }

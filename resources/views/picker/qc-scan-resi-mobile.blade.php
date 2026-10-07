@@ -209,6 +209,18 @@
     .bundle-component.done {
         color: #15803d;
     }
+    .bundle-component > strong,
+    .next-qty,
+    .qty-pill {
+        flex-shrink: 0;
+    }
+    /* Kolom teks boleh menyusut agar qty di kanan selalu terlihat. */
+    .next-box > div:first-child,
+    .check-row > div,
+    .bundle-component > span {
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
     .history-list {
         display: grid;
         gap: 8px;
