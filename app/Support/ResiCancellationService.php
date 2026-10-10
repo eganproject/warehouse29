@@ -214,80 +214,107 @@ class ResiCancellationService
             ->groupBy('item_id')
             ->map(fn ($rows) => (int) $rows->sum('scanned_qty'));
 
+        $qcDate = $qcResi->scanned_at?->toDateString();
         foreach ($items as $itemId => $qty) {
-            if ($scanOut) {
-                self::reverseConsumedTransit((int) $itemId, $qty, $scanOut->scan_date?->toDateString());
-            } else {
-                self::reverseAvailableTransit((int) $itemId, $qty, $qcResi->scanned_at?->toDateString());
-            }
+            self::reverseTransit((int) $itemId, $qty, $qcDate, $scanOut?->scan_date?->toDateString(), $scanOut !== null);
         }
     }
 
-    private static function reverseAvailableTransit(int $itemId, int $qty, ?string $preferredDate): void
+    /**
+     * Transit QC per (item, tanggal): qty = total yang di-QC pada tanggal itu, remaining = sisa yang
+     * belum discan out. Scan out memakai remaining FIFO lintas tanggal tanpa mencatat baris mana yang
+     * dipakai resi, jadi pembalikan cancel:
+     * - selalu mengurangi qty pada tanggal QC resi (tempat qty itu dulu ditambahkan), dan
+     * - mengurangi total remaining (belum scan out) atau mempertahankannya (sudah scan out),
+     *   dengan menyeimbangkan remaining pada tanggal lain bila baris tanggal QC tidak cukup.
+     */
+    private static function reverseTransit(int $itemId, int $qty, ?string $qcDate, ?string $scanDate, bool $scannedOut): void
     {
         $rows = QcTransitItem::where('item_id', $itemId)
-            ->where('remaining_qty', '>', 0)
-            ->orderByDesc('transit_date')
-            ->orderByDesc('id')
-            ->lockForUpdate()
-            ->get();
-
-        if ($preferredDate) {
-            $rows = $rows->sortByDesc(fn ($row) => $row->transit_date?->toDateString() === $preferredDate ? 1 : 0)->values();
-        }
-
-        $available = (int) $rows->sum(fn ($row) => min((int) $row->qty, (int) $row->remaining_qty));
-        if ($available < $qty) {
-            throw ValidationException::withMessages([
-                'resi' => "QC transit tidak mencukupi untuk reversal. Dibutuhkan {$qty}, tersedia {$available}.",
-            ]);
-        }
-
-        $need = $qty;
-        foreach ($rows as $row) {
-            if ($need <= 0) {
-                break;
-            }
-            $take = min($need, (int) $row->qty, (int) $row->remaining_qty);
-            if ($take <= 0) {
-                continue;
-            }
-            $row->qty -= $take;
-            $row->remaining_qty -= $take;
-            $need -= $take;
-            self::saveOrDeleteTransit($row);
-        }
-    }
-
-    private static function reverseConsumedTransit(int $itemId, int $qty, ?string $scanDate): void
-    {
-        $rows = QcTransitItem::where('item_id', $itemId)
-            ->when($scanDate, fn ($query) => $query->whereDate('transit_date', '<=', $scanDate))
-            ->whereColumn('qty', '>', 'remaining_qty')
             ->orderBy('transit_date')
             ->orderBy('id')
             ->lockForUpdate()
             ->get();
 
-        $consumed = (int) $rows->sum(fn ($row) => max(0, (int) $row->qty - (int) $row->remaining_qty));
-        if ($consumed < $qty) {
+        if ($scannedOut) {
+            $consumed = (int) $rows->sum(fn ($row) => max(0, (int) $row->qty - (int) $row->remaining_qty));
+            if ($consumed < $qty) {
+                throw ValidationException::withMessages([
+                    'resi' => "Riwayat konsumsi QC transit tidak mencukupi untuk reversal scan out. Dibutuhkan {$qty}, tersedia {$consumed}.",
+                ]);
+            }
+        } else {
+            $available = (int) $rows->sum(fn ($row) => min((int) $row->qty, (int) $row->remaining_qty));
+            if ($available < $qty) {
+                throw ValidationException::withMessages([
+                    'resi' => "QC transit tidak mencukupi untuk reversal. Dibutuhkan {$qty}, tersedia {$available}.",
+                ]);
+            }
+        }
+
+        $home = $qcDate ? $rows->first(fn ($row) => $row->transit_date?->toDateString() === $qcDate) : null;
+        $others = $rows->reject(fn ($row) => $home && (int) $row->id === (int) $home->id);
+        $qtyLeft = $qty;
+        // Perubahan total remaining yang masih harus diterapkan pada baris lain.
+        $remainingDelta = $scannedOut ? 0 : -$qty;
+
+        if ($home) {
+            $take = min($qtyLeft, (int) $home->qty);
+            $before = (int) $home->remaining_qty;
+            $home->qty -= $take;
+            $after = $scannedOut ? $before : max(0, $before - $qty);
+            $home->remaining_qty = min($after, (int) $home->qty);
+            $remainingDelta -= (int) $home->remaining_qty - $before;
+            $qtyLeft -= $take;
+        }
+
+        // Data lama: qty tanggal QC tidak cukup, sisanya diambil dari tanggal lain seperti sebelumnya.
+        if ($qtyLeft > 0) {
+            $fallback = $scannedOut
+                ? $others->filter(fn ($row) => !$scanDate || $row->transit_date?->toDateString() <= $scanDate)
+                : $others->reverse();
+            foreach ($fallback as $row) {
+                if ($qtyLeft <= 0) {
+                    break;
+                }
+                $capacity = $scannedOut
+                    ? max(0, (int) $row->qty - (int) $row->remaining_qty)
+                    : min((int) $row->qty, (int) $row->remaining_qty);
+                $take = min($qtyLeft, $capacity);
+                $row->qty -= $take;
+                if (!$scannedOut) {
+                    $row->remaining_qty -= $take;
+                    $remainingDelta += $take;
+                }
+                $qtyLeft -= $take;
+            }
+        }
+
+        foreach ($others->reverse() as $row) {
+            if ($remainingDelta === 0) {
+                break;
+            }
+            if ($remainingDelta < 0) {
+                $take = min(-$remainingDelta, (int) $row->remaining_qty);
+                $row->remaining_qty -= $take;
+                $remainingDelta += $take;
+            } else {
+                $take = min($remainingDelta, max(0, (int) $row->qty - (int) $row->remaining_qty));
+                $row->remaining_qty += $take;
+                $remainingDelta -= $take;
+            }
+        }
+
+        if ($qtyLeft > 0 || $remainingDelta !== 0) {
             throw ValidationException::withMessages([
-                'resi' => "Riwayat konsumsi QC transit tidak mencukupi untuk reversal scan out. Dibutuhkan {$qty}, tersedia {$consumed}.",
+                'resi' => 'Data QC transit tidak konsisten untuk reversal. Cancel memerlukan pemeriksaan manual.',
             ]);
         }
 
-        $need = $qty;
         foreach ($rows as $row) {
-            if ($need <= 0) {
-                break;
+            if ($row->isDirty()) {
+                self::saveOrDeleteTransit($row);
             }
-            $take = min($need, max(0, (int) $row->qty - (int) $row->remaining_qty));
-            if ($take <= 0) {
-                continue;
-            }
-            $row->qty -= $take;
-            $need -= $take;
-            self::saveOrDeleteTransit($row);
         }
     }
 

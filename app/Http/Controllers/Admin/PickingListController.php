@@ -7,6 +7,7 @@ use App\Exports\PickingListExport;
 use App\Models\Item;
 use App\Models\PickingList;
 use App\Models\PickingListException;
+use App\Models\PickingListReturn;
 use App\Models\PackerScanException;
 use App\Models\QcTransitItem;
 use App\Models\StockMutation;
@@ -167,7 +168,7 @@ class PickingListController extends Controller
                 ]);
             }
 
-            $exception = PickingListException::where('list_date', $listDate)
+            $exception = PickingListException::whereDate('list_date', $listDate)
                 ->where('sku', $sku)
                 ->lockForUpdate()
                 ->first();
@@ -193,7 +194,7 @@ class PickingListController extends Controller
             }
 
             $transit = QcTransitItem::where('item_id', $item->id)
-                ->where('transit_date', $listDate)
+                ->whereDate('transit_date', $listDate)
                 ->lockForUpdate()
                 ->first();
 
@@ -212,6 +213,14 @@ class PickingListController extends Controller
             } else {
                 $exception->save();
             }
+
+            // Barang yang diretur tidak lagi dihitung "sudah diambil" pada picking list tanggal ini.
+            PickingListReturn::create([
+                'list_date' => $listDate,
+                'sku' => $item->sku,
+                'qty' => $qty,
+                'created_by' => auth()->id(),
+            ]);
 
             $transit->qty = max(0, (int) $transit->qty - $qty);
             $transit->remaining_qty = max(0, (int) $transit->remaining_qty - $qty);

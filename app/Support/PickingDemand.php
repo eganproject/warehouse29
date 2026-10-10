@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\DB;
  * (BNDL01 x3 -> TRIP1 x30) dan digabung dengan SKU yang sama yang dipesan langsung.
  *
  * Transit QC tetap dicatat per SKU resi (bundle) karena dipakai scan out, jadi qty
- * "sudah diambil" untuk komponen dihitung dari progres scan komponen QC bundle.
+ * "sudah diambil" dihitung dari catatan scan QC: baris item biasa dan progres scan komponen bundle.
  */
 class PickingDemand
 {
@@ -69,24 +69,32 @@ class PickingDemand
         return $totals;
     }
 
-    /** Qty barang fisik yang sudah diambil (QC) untuk SKU pada tanggal picking list. */
+    /**
+     * Qty barang fisik yang sudah diambil (QC) untuk SKU pada tanggal picking list.
+     *
+     * Dihitung dari catatan scan QC resi aktif (sumber yang sama dengan pemotongan picking list
+     * saat scan), dikurangi retur exception. Tidak memakai qty transit karena transit adalah
+     * pool scan out lintas tanggal dan bisa bergeser saat pembalikan cancel.
+     */
     public static function pickedQty(string $date, string $sku): int
     {
-        $item = Item::where('sku', $sku)->first(['id', 'is_bundle']);
+        $item = Item::where('sku', $sku)->first(['id', 'sku', 'is_bundle']);
         if (!$item) {
             return 0;
         }
 
-        $direct = (int) QcTransitItem::where('item_id', $item->id)
-            ->whereDate('transit_date', $date)
-            ->value('qty');
         if ($item->is_bundle) {
-            return $direct;
+            // Baris bundle lama pada picking list (sebelum picking list berisi barang fisik).
+            return (int) QcTransitItem::where('item_id', $item->id)
+                ->whereDate('transit_date', $date)
+                ->sum('qty');
         }
 
-        return $direct + (int) self::componentPickedQuery($date)
-            ->where('c.component_item_id', $item->id)
-            ->sum('c.scanned_qty');
+        $picked = (int) self::directPickedQuery($date)->where('qi.item_id', $item->id)->sum('qi.scanned_qty')
+            + (int) self::componentPickedQuery($date)->where('c.component_item_id', $item->id)->sum('c.scanned_qty')
+            - (int) DB::table('picking_list_returns')->whereDate('list_date', $date)->where('sku', $item->sku)->sum('qty');
+
+        return max(0, $picked);
     }
 
     /** @return array<string,int> [sku fisik => qty sudah diambil] */
@@ -94,13 +102,9 @@ class PickingDemand
     {
         $picked = [];
 
-        $direct = DB::table('qc_transit_items as t')
-            ->join('items as i', 'i.id', '=', 't.item_id')
-            ->whereDate('t.transit_date', $date)
-            // Transit bundle sudah tercermin lewat komponennya.
-            ->where('i.is_bundle', false)
+        $direct = self::directPickedQuery($date)
             ->groupBy('i.sku')
-            ->get(['i.sku', DB::raw('SUM(t.qty) as qty')]);
+            ->get(['i.sku', DB::raw('SUM(qi.scanned_qty) as qty')]);
         foreach ($direct as $row) {
             $picked[$row->sku] = ($picked[$row->sku] ?? 0) + (int) $row->qty;
         }
@@ -111,6 +115,15 @@ class PickingDemand
             ->get(['ci.sku', DB::raw('SUM(c.scanned_qty) as qty')]);
         foreach ($components as $row) {
             $picked[$row->sku] = ($picked[$row->sku] ?? 0) + (int) $row->qty;
+        }
+
+        $returns = DB::table('picking_list_returns')
+            ->whereDate('list_date', $date)
+            ->groupBy('sku')
+            ->get(['sku', DB::raw('SUM(qty) as qty')]);
+        foreach ($returns as $row) {
+            $key = self::matchSkuKey($picked, (string) $row->sku);
+            $picked[$key] = ($picked[$key] ?? 0) - (int) $row->qty;
         }
 
         return array_filter($picked, fn ($qty) => $qty > 0);
@@ -166,15 +179,41 @@ class PickingDemand
             ->implode(', ');
     }
 
+    /** Baris QC item biasa (bukan bundle) dari resi aktif yang di-QC pada tanggal tersebut. */
+    private static function directPickedQuery(string $date)
+    {
+        return self::activeQcQuery($date)
+            ->join('qc_scan_resi_items as qi', 'qi.qc_scan_resi_id', '=', 'q.id')
+            ->join('items as i', 'i.id', '=', 'qi.item_id')
+            // Bundle tercermin lewat scan komponennya.
+            ->where('i.is_bundle', false);
+    }
+
     private static function componentPickedQuery(string $date)
     {
-        return DB::table('qc_scan_resi_bundle_components as c')
-            ->join('qc_scan_resi_items as qi', 'qi.id', '=', 'c.qc_scan_resi_item_id')
-            ->join('qc_scan_resis as q', 'q.id', '=', 'qi.qc_scan_resi_id')
+        return self::activeQcQuery($date)
+            ->join('qc_scan_resi_items as qi', 'qi.qc_scan_resi_id', '=', 'q.id')
+            ->join('qc_scan_resi_bundle_components as c', 'c.qc_scan_resi_item_id', '=', 'qi.id');
+    }
+
+    private static function activeQcQuery(string $date)
+    {
+        return DB::table('qc_scan_resis as q')
             ->join('resis as r', 'r.id', '=', 'q.resi_id')
             ->whereDate('q.scanned_at', $date)
             // Resi batal: stok & transitnya sudah dibalik, jadi tidak dihitung sebagai diambil.
             ->where(fn ($q) => $q->whereNull('r.status')->orWhere('r.status', '!=', 'canceled'));
+    }
+
+    private static function matchSkuKey(array $totals, string $sku): string
+    {
+        foreach (array_keys($totals) as $key) {
+            if (strcasecmp((string) $key, $sku) === 0) {
+                return (string) $key;
+            }
+        }
+
+        return $sku;
     }
 
     private static function packerExceptionLookup(): array
