@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\PackerScanOut;
 use App\Models\Resi;
 use App\Models\User;
+use App\Support\TokoFilter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -27,6 +28,7 @@ class PackerReportController extends Controller
         return view('admin.outbound.packer-reports.index', [
             'dataUrl' => route('admin.reports.packer-reports.data'),
             'packers' => $packers,
+            'tokos' => TokoFilter::tokoOptions(),
             'today' => now()->toDateString(),
         ]);
     }
@@ -50,6 +52,9 @@ class PackerReportController extends Controller
         if ($packerId) {
             $query->where('ps.scanned_by', $packerId);
         }
+
+        $tokoId = TokoFilter::fromRequest($request);
+        TokoFilter::applyViaResi($query, 'ps.resi_id', $tokoId);
 
         $dateFrom = $this->parseDate($request->input('date_from'));
         $dateTo = $this->parseDate($request->input('date_to'));
@@ -89,7 +94,7 @@ class PackerReportController extends Controller
             ];
         });
 
-        $comparison = $this->buildComparisonData($dateFrom, $dateTo);
+        $comparison = $this->buildComparisonData($dateFrom, $dateTo, $tokoId);
 
         return response()->json([
             'data' => $data,
@@ -109,9 +114,10 @@ class PackerReportController extends Controller
         }
     }
 
-    private function buildComparisonData(?string $dateFrom, ?string $dateTo): array
+    private function buildComparisonData(?string $dateFrom, ?string $dateTo, int|string|null $tokoId = null): array
     {
         $resiQuery = Resi::query();
+        TokoFilter::apply($resiQuery, $tokoId, 'resis.toko_id');
         if ($dateFrom) {
             $resiQuery->whereDate('tanggal_upload', '>=', $dateFrom);
         }
@@ -138,7 +144,9 @@ class PackerReportController extends Controller
         $missingBase = (clone $activeResiQuery)
             ->leftJoin('packer_scan_outs as ps', 'ps.resi_id', '=', 'resis.id')
             ->whereNull('ps.id')
-            ->select('resis.id_pesanan', 'resis.no_resi', 'resis.tanggal_upload');
+            ->leftJoin('tokos as t', 't.id', '=', 'resis.toko_id')
+            ->leftJoin('channels as c', 'c.id', '=', 'resis.channel_id')
+            ->select('resis.id_pesanan', 'resis.no_resi', 'resis.tanggal_upload', 't.name as toko_name', 'c.name as channel_name');
 
         $missingTotal = (clone $missingBase)->count();
         $missingSamples = (clone $missingBase)
@@ -149,6 +157,8 @@ class PackerReportController extends Controller
                 return [
                     'id_pesanan' => (string) ($row->id_pesanan ?? '-'),
                     'no_resi' => (string) ($row->no_resi ?? '-'),
+                    'toko' => (string) ($row->toko_name ?? '-'),
+                    'channel' => (string) ($row->channel_name ?? '-'),
                     'tanggal_upload' => $row->tanggal_upload
                         ? Carbon::parse($row->tanggal_upload)->format('Y-m-d')
                         : '-',
@@ -161,6 +171,43 @@ class PackerReportController extends Controller
             'missing_total' => $missingTotal,
             'canceled_total' => $canceledTotal,
             'missing_samples' => $missingSamples,
+            'per_toko' => $this->perTokoBreakdown($resiQuery),
         ];
+    }
+
+    /**
+     * Rekap import vs scan out per toko, diurutkan dari sisa terbanyak.
+     */
+    private function perTokoBreakdown($resiQuery): array
+    {
+        $scanned = DB::table('packer_scan_outs')->select('resi_id')->distinct();
+        $active = "(resis.status IS NULL OR resis.status != 'canceled')";
+
+        return (clone $resiQuery)
+            ->toBase()
+            ->leftJoin('tokos as t', 't.id', '=', 'resis.toko_id')
+            ->leftJoinSub($scanned, 'pso', 'pso.resi_id', '=', 'resis.id')
+            ->groupBy('resis.toko_id', 't.name')
+            ->select('resis.toko_id', 't.name as toko_name')
+            ->selectRaw("SUM(CASE WHEN {$active} THEN 1 ELSE 0 END) as import_total")
+            ->selectRaw("SUM(CASE WHEN {$active} AND pso.resi_id IS NOT NULL THEN 1 ELSE 0 END) as scanned_total")
+            ->selectRaw("SUM(CASE WHEN resis.status = 'canceled' THEN 1 ELSE 0 END) as canceled_total")
+            ->get()
+            ->map(function ($row) {
+                $import = (int) $row->import_total;
+                $scanned = (int) $row->scanned_total;
+
+                return [
+                    'toko' => $row->toko_id ? ($row->toko_name ?? 'Toko #'.$row->toko_id) : 'Tanpa Toko',
+                    'import_total' => $import,
+                    'scanned_total' => $scanned,
+                    'missing_total' => max(0, $import - $scanned),
+                    'canceled_total' => (int) $row->canceled_total,
+                    'completion_rate' => $import > 0 ? round($scanned / $import * 100, 1) : 0,
+                ];
+            })
+            ->sortBy([['missing_total', 'desc'], ['import_total', 'desc'], ['toko', 'asc']])
+            ->values()
+            ->all();
     }
 }

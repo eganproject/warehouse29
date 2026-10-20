@@ -44,6 +44,7 @@
                         <option value="{{ $packer->id }}">{{ $packer->name }}</option>
                     @endforeach
                 </select>
+                @include('admin.partials.toko-filter', ['tokos' => $tokos, 'id' => 'filter_toko', 'class' => 'w-200px'])
                 <button type="button" class="btn btn-light" id="filter_apply">Terapkan</button>
                 <button type="button" class="btn btn-light" id="filter_reset">Reset</button>
             </div>
@@ -151,18 +152,40 @@
                     </div>
                 </div>
             </div>
+            <div class="mb-6">
+                <div class="fw-bold fs-6 mb-2">Rekap per Toko</div>
+                <div class="table-responsive">
+                    <table class="table table-row-dashed align-middle fs-7 gy-3 mb-0">
+                        <thead>
+                            <tr class="text-start text-gray-400 fw-bolder fs-8 text-uppercase gs-0">
+                                <th>Toko</th>
+                                <th class="text-end">Import (Aktif)</th>
+                                <th class="text-end">Sudah Scan Out</th>
+                                <th class="text-end">Sisa</th>
+                                <th class="text-end">Cancel</th>
+                                <th class="text-end">Penyelesaian</th>
+                            </tr>
+                        </thead>
+                        <tbody id="per_toko_body">
+                            <tr><td colspan="6" class="text-center text-muted py-4">Belum ada data.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="fw-bold fs-6 mb-2">Resi Belum Scan Out</div>
             <div class="table-responsive">
                 <table class="table table-row-dashed align-middle">
                     <thead>
                         <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
-                            <th width="35%">ID Pesanan</th>
-                            <th width="35%">No Resi</th>
-                            <th width="30%">Tanggal Upload</th>
+                            <th width="25%">ID Pesanan</th>
+                            <th width="25%">No Resi</th>
+                            <th width="30%">Toko</th>
+                            <th width="20%">Tanggal Upload</th>
                         </tr>
                     </thead>
                     <tbody id="missing_transit_body">
                         <tr>
-                            <td colspan="3" class="text-center text-muted py-6" id="missing_transit_empty">
+                            <td colspan="4" class="text-center text-muted py-6" id="missing_transit_empty">
                                 Tidak ada data tertinggal.
                             </td>
                         </tr>
@@ -218,6 +241,9 @@
         const dateFromEl = document.getElementById('filter_date_from');
         const dateToEl = document.getElementById('filter_date_to');
         const packerSelect = document.getElementById('filter_packer');
+        const tokoSelect = document.getElementById('filter_toko');
+        const perTokoBody = document.getElementById('per_toko_body');
+        const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (m) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
         const searchInput = document.querySelector('[data-kt-filter="search"]');
         const applyBtn = document.getElementById('filter_apply');
         const resetBtn = document.getElementById('filter_reset');
@@ -274,15 +300,16 @@
             if (!paginated.length) {
                 missingBody.innerHTML = `
                     <tr>
-                        <td colspan="3" class="text-center text-muted py-6">Tidak ada data tertinggal.</td>
+                        <td colspan="4" class="text-center text-muted py-6">Tidak ada data tertinggal.</td>
                     </tr>
                 `;
             } else {
                 missingBody.innerHTML = paginated.map((sample) => `
                     <tr>
-                        <td>${sample.id_pesanan || '-'}</td>
-                        <td>${sample.no_resi || '-'}</td>
-                        <td>${sample.tanggal_upload || '-'}</td>
+                        <td>${esc(sample.id_pesanan || '-')}</td>
+                        <td>${esc(sample.no_resi || '-')}</td>
+                        <td>${esc(sample.toko || '-')}${sample.channel && sample.channel !== '-' ? `<div class="text-muted fs-8">${esc(sample.channel)}</div>` : ''}</td>
+                        <td>${esc(sample.tanggal_upload || '-')}</td>
                     </tr>
                 `).join('');
             }
@@ -317,6 +344,26 @@
                 : [];
             comparisonState.page = 1;
             renderMissingRows();
+            renderPerToko(Array.isArray(comparison?.per_toko) ? comparison.per_toko : []);
+        };
+
+        const renderPerToko = (rows) => {
+            if (!perTokoBody) return;
+            if (!rows.length) {
+                perTokoBody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">Belum ada data.</td></tr>';
+                return;
+            }
+            const fmt = (v) => Number(v || 0).toLocaleString('id-ID');
+            perTokoBody.innerHTML = rows.map((row) => `
+                <tr>
+                    <td class="fw-semibold">${esc(row.toko)}</td>
+                    <td class="text-end">${fmt(row.import_total)}</td>
+                    <td class="text-end text-success">${fmt(row.scanned_total)}</td>
+                    <td class="text-end fw-bold ${Number(row.missing_total) > 0 ? 'text-warning' : 'text-success'}">${fmt(row.missing_total)}</td>
+                    <td class="text-end text-danger">${fmt(row.canceled_total)}</td>
+                    <td class="text-end">${esc(row.completion_rate)}%</td>
+                </tr>
+            `).join('');
         };
 
         const dt = tableEl.DataTable({
@@ -335,6 +382,7 @@
                     params.date_from = dateFromEl?.value || '';
                     params.date_to = dateToEl?.value || '';
                     params.packer_id = packerSelect?.value || '';
+                    params.toko_id = tokoSelect?.value || '';
                     params.q = searchInput?.value || '';
                 }
             },
@@ -363,6 +411,7 @@
         });
 
         packerSelect?.addEventListener('change', reloadTable);
+        tokoSelect?.addEventListener('change', reloadTable);
 
         searchInput?.addEventListener('keyup', (e) => {
             if (e.key === 'Enter') {
@@ -374,6 +423,7 @@
             if (fpFrom) fpFrom.clear(); else if (dateFromEl) dateFromEl.value = todayStr || '';
             if (fpTo) fpTo.clear(); else if (dateToEl) dateToEl.value = todayStr || '';
             if (packerSelect) packerSelect.value = '';
+            if (tokoSelect) tokoSelect.value = '';
             if (searchInput) searchInput.value = '';
             reloadTable();
         });

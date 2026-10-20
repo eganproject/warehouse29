@@ -43,7 +43,7 @@ class QcScanPerformanceDataSheet implements FromCollection, WithColumnWidths, Wi
                 'Rata-rata Durasi (menit)',
             ],
             'detail' => [
-                'Tanggal', 'Akun QC', 'No. Resi', 'ID Pesanan', 'Status', 'Waktu Scan',
+                'Tanggal', 'Akun QC', 'No. Resi', 'ID Pesanan', 'Toko', 'Channel', 'Status', 'Waktu Scan',
                 'Waktu Selesai', 'Durasi (menit)', 'Baris SKU', 'Qty Discan', 'Qty Wajib', 'Pemenuhan Qty (%)',
             ],
             default => [
@@ -77,7 +77,7 @@ class QcScanPerformanceDataSheet implements FromCollection, WithColumnWidths, Wi
     public function columnWidths(): array
     {
         if ($this->type === 'detail') {
-            return ['A' => 14, 'B' => 24, 'C' => 24, 'D' => 22, 'E' => 16, 'F' => 19, 'G' => 19, 'H' => 16, 'I' => 12, 'J' => 13, 'K' => 13, 'L' => 19];
+            return ['A' => 14, 'B' => 24, 'C' => 24, 'D' => 22, 'E' => 24, 'F' => 16, 'G' => 16, 'H' => 19, 'I' => 19, 'J' => 16, 'K' => 12, 'L' => 13, 'M' => 13, 'N' => 19];
         }
         if ($this->type === 'hourly') {
             return ['A' => 14, 'B' => 24, 'C' => 18, 'D' => 13, 'E' => 12, 'F' => 15, 'G' => 18, 'H' => 12, 'I' => 13, 'J' => 13, 'K' => 19, 'L' => 24];
@@ -183,6 +183,8 @@ class QcScanPerformanceDataSheet implements FromCollection, WithColumnWidths, Wi
                     $row->petugas,
                     $row->no_resi ?? '-',
                     $row->id_pesanan ?? '-',
+                    $row->toko_name ?? '-',
+                    $row->channel_name ?? '-',
                     $row->status === 'completed' ? 'Selesai' : 'Belum Selesai',
                     $row->scanned_at ? Carbon::parse($row->scanned_at)->format('d-m-Y H:i:s') : '-',
                     $row->completed_at ? Carbon::parse($row->completed_at)->format('d-m-Y H:i:s') : '-',

@@ -26,6 +26,7 @@ class InboundReturnsExport implements WithMultipleSheets
             new InboundReturnsReasonAnalysisSheet($transactions),
             new InboundReturnsDailyTrendSheet($transactions),
             new InboundReturnsCourierAnalysisSheet($transactions),
+            new InboundReturnsTokoAnalysisSheet($transactions),
         ];
     }
 
@@ -36,6 +37,8 @@ class InboundReturnsExport implements WithMultipleSheets
                 'items.item',
                 'items.returnReason',
                 'resi.kurir',
+                'resi.toko',
+                'resi.channel',
                 'creator',
                 'approver',
                 'finalizer',
@@ -53,7 +56,8 @@ class InboundReturnsExport implements WithMultipleSheets
                     ->orWhere('note', 'like', "%{$search}%")
                     ->orWhereHas('resi', function ($resiQuery) use ($search) {
                         $resiQuery->where('no_resi', 'like', "%{$search}%")
-                            ->orWhere('id_pesanan', 'like', "%{$search}%");
+                            ->orWhere('id_pesanan', 'like', "%{$search}%")
+                            ->orWhereHas('toko', fn ($tokoQuery) => $tokoQuery->where('name', 'like', "%{$search}%"));
                     })
                     ->orWhereHas('creator', fn ($userQuery) => $userQuery->where('name', 'like', "%{$search}%"))
                     ->orWhereHas('items', function ($itemLineQuery) use ($search) {

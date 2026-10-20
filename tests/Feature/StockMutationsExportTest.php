@@ -96,7 +96,7 @@ class StockMutationsExportTest extends TestCase
             $this->assertStringNotContainsString("PK\x06\x07", $binary, 'XLSX tidak boleh memakai ZIP64 locator.');
 
             $spreadsheet = IOFactory::load($temporaryFile);
-            $this->assertSame(['Ringkasan', 'Rekap Sumber', 'Detail Mutasi'], $spreadsheet->getSheetNames());
+            $this->assertSame(['Ringkasan', 'Rekap Sumber', 'Rekap Toko', 'Detail Mutasi'], $spreadsheet->getSheetNames());
 
             $summarySheet = $spreadsheet->getSheetByName('Ringkasan');
             $this->assertSame('Laporan Mutasi Stok', (string) $summarySheet->getCell('B2')->getValue());
@@ -128,7 +128,7 @@ class StockMutationsExportTest extends TestCase
             $this->assertSame('FFFFFFFF', $detailSheet->getStyle('A1')->getFont()->getColor()->getARGB());
             $this->assertSame('FF1F4E78', $detailSheet->getStyle('A1')->getFill()->getStartColor()->getARGB());
             $this->assertSame('A2', $detailSheet->getFreezePane());
-            $this->assertSame('A1:T3', $detailSheet->getAutoFilter()->getRange());
+            $this->assertSame('A1:V3', $detailSheet->getAutoFilter()->getRange());
             $this->assertSame(32.0, $detailSheet->getColumnDimension('E')->getWidth());
         } finally {
             if (isset($spreadsheet)) {

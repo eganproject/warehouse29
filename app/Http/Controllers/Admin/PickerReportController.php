@@ -8,6 +8,7 @@ use App\Models\Divisi;
 use App\Models\QcScanResi;
 use App\Models\User;
 use App\Support\QcScanPerformanceReport;
+use App\Support\TokoFilter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -28,6 +29,7 @@ class PickerReportController extends Controller
             'dataUrl' => route('admin.outbound.picker-reports.data'),
             'exportUrl' => route('admin.outbound.picker-reports.export'),
             'divisis' => $divisis,
+            'tokos' => TokoFilter::tokoOptions(),
             'today' => now()->toDateString(),
             'generatedBy' => $authUser?->name ?? '-',
         ]);
@@ -148,14 +150,18 @@ class PickerReportController extends Controller
             }
         }
 
+        $tokoId = TokoFilter::fromRequest($request);
         $qcResis = QcScanResi::query()
             ->with([
-                'resi:id,no_resi,id_pesanan',
+                'resi:id,no_resi,id_pesanan,toko_id,channel_id',
+                'resi.toko:id,name',
+                'resi.channel:id,name',
                 'items:id,qc_scan_resi_id,item_id,sku,required_qty,scanned_qty',
                 'items.item:id,name',
             ])
             ->where('scanned_by', $userId)
             ->whereDate('scanned_at', $date)
+            ->tap(fn ($query) => TokoFilter::applyViaResi($query, 'resi_id', $tokoId))
             ->orderBy('scanned_at')
             ->get();
 
@@ -170,6 +176,8 @@ class PickerReportController extends Controller
             return [
                 'no_resi' => $qc->resi?->no_resi ?? '-',
                 'id_pesanan' => $qc->resi?->id_pesanan ?? '-',
+                'toko' => $qc->resi?->toko?->name ?? '-',
+                'channel' => $qc->resi?->channel?->name ?? '-',
                 'status' => $qc->status,
                 'scanned_at' => $qc->scanned_at ? Carbon::parse($qc->scanned_at)->format('H:i') : '-',
                 'completed_at' => $qc->completed_at ? Carbon::parse($qc->completed_at)->format('H:i') : '-',
@@ -241,6 +249,7 @@ class PickerReportController extends Controller
             'divisi_id' => $request->integer('divisi_id') ?: null,
             'date_from' => $request->input('date_from'),
             'date_to' => $request->input('date_to'),
+            'toko_id' => TokoFilter::fromRequest($request),
         ];
     }
 }

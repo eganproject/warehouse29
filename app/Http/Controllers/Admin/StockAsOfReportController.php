@@ -7,6 +7,7 @@ use App\Exports\StockMovementAnalysisExport;
 use App\Http\Controllers\Controller;
 use App\Models\Category;
 use App\Support\StockPeriodReport;
+use App\Support\TokoFilter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Maatwebsite\Excel\Facades\Excel;
@@ -25,6 +26,7 @@ class StockAsOfReportController extends Controller
             'rows' => $report->ordered($filters)->paginate($filters['per_page'])->appends($filters),
             'categories' => Category::orderBy('name')->get(['id', 'name']),
             'movements' => StockPeriodReport::MOVEMENTS,
+            'tokos' => TokoFilter::tokoOptions(),
         ]);
     }
 
@@ -71,6 +73,7 @@ class StockAsOfReportController extends Controller
             'status' => ['nullable', 'in:positive,zero,negative,low'],
             'movement' => ['nullable', 'in:fast,medium,slow,non'],
             'per_page' => ['nullable', 'integer', 'in:10,25,50,100'],
+            'toko_id' => ['nullable', 'regex:/^(none|[0-9]+)$/'],
         ]);
         $end = $values['date_to'] ?? $values['as_of_date'] ?? now()->toDateString();
         $filters = [
@@ -83,6 +86,7 @@ class StockAsOfReportController extends Controller
             'status' => $values['status'] ?? '',
             'movement' => $values['movement'] ?? '',
             'per_page' => (int) ($values['per_page'] ?? 25),
+            'toko_id' => (string) ($values['toko_id'] ?? ''),
         ];
         validator($filters, [
             'date_to' => ['after_or_equal:date_from', 'before_or_equal:'.Carbon::parse($filters['date_from'])->addDays(365)->toDateString()],

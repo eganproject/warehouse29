@@ -11,7 +11,9 @@ use App\Models\PickerSession;
 use App\Models\QcScanResi;
 use App\Models\StockMutation;
 use App\Models\StockOpname;
+use App\Support\StockMutationToko;
 use App\Support\StreamingXlsxWriter;
+use App\Support\TokoFilter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
@@ -21,7 +23,9 @@ class StockMutationController extends Controller
 {
     public function index()
     {
-        return view('admin.inventory.stock-mutations.index');
+        return view('admin.inventory.stock-mutations.index', [
+            'tokos' => TokoFilter::tokoOptions(),
+        ]);
     }
 
     public function data(Request $request)
@@ -48,6 +52,7 @@ class StockMutationController extends Controller
         }
 
         $this->applyDateFilter($query, $request);
+        StockMutationToko::applyFilter($query, 'stock_mutations', 'stock_mutations.id', TokoFilter::fromRequest($request));
 
         $recordsTotal = StockMutation::count();
         $recordsFiltered = (clone $query)->count();
@@ -62,7 +67,11 @@ class StockMutationController extends Controller
             $query->skip($start)->take($length);
         }
 
-        $data = $query->get()->map(function ($m) {
+        $mutations = $query->get();
+        $tokos = StockMutationToko::namesFor('stock_mutations', $mutations->pluck('id'));
+
+        $data = $mutations->map(function ($m) use ($tokos) {
+            $toko = $tokos->get($m->id);
             $itemLabel = trim(($m->item?->sku ?? '').' - '.($m->item?->name ?? ''));
             $ts = $m->occurred_at ? Carbon::parse($m->occurred_at)->format('Y-m-d H:i') : '';
             $direction = $m->direction === 'in' ? 'IN' : 'OUT';
@@ -78,6 +87,8 @@ class StockMutationController extends Controller
                 'stock_after' => $m->stockAfterValue(),
                 'source' => trim($source),
                 'source_code' => $m->source_code ?? '',
+                'toko' => $toko ? ($toko->toko ?? 'Tanpa Toko') : '-',
+                'channel' => $toko?->channel ?? '-',
                 'note' => $m->note ?? '',
             ];
         });
@@ -103,7 +114,7 @@ class StockMutationController extends Controller
         $filename = 'stock-mutations-'.now()->format('YmdHis').'.xlsx';
 
         try {
-            $export = new StockMutationsExport($search, $dateFrom, $dateTo);
+            $export = new StockMutationsExport($search, $dateFrom, $dateTo, TokoFilter::fromRequest($request));
 
             return $writer->downloadWorkbook(
                 $filename,
@@ -155,6 +166,7 @@ class StockMutationController extends Controller
     {
         $mutation = StockMutation::with(['item', 'creator'])->findOrFail($id);
         [$sourceSummary, $sourceItems] = $this->resolveSource($mutation);
+        $toko = StockMutationToko::namesFor('stock_mutations', [$mutation->id])->get($mutation->id);
 
         $itemLabel = trim(($mutation->item?->sku ?? '').' - '.($mutation->item?->name ?? ''));
         $direction = $mutation->direction === 'in' ? 'IN' : 'OUT';
@@ -173,6 +185,8 @@ class StockMutationController extends Controller
                 'source_code' => $mutation->source_code ?? '',
                 'note' => $mutation->note ?? '',
                 'user' => $mutation->creator?->name ?? '-',
+                'toko' => $toko ? ($toko->toko ?? 'Tanpa Toko') : '-',
+                'channel' => $toko?->channel ?? '-',
             ],
             'source' => $sourceSummary ? array_merge($sourceSummary, ['items' => $sourceItems]) : null,
         ]);

@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Category;
+use App\Support\StockMutationToko;
+use App\Support\TokoFilter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -14,6 +16,7 @@ class AnalyticsReportController extends Controller
     {
         return view('admin.reports.stock-mutations.index', [
             'dataUrl' => route('admin.reports.stock-mutations.data'),
+            'tokos' => TokoFilter::tokoOptions(),
             'today' => now()->toDateString(),
         ]);
     }
@@ -25,6 +28,8 @@ class AnalyticsReportController extends Controller
         $base = DB::table('stock_mutations as sm')
             ->leftJoin('items as i', 'i.id', '=', 'sm.item_id')
             ->whereBetween('sm.occurred_at', [$from, $to]);
+
+        StockMutationToko::applyFilter($base, 'stock_mutations', 'sm.id', TokoFilter::fromRequest($request));
 
         $sourceType = trim((string) $request->input('source_type', ''));
         if ($sourceType !== '') {
@@ -113,6 +118,7 @@ class AnalyticsReportController extends Controller
     {
         return view('admin.reports.couriers.index', [
             'dataUrl' => route('admin.reports.couriers.data'),
+            'tokos' => TokoFilter::tokoOptions(),
             'today' => now()->toDateString(),
         ]);
     }
@@ -129,6 +135,8 @@ class AnalyticsReportController extends Controller
             ->selectRaw("COUNT(CASE WHEN status = 'canceled' THEN 1 END) as canceled_total")
             ->whereBetween('tanggal_upload', [$fromDate, $toDate])
             ->groupBy('kurir_id');
+        $tokoId = TokoFilter::fromRequest($request);
+        TokoFilter::apply($resiAgg, $tokoId, 'toko_id');
 
         $scanAgg = DB::table('packer_scan_outs as pso')
             ->join('resis as r', 'r.id', '=', 'pso.resi_id')
@@ -138,6 +146,7 @@ class AnalyticsReportController extends Controller
             ->selectRaw('MAX(pso.scanned_at) as last_scan_at')
             ->whereBetween('r.tanggal_upload', [$fromDate, $toDate])
             ->groupBy('r.kurir_id');
+        TokoFilter::apply($scanAgg, $tokoId, 'r.toko_id');
 
         $base = DB::table('kurirs as k')
             ->leftJoinSub($resiAgg, 'ra', 'ra.kurir_id', '=', 'k.id')

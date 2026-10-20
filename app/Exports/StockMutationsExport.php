@@ -3,15 +3,19 @@
 namespace App\Exports;
 
 use App\Models\StockMutation;
+use App\Support\StockMutationToko;
+use App\Support\TokoFilter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class StockMutationsExport
 {
     public function __construct(
         private string $search = '',
         private ?string $dateFrom = null,
-        private ?string $dateTo = null
+        private ?string $dateTo = null,
+        private int|string|null $tokoId = null
     ) {
     }
 
@@ -43,6 +47,8 @@ class StockMutationsExport
             'Subtipe Sumber',
             'ID Sumber',
             'Kode Sumber',
+            'Toko',
+            'Channel',
             'Catatan',
         ];
     }
@@ -69,7 +75,9 @@ class StockMutationsExport
             'Q' => 20,
             'R' => 12,
             'S' => 22,
-            'T' => 40,
+            'T' => 24,
+            'U' => 16,
+            'V' => 40,
         ];
     }
 
@@ -81,13 +89,18 @@ class StockMutationsExport
     public function rows(): \Generator
     {
         $number = 1;
-        foreach ($this->query()->lazyByIdDesc($this->chunkSize(), 'stock_mutations.id', 'id') as $mutation) {
-            yield $this->map($mutation, $number);
-            $number++;
+        $mutations = $this->query()->lazyByIdDesc($this->chunkSize(), 'stock_mutations.id', 'id');
+        foreach ($mutations->chunk($this->chunkSize()) as $chunk) {
+            // Toko diambil per chunk agar tidak query per baris.
+            $tokos = StockMutationToko::namesFor('stock_mutations', $chunk->pluck('id'));
+            foreach ($chunk as $mutation) {
+                yield $this->map($mutation, $number, $tokos->get($mutation->id));
+                $number++;
+            }
         }
     }
 
-    public function map($row, int $number = 1): array
+    public function map($row, int $number = 1, ?object $toko = null): array
     {
         $stockBefore = $row->stockBeforeValue();
         $stockAfter = $row->stock_after !== null
@@ -118,6 +131,8 @@ class StockMutationsExport
             $row->source_subtype ?: '-',
             $row->source_id ? (int) $row->source_id : null,
             $row->source_code ?? '',
+            $toko ? ($toko->toko ?? 'Tanpa Toko') : '-',
+            $toko?->channel ?? '-',
             $row->note ?? '',
         ];
     }
@@ -158,6 +173,12 @@ class StockMutationsExport
                 ],
             ],
             [
+                'name' => 'Rekap Toko',
+                'headings' => ['Toko', 'Jumlah Mutasi', 'Jumlah SKU', 'Qty Masuk', 'Qty Keluar', 'Mutasi Bersih'],
+                'rows' => $this->tokoSummaryRows(),
+                'column_widths' => ['A' => 32, 'B' => 16, 'C' => 14, 'D' => 14, 'E' => 14, 'F' => 16],
+            ],
+            [
                 'name' => 'Detail Mutasi',
                 'headings' => $this->headings(),
                 'rows' => $this->rows(),
@@ -193,7 +214,37 @@ class StockMutationsExport
             ['Mutasi Bersih', $totalIn - $totalOut],
             ['Mutasi Pertama', $summary?->first_at ? Carbon::parse($summary->first_at)->format('Y-m-d H:i') : '-'],
             ['Mutasi Terakhir', $summary?->last_at ? Carbon::parse($summary->last_at)->format('Y-m-d H:i') : '-'],
+            ['Filter Toko', TokoFilter::tokoLabel($this->tokoId)],
         ];
+    }
+
+    /**
+     * Mutasi per toko asal resi; mutasi non-resi (penerimaan, opname, dll.) dikelompokkan terpisah.
+     */
+    private function tokoSummaryRows(): array
+    {
+        $ids = $this->filteredQuery()->select('stock_mutations.id');
+        $query = DB::table('stock_mutations as sm')->whereIn('sm.id', $ids);
+        StockMutationToko::join($query, 'sm');
+
+        return $query
+            ->groupByRaw('CASE WHEN smt_resi.id IS NULL THEN -1 ELSE COALESCE(smt_resi.toko_id, 0) END')
+            ->selectRaw("CASE WHEN MAX(smt_resi.id) IS NULL THEN 'Bukan dari resi' ELSE COALESCE(MAX(smt_toko.name), 'Tanpa Toko') END as toko")
+            ->selectRaw('COUNT(*) as mutation_count')
+            ->selectRaw('COUNT(DISTINCT sm.item_id) as sku_count')
+            ->selectRaw("COALESCE(SUM(CASE WHEN sm.direction = 'in' THEN sm.qty ELSE 0 END), 0) as total_in")
+            ->selectRaw("COALESCE(SUM(CASE WHEN sm.direction = 'out' THEN sm.qty ELSE 0 END), 0) as total_out")
+            ->orderByDesc('total_out')
+            ->get()
+            ->map(fn ($row) => [
+                $row->toko,
+                (int) $row->mutation_count,
+                (int) $row->sku_count,
+                (int) $row->total_in,
+                (int) $row->total_out,
+                (int) $row->total_in - (int) $row->total_out,
+            ])
+            ->all();
     }
 
     private function sourceSummaryRows(): \Generator
@@ -235,6 +286,7 @@ class StockMutationsExport
 
         $this->applySearch($query);
         $this->applyDateFilter($query);
+        StockMutationToko::applyFilter($query, 'stock_mutations', 'stock_mutations.id', $this->tokoId);
 
         return $query;
     }

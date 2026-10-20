@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\InboundTransaction;
 use App\Models\OutboundTransaction;
 use App\Models\ReturnReason;
+use App\Support\TokoFilter;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Http\Request;
@@ -25,6 +26,7 @@ class ReturnReportController extends Controller
                 ->where('is_active', true)
                 ->orderBy('name')
                 ->get(['id', 'name']),
+            'tokos' => TokoFilter::tokoOptions(),
         ]);
     }
 
@@ -100,11 +102,12 @@ class ReturnReportController extends Controller
             'top_skus' => $this->inboundTopSkus($items),
             'reasons' => $this->inboundReasons($items),
             'submitters' => $this->topSubmitters($base, 'inbound_transactions'),
+            'tokos' => $this->inboundTokos($base),
         ];
 
         [$start, $length] = $this->pagination($request);
         $rows = (clone $base)
-            ->with(['items.item', 'items.returnReason', 'resi', 'creator', 'approver', 'finalizer'])
+            ->with(['items.item', 'items.returnReason', 'resi.toko', 'resi.channel', 'creator', 'approver', 'finalizer'])
             ->orderByDesc('inbound_transactions.transacted_at')
             ->orderByDesc('inbound_transactions.id')
             ->skip($start)
@@ -214,6 +217,17 @@ class ReturnReportController extends Controller
             $query->whereHas('items', fn ($items) => $items->where('return_reason_id', $reasonId));
         }
 
+        // Toko diambil dari resi asal; "Tanpa toko" juga mencakup retur yang tidak terhubung resi.
+        $tokoId = TokoFilter::fromRequest($request);
+        if ($tokoId === TokoFilter::NONE) {
+            $query->where(function ($nested) {
+                $nested->whereNull('inbound_transactions.resi_id')
+                    ->orWhereIn('inbound_transactions.resi_id', fn ($sub) => $sub->from('resis')->select('id')->whereNull('toko_id'));
+            });
+        } elseif ($tokoId !== null) {
+            TokoFilter::applyViaResi($query, 'inbound_transactions.resi_id', $tokoId);
+        }
+
         $search = trim((string) $request->input('q', ''));
         if ($search !== '') {
             $query->where(function ($nested) use ($search) {
@@ -222,7 +236,8 @@ class ReturnReportController extends Controller
                     ->orWhere('inbound_transactions.return_resi_no', 'like', "%{$search}%")
                     ->orWhereHas('resi', function ($resi) use ($search) {
                         $resi->where('no_resi', 'like', "%{$search}%")
-                            ->orWhere('id_pesanan', 'like', "%{$search}%");
+                            ->orWhere('id_pesanan', 'like', "%{$search}%")
+                            ->orWhereHas('toko', fn ($toko) => $toko->where('name', 'like', "%{$search}%"));
                     })
                     ->orWhereHas('creator', fn ($user) => $user->where('name', 'like', "%{$search}%"))
                     ->orWhereHas('items.item', function ($item) use ($search) {
@@ -420,6 +435,35 @@ class ReturnReportController extends Controller
             ->all();
     }
 
+    /**
+     * Toko asal retur (dari resi terhubung): jumlah transaksi & qty diterima.
+     */
+    private function inboundTokos(EloquentBuilder $base): array
+    {
+        $qty = DB::table('inbound_items')
+            ->select('inbound_transaction_id')
+            ->selectRaw('COALESCE(SUM(qty_received), 0) as qty')
+            ->groupBy('inbound_transaction_id');
+
+        return (clone $base)
+            ->leftJoin('resis as toko_resis', 'toko_resis.id', '=', 'inbound_transactions.resi_id')
+            ->leftJoin('tokos as report_tokos', 'report_tokos.id', '=', 'toko_resis.toko_id')
+            ->leftJoinSub($qty, 'toko_qty', 'toko_qty.inbound_transaction_id', '=', 'inbound_transactions.id')
+            ->selectRaw("COALESCE(report_tokos.name, 'Tanpa toko') as label")
+            ->selectRaw('COUNT(*) as value')
+            ->selectRaw('COALESCE(SUM(toko_qty.qty), 0) as secondary')
+            ->groupBy('report_tokos.id', 'report_tokos.name')
+            ->orderByDesc('value')
+            ->limit(5)
+            ->get()
+            ->map(fn ($row) => [
+                'label' => $row->label,
+                'value' => (int) $row->value,
+                'secondary' => (int) $row->secondary,
+            ])
+            ->all();
+    }
+
     private function mapInboundRow(InboundTransaction $transaction, ?int $reasonId): array
     {
         $allItems = $transaction->items ?? collect();
@@ -435,6 +479,8 @@ class ReturnReportController extends Controller
             'ref_no' => $transaction->ref_no ?: '-',
             'return_resi_no' => $transaction->return_resi_no ?: ($transaction->resi?->no_resi ?: '-'),
             'order_no' => $transaction->resi?->id_pesanan ?: '-',
+            'toko' => $transaction->resi?->toko?->name ?: '-',
+            'channel' => $transaction->resi?->channel?->name ?: '-',
             'submit_by' => $transaction->creator?->name ?: '-',
             'approved_by' => $transaction->approver?->name ?: '-',
             'finalized_by' => $transaction->finalizer?->name ?: '-',

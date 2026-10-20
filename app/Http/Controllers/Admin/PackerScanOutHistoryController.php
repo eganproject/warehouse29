@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\PackerScanOut;
+use App\Support\TokoFilter;
 use Illuminate\Http\Request;
 
 class PackerScanOutHistoryController extends Controller
@@ -12,6 +13,7 @@ class PackerScanOutHistoryController extends Controller
     {
         return view('admin.outbound.packer-scan-outs.index', [
             'dataUrl' => route('admin.outbound.packer-scan-outs.data'),
+            'tokos' => TokoFilter::tokoOptions(),
             'today' => now()->toDateString(),
         ]);
     }
@@ -19,7 +21,7 @@ class PackerScanOutHistoryController extends Controller
     public function data(Request $request)
     {
         $baseQuery = PackerScanOut::query()
-            ->with(['resi.cancellation', 'scanner'])
+            ->with(['resi.cancellation', 'resi.toko', 'resi.channel', 'scanner'])
             ->orderByDesc('scanned_at');
 
         $this->applyDateFilter($baseQuery, $request);
@@ -33,7 +35,8 @@ class PackerScanOutHistoryController extends Controller
                     ->orWhere('scan_type', 'like', "%{$search}%")
                     ->orWhereHas('resi', function ($resiQ) use ($search) {
                         $resiQ->where('id_pesanan', 'like', "%{$search}%")
-                            ->orWhere('no_resi', 'like', "%{$search}%");
+                            ->orWhere('no_resi', 'like', "%{$search}%")
+                            ->orWhereHas('toko', fn ($tokoQ) => $tokoQ->where('name', 'like', "%{$search}%"));
                     })
                     ->orWhereHas('scanner', function ($userQ) use ($search) {
                         $userQ->where('name', 'like', "%{$search}%")
@@ -41,6 +44,8 @@ class PackerScanOutHistoryController extends Controller
                     });
             });
         }
+
+        TokoFilter::applyViaResi($query, 'resi_id', TokoFilter::fromRequest($request));
 
         $recordsTotal = (clone $baseQuery)->count();
         $recordsFiltered = (clone $query)->count();
@@ -66,6 +71,8 @@ class PackerScanOutHistoryController extends Controller
                 'scan_code' => $row->scan_code ?? '-',
                 'id_pesanan' => $row->resi?->id_pesanan ?? '-',
                 'no_resi' => $row->resi?->no_resi ?? '-',
+                'toko' => $row->resi?->toko?->name ?? '-',
+                'channel' => $row->resi?->channel?->name ?? '-',
                 'status' => $isCanceled ? 'canceled' : 'completed',
                 'cancellation_stage' => $isCanceled ? $row->resi?->cancellation?->stage : null,
             ];

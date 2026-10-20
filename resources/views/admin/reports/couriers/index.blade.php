@@ -13,6 +13,7 @@
             <div class="d-flex align-items-end gap-3 flex-wrap">
                 <input type="text" class="form-control form-control-solid w-150px" id="filter_date_from" value="{{ $today }}" placeholder="Dari">
                 <input type="text" class="form-control form-control-solid w-150px" id="filter_date_to" value="{{ $today }}" placeholder="Sampai">
+                @include('admin.partials.toko-filter', ['tokos' => $tokos, 'id' => 'filter_toko', 'class' => 'w-175px'])
                 <select id="filter_limit" class="form-select form-select-solid w-100px">
                     <option value="10" selected>10</option>
                     <option value="25">25</option>
@@ -69,6 +70,7 @@
         const dateFromEl = document.getElementById('filter_date_from');
         const dateToEl = document.getElementById('filter_date_to');
         const limitEl = document.getElementById('filter_limit');
+        const tokoEl = document.getElementById('filter_toko');
         const applyBtn = document.getElementById('filter_apply');
         const resetBtn = document.getElementById('filter_reset');
         let fpFrom = null;
@@ -101,6 +103,7 @@
                     params.q = searchInput?.value || '';
                     params.date_from = dateFromEl?.value || '';
                     params.date_to = dateToEl?.value || '';
+                    params.toko_id = tokoEl?.value || '';
                 }
             },
             columns: [
@@ -121,6 +124,7 @@
         limitEl?.addEventListener('change', () => dt.page.len(Number(limitEl.value || 10)).draw());
         resetBtn?.addEventListener('click', () => {
             if (searchInput) searchInput.value = '';
+            if (tokoEl) tokoEl.value = '';
             if (fpFrom) fpFrom.setDate(todayStr, true); else dateFromEl.value = todayStr;
             if (fpTo) fpTo.setDate(todayStr, true); else dateToEl.value = todayStr;
             if (limitEl) {

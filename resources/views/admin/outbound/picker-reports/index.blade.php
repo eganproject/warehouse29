@@ -279,14 +279,14 @@
             </div>
 
             <div class="pr-filter-grid">
-                <div class="pr-field pr-col-4">
+                <div class="pr-field pr-col-3">
                     <span class="pr-field-label">Cari Petugas QC</span>
                     <div class="position-relative">
                         <i class="bi bi-search position-absolute ms-3 text-gray-500 fs-6" style="top:50%;transform:translateY(-50%)"></i>
                         <input type="text" class="form-control form-control-solid ps-10" id="filter_search" placeholder="Nama petugas QC" autocomplete="off" />
                     </div>
                 </div>
-                <div class="pr-field pr-col-4">
+                <div class="pr-field pr-col-3">
                     <span class="pr-field-label">Divisi</span>
                     <select id="filter_divisi" class="form-select form-select-solid">
                         <option value="">Semua Divisi</option>
@@ -295,7 +295,11 @@
                         @endforeach
                     </select>
                 </div>
-                <div class="pr-field pr-col-4">
+                <div class="pr-field pr-col-3">
+                    <span class="pr-field-label">Toko</span>
+                    @include('admin.partials.toko-filter', ['tokos' => $tokos, 'id' => 'filter_toko', 'class' => ''])
+                </div>
+                <div class="pr-field pr-col-3">
                     <span class="pr-field-label">Data per Halaman</span>
                     <select id="filter_limit" class="form-select form-select-solid">
                         <option value="10" selected>10 baris</option>
@@ -559,6 +563,7 @@
         const tableEl = $('#qc_report_table');
         const searchInput = document.getElementById('filter_search');
         const divisiSelect = document.getElementById('filter_divisi');
+        const tokoSelect = document.getElementById('filter_toko');
         const limitSelect = document.getElementById('filter_limit');
         const dateFromEl = document.getElementById('filter_date_from');
         const dateToEl = document.getElementById('filter_date_to');
@@ -694,6 +699,7 @@
                 data(d) {
                     d.q = searchInput?.value || '';
                     d.divisi_id = divisiSelect?.value || '';
+                    d.toko_id = tokoSelect?.value || '';
                     d.date_from = dateFromEl?.value || '';
                     d.date_to = dateToEl?.value || '';
                 },
@@ -754,12 +760,17 @@
         });
         applyBtn?.addEventListener('click', reloadTable);
         $(divisiSelect).on('change', reloadTable);
+        $(tokoSelect).on('change', reloadTable);
         limitSelect?.addEventListener('change', () => dt.page.len(Number(limitSelect.value || 10)).draw());
         resetBtn?.addEventListener('click', () => {
             if (searchInput) searchInput.value = '';
             if (divisiSelect) {
                 divisiSelect.value = '';
                 if ($(divisiSelect).data('select2')) $(divisiSelect).val('').trigger('change.select2');
+            }
+            if (tokoSelect) {
+                tokoSelect.value = '';
+                if ($(tokoSelect).data('select2')) $(tokoSelect).val('').trigger('change.select2');
             }
             if (limitSelect) { limitSelect.value = '10'; dt.page.len(10); }
             setDate(fpFrom, dateFromEl, todayStr);
@@ -773,6 +784,7 @@
             const params = new URLSearchParams({
                 q: searchInput?.value || '',
                 divisi_id: divisiSelect?.value || '',
+                toko_id: tokoSelect?.value || '',
                 date_from: dateFromEl?.value || '',
                 date_to: dateToEl?.value || '',
             });
@@ -802,7 +814,7 @@
             const keyword = (detailSearchEl?.value || '').trim().toLowerCase();
             const rows = detailRows.filter(r => {
                 if (!keyword) return true;
-                const hay = [r.no_resi, r.id_pesanan, ...(r.items || []).map(i => i.sku)].join(' ').toLowerCase();
+                const hay = [r.no_resi, r.id_pesanan, r.toko, r.channel, ...(r.items || []).map(i => i.sku)].join(' ').toLowerCase();
                 return hay.includes(keyword);
             });
             if (!rows.length) {
@@ -815,6 +827,7 @@
                     <td>
                         <span class="fw-bold font-monospace text-primary">${esc(r.no_resi) || '-'}</span>
                         <div class="text-muted fs-8">Pesanan: ${esc(r.id_pesanan) || '-'}</div>
+                        <div class="text-muted fs-8"><i class="bi bi-shop me-1"></i>${esc(r.toko) || '-'}${r.channel && r.channel !== '-' ? ' • ' + esc(r.channel) : ''}</div>
                     </td>
                     <td>${statusBadge(r.status)}</td>
                     <td><span class="fw-semibold">${esc(r.scanned_at) || '-'}</span>
@@ -866,7 +879,7 @@
             detailModal.show();
 
             try {
-                const url = `${detailUrl}?date=${encodeURIComponent(date)}&user_id=${encodeURIComponent(userId)}`;
+                const url = `${detailUrl}?date=${encodeURIComponent(date)}&user_id=${encodeURIComponent(userId)}&toko_id=${encodeURIComponent(tokoSelect?.value || '')}`;
                 const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
                 const json = await res.json();
                 if (!res.ok) throw new Error(json?.message || 'Gagal memuat detail');

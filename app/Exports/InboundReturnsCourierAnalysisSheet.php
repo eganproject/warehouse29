@@ -28,7 +28,7 @@ class InboundReturnsCourierAnalysisSheet extends InboundReturnsTableSheet implem
     {
         return [
             'Peringkat',
-            'Kurir',
+            $this->groupHeading(),
             'Jumlah Transaksi',
             'Kontribusi Transaksi (%)',
             'Pesanan Unik',
@@ -52,7 +52,7 @@ class InboundReturnsCourierAnalysisSheet extends InboundReturnsTableSheet implem
         );
 
         return $this->transactions
-            ->groupBy(fn ($transaction) => $transaction->resi?->kurir_id ?: 'unknown')
+            ->groupBy(fn ($transaction) => $this->groupKey($transaction))
             ->map(function (Collection $transactions) use ($transactionCount, $totalReceived) {
                 $items = $transactions->flatMap->items;
                 $expected = (int) $items->sum(fn ($item) => $this->qtyExpected($item));
@@ -60,7 +60,7 @@ class InboundReturnsCourierAnalysisSheet extends InboundReturnsTableSheet implem
                 $damaged = (int) $items->sum(fn ($item) => (int) ($item->qty_damaged ?? 0));
 
                 return [
-                    'courier' => $this->safeText($transactions->first()->resi?->kurir?->name, 'Tidak diketahui / tanpa resi'),
+                    'courier' => $this->groupLabel($transactions->first()),
                     'transactions' => $transactions->count(),
                     'transaction_share' => $this->ratio($transactions->count(), $transactionCount),
                     'orders' => $transactions->pluck('resi.id_pesanan')->filter()->unique()->count(),
@@ -95,6 +95,21 @@ class InboundReturnsCourierAnalysisSheet extends InboundReturnsTableSheet implem
                 $row['damage_rate'],
                 $row['contribution'],
             ]);
+    }
+
+    protected function groupHeading(): string
+    {
+        return 'Kurir';
+    }
+
+    protected function groupKey($transaction): int|string
+    {
+        return $transaction->resi?->kurir_id ?: 'unknown';
+    }
+
+    protected function groupLabel($transaction): string
+    {
+        return $this->safeText($transaction->resi?->kurir?->name, 'Tidak diketahui / tanpa resi');
     }
 
     public function columnWidths(): array

@@ -4,6 +4,7 @@ namespace App\Support;
 
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -27,16 +28,22 @@ class StockPeriodReport
         $start = Carbon::parse($filters['date_from'])->startOfDay();
         $end = Carbon::parse($filters['date_to'])->addDay()->startOfDay();
         $table = $filters['stock_type'] === 'damaged' ? 'damaged_stock_mutations' : 'stock_mutations';
-        $mutations = DB::table($table)->select('item_id')
-            ->where('occurred_at', '<', $end)
-            ->selectRaw("SUM(CASE WHEN occurred_at < ? THEN CASE WHEN direction = 'in' THEN qty ELSE -qty END ELSE 0 END) as opening", [$start])
-            ->selectRaw("SUM(CASE WHEN occurred_at >= ? AND direction = 'in' THEN qty ELSE 0 END) as qty_in", [$start])
-            ->selectRaw("SUM(CASE WHEN occurred_at >= ? AND direction = 'out' THEN qty ELSE 0 END) as qty_out", [$start])
-            ->selectRaw("SUM(CASE WHEN direction = 'in' THEN qty ELSE -qty END) as closing")
-            ->selectRaw("COUNT(DISTINCT CASE WHEN occurred_at >= ? AND direction = 'out' AND qty > 0 THEN DATE(occurred_at) END) as outgoing_days", [$start])
-            ->selectRaw("COUNT(CASE WHEN occurred_at >= ? AND direction = 'out' AND qty > 0 THEN 1 END) as outgoing_frequency", [$start])
-            ->selectRaw("MAX(CASE WHEN direction = 'out' AND qty > 0 THEN occurred_at END) as last_out_at")
-            ->groupBy('item_id');
+        // Filter toko (tab pergerakan): qty masuk/keluar, frekuensi & tanggal keluar hanya dari mutasi
+        // resi toko tsb. Stok awal/akhir tetap stok gudang karena stok tidak dipisah per toko.
+        $toko = self::tokoCondition($filters);
+        $mutations = DB::table($table.' as sm')->select('sm.item_id')
+            ->where('sm.occurred_at', '<', $end)
+            ->selectRaw("SUM(CASE WHEN sm.occurred_at < ? THEN CASE WHEN sm.direction = 'in' THEN sm.qty ELSE -sm.qty END ELSE 0 END) as opening", [$start])
+            ->selectRaw("SUM(CASE WHEN sm.occurred_at >= ? AND sm.direction = 'in'{$toko} THEN sm.qty ELSE 0 END) as qty_in", [$start])
+            ->selectRaw("SUM(CASE WHEN sm.occurred_at >= ? AND sm.direction = 'out'{$toko} THEN sm.qty ELSE 0 END) as qty_out", [$start])
+            ->selectRaw("SUM(CASE WHEN sm.direction = 'in' THEN sm.qty ELSE -sm.qty END) as closing")
+            ->selectRaw("COUNT(DISTINCT CASE WHEN sm.occurred_at >= ? AND sm.direction = 'out' AND sm.qty > 0{$toko} THEN DATE(sm.occurred_at) END) as outgoing_days", [$start])
+            ->selectRaw("COUNT(CASE WHEN sm.occurred_at >= ? AND sm.direction = 'out' AND sm.qty > 0{$toko} THEN 1 END) as outgoing_frequency", [$start])
+            ->selectRaw("MAX(CASE WHEN sm.direction = 'out' AND sm.qty > 0{$toko} THEN sm.occurred_at END) as last_out_at")
+            ->groupBy('sm.item_id');
+        if ($toko !== '') {
+            StockMutationToko::join($mutations, 'sm');
+        }
 
         $items = DB::table('items as i')
             ->leftJoin('categories as c', 'c.id', '=', 'i.category_id')
@@ -98,6 +105,58 @@ class StockPeriodReport
         return $query;
     }
 
+    /**
+     * Toko hanya berlaku di tab pergerakan (tab saldo harus tetap memenuhi awal + in − out = akhir).
+     */
+    public static function tokoId(array $filters): int|string|null
+    {
+        return ($filters['tab'] ?? 'balance') === 'movement'
+            ? TokoFilter::normalize($filters['toko_id'] ?? null)
+            : null;
+    }
+
+    private static function tokoCondition(array $filters): string
+    {
+        $tokoId = self::tokoId($filters);
+
+        return $tokoId === null ? '' : ' AND '.StockMutationToko::condition($tokoId);
+    }
+
+    /**
+     * Barang keluar per toko untuk SKU yang lolos filter (sheet export pergerakan).
+     */
+    public function outgoingPerToko(array $filters): Collection
+    {
+        $start = Carbon::parse($filters['date_from'])->startOfDay();
+        $end = Carbon::parse($filters['date_to'])->addDay()->startOfDay();
+        $table = $filters['stock_type'] === 'damaged' ? 'damaged_stock_mutations' : 'stock_mutations';
+        $filteredItems = $this->query($filters)->select('id');
+
+        $query = DB::table($table.' as sm')
+            ->joinSub($filteredItems, 'filtered_items', 'filtered_items.id', '=', 'sm.item_id')
+            ->where('sm.direction', 'out')
+            ->where('sm.qty', '>', 0)
+            ->where('sm.occurred_at', '>=', $start)
+            ->where('sm.occurred_at', '<', $end);
+        StockMutationToko::join($query, 'sm');
+        if (($tokoCondition = self::tokoCondition($filters)) !== '') {
+            $query->whereRaw(substr($tokoCondition, 5));
+        }
+
+        return $query
+            // -1 = mutasi bukan dari resi, 0 = resi tanpa toko.
+            ->groupByRaw('CASE WHEN smt_resi.id IS NULL THEN -1 ELSE COALESCE(smt_resi.toko_id, 0) END')
+            ->selectRaw('CASE WHEN smt_resi.id IS NULL THEN -1 ELSE COALESCE(smt_resi.toko_id, 0) END as toko_key')
+            ->selectRaw("CASE WHEN MAX(smt_resi.id) IS NULL THEN 'Bukan dari resi (manual/lainnya)' ELSE COALESCE(MAX(smt_toko.name), 'Tanpa toko') END as toko")
+            ->selectRaw('COALESCE(SUM(sm.qty), 0) as qty_out')
+            ->selectRaw('COUNT(*) as frequency')
+            ->selectRaw('COUNT(DISTINCT sm.item_id) as sku_count')
+            ->selectRaw('COUNT(DISTINCT smt_resi.id) as resi_count')
+            ->selectRaw('COUNT(DISTINCT DATE(sm.occurred_at)) as active_days')
+            ->orderByDesc('qty_out')
+            ->get();
+    }
+
     public function ordered(array $filters): Builder
     {
         $query = $this->query($filters);
@@ -125,6 +184,9 @@ class StockPeriodReport
 
         $totals = DB::table($table.' as sm')
             ->joinSub($filteredItems, 'filtered_items', 'filtered_items.id', '=', 'sm.item_id')
+            ->when(self::tokoCondition($filters) !== '', function ($query) use ($filters) {
+                StockMutationToko::join($query, 'sm')->whereRaw(StockMutationToko::condition(self::tokoId($filters)));
+            })
             ->where('sm.occurred_at', '>=', $start)
             ->where('sm.occurred_at', '<', $end)
             ->selectRaw('DATE(sm.occurred_at) as movement_date')
