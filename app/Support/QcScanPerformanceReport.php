@@ -38,6 +38,11 @@ class QcScanPerformanceReport
             ->groupByRaw('DATE(qs.scanned_at)')
             ->groupBy('qs.scanned_by');
 
+        if ($applyFilters) {
+            self::applyTokoScope($resiAgg, $filters);
+            self::applyTokoScope($itemAgg, $filters);
+        }
+
         $query = DB::query()
             ->fromSub($resiAgg, 'r')
             ->join('users', 'users.id', '=', 'r.user_id')
@@ -90,6 +95,9 @@ class QcScanPerformanceReport
             ->whereNotNull('qs.scanned_by')
             ->groupByRaw('DATE(qs.scanned_at), qs.scanned_by, HOUR(qs.scanned_at)');
 
+        self::applyTokoScope($resiAgg, $filters);
+        self::applyTokoScope($itemAgg, $filters);
+
         $query = DB::query()
             ->fromSub($resiAgg, 'h')
             ->join('users', 'users.id', '=', 'h.user_id')
@@ -127,7 +135,10 @@ class QcScanPerformanceReport
             ->join('users', 'users.id', '=', 'qs.scanned_by')
             ->leftJoin('resis', 'resis.id', '=', 'qs.resi_id')
             ->leftJoinSub($itemAgg, 'i', 'i.qc_scan_resi_id', '=', 'qs.id')
+            ->leftJoin('tokos', 'tokos.id', '=', 'resis.toko_id')
+            ->leftJoin('channels', 'channels.id', '=', 'resis.channel_id')
             ->selectRaw('DATE(qs.scanned_at) as report_date, users.name as petugas')
+            ->selectRaw('tokos.name as toko_name, channels.name as channel_name')
             ->selectRaw('resis.no_resi, resis.id_pesanan, qs.status, qs.scanned_at, qs.completed_at')
             ->selectRaw('COALESCE(i.sku_lines, 0) as sku_lines, COALESCE(i.required_qty, 0) as required_qty, COALESCE(i.scanned_qty, 0) as scanned_qty')
             ->selectRaw('CASE WHEN qs.completed_at >= qs.scanned_at THEN ROUND(TIMESTAMPDIFF(SECOND, qs.scanned_at, qs.completed_at) / 60, 2) ELSE NULL END as completion_minutes')
@@ -137,8 +148,17 @@ class QcScanPerformanceReport
 
         self::applyUserScope($query, $allowedDivisiId);
         self::applyFilters($query, $filters, 'qs.scanned_at', true);
+        TokoFilter::apply($query, TokoFilter::normalize($filters['toko_id'] ?? null), 'resis.toko_id');
 
         return $query;
+    }
+
+    /**
+     * Batasi agregasi QC ke resi milik toko tertentu (filter toko_id).
+     */
+    private static function applyTokoScope(Builder $query, array $filters): void
+    {
+        TokoFilter::applyViaResi($query, 'qs.resi_id', TokoFilter::normalize($filters['toko_id'] ?? null));
     }
 
     private static function applyUserScope(Builder $query, ?int $allowedDivisiId): void

@@ -29,6 +29,7 @@ use App\Http\Controllers\Admin\StockOpnameReportController;
 use App\Http\Controllers\Admin\StockAsOfReportController;
 use App\Http\Controllers\Admin\ReturnReportController;
 use App\Http\Controllers\Admin\StockForecastReportController;
+use App\Http\Controllers\Admin\TokoReportController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\MenuController;
 use App\Http\Controllers\Admin\PermissionController;
@@ -380,6 +381,9 @@ Route::middleware(['auth', 'verified', 'menu.permission'])->prefix('admin')->as(
         Route::get('/stock-as-of/export', [StockAsOfReportController::class, 'export'])->name('stock-as-of.export');
         Route::get('/couriers', [AnalyticsReportController::class, 'couriers'])->name('couriers.index');
         Route::get('/couriers/data', [AnalyticsReportController::class, 'couriersData'])->name('couriers.data');
+        Route::get('/toko', [TokoReportController::class, 'index'])->name('toko.index');
+        Route::get('/toko/data', [TokoReportController::class, 'data'])->name('toko.data');
+        Route::get('/toko/export', [TokoReportController::class, 'export'])->name('toko.export');
         Route::get('/stock-health', [AnalyticsReportController::class, 'stockHealth'])->name('stock-health.index');
         Route::get('/stock-health/data', [AnalyticsReportController::class, 'stockHealthData'])->name('stock-health.data');
         Route::get('/stock-opname', [StockOpnameReportController::class, 'index'])->name('stock-opname.index');

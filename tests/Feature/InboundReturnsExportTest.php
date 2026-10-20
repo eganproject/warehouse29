@@ -119,7 +119,7 @@ class InboundReturnsExportTest extends TestCase
             $spreadsheet = IOFactory::load($temporaryFile);
 
             $this->assertSame(
-                ['Ringkasan', 'Detail Retur', 'Analisis SKU', 'Analisis Penyebab', 'Tren Harian', 'Analisis Kurir'],
+                ['Ringkasan', 'Detail Retur', 'Analisis SKU', 'Analisis Penyebab', 'Tren Harian', 'Analisis Kurir', 'Analisis Toko'],
                 $spreadsheet->getSheetNames()
             );
 
@@ -135,10 +135,10 @@ class InboundReturnsExportTest extends TestCase
 
             $detail = $spreadsheet->getSheetByName('Detail Retur');
             $this->assertSame('INB-RET-TEST-001', $detail->getCell('B2')->getValue());
-            $this->assertSame('SKU-RET-001', $detail->getCell('I2')->getValue());
-            $this->assertSame(10, $detail->getCell('K2')->getValue());
-            $this->assertSame(8, $detail->getCell('L2')->getValue());
-            $this->assertSame('Sesuai', $detail->getCell('AA2')->getValue());
+            $this->assertSame('SKU-RET-001', $detail->getCell('K2')->getValue());
+            $this->assertSame(10, $detail->getCell('M2')->getValue());
+            $this->assertSame(8, $detail->getCell('N2')->getValue());
+            $this->assertSame('Sesuai', $detail->getCell('AC2')->getValue());
             $this->assertSame(2, $detail->getHighestDataRow());
             $this->assertSame('A2', $detail->getFreezePane());
 

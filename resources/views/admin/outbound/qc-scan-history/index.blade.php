@@ -19,6 +19,7 @@
                     <option value="{{ $u->id }}">{{ $u->name }}</option>
                 @endforeach
             </select>
+            @include('admin.partials.toko-filter', ['tokos' => $tokos, 'id' => 'filter_toko', 'class' => 'w-175px'])
             <select id="filter_picker_status" class="form-select form-select-solid w-170px">
                 <option value="">Semua Status QC</option>
                 <option value="in_progress">Belum Lengkap</option>
@@ -48,6 +49,7 @@
                     <tr class="text-start text-gray-400 fw-bolder fs-7 text-uppercase gs-0">
                         <th>No Resi</th>
                         <th>ID Pesanan</th>
+                        <th>Toko</th>
                         <th>Petugas QC</th>
                         <th>Waktu Scan</th>
                         <th>SKU</th>
@@ -117,6 +119,7 @@
         const searchInput = document.getElementById('qc_search');
         const userSelect = document.getElementById('filter_picker_user');
         const statusSelect = document.getElementById('filter_picker_status');
+        const tokoSelect = document.getElementById('filter_toko');
         const limitSelect = document.getElementById('filter_limit');
         const dateFromEl = document.getElementById('filter_date_from');
         const dateToEl = document.getElementById('filter_date_to');
@@ -144,6 +147,7 @@
         };
         select2Safe(userSelect, 'Semua Petugas');
         select2Safe(statusSelect, 'Semua Status QC');
+        select2Safe(tokoSelect, 'Semua Toko');
 
         let fpFrom = null;
         let fpTo = null;
@@ -156,7 +160,7 @@
             processing: true,
             serverSide: true,
             dom: 'rtip',
-            order: [[3, 'desc']],
+            order: [[4, 'desc']],
             pageLength: Number(limitSelect?.value || 10),
             ajax: {
                 url: dataUrl,
@@ -165,6 +169,7 @@
                     params.q = searchInput?.value || '';
                     params.user_id = userSelect?.value || '';
                     params.status = statusSelect?.value || '';
+                    params.toko_id = tokoSelect?.value || '';
                     if (dateFromEl?.value) params.date_from = dateFromEl.value;
                     if (dateToEl?.value) params.date_to = dateToEl.value;
                 },
@@ -179,6 +184,7 @@
                     },
                 },
                 { data: 'id_pesanan', render: data => esc(data) || '-' },
+                { data: 'toko', orderable: false, render: (data, type, row) => tokoCell(data, row.channel) },
                 { data: 'picker', render: data => esc(data) || '-' },
                 {
                     data: 'scanned_at',
@@ -245,6 +251,7 @@
             if (searchInput) searchInput.value = '';
             setSelectValue(userSelect, '');
             setSelectValue(statusSelect, '');
+            setSelectValue(tokoSelect, '');
             if (limitSelect) {
                 limitSelect.value = '10';
                 dt.page.len(10);
@@ -296,6 +303,7 @@
                     qcStatusBadge(row.status),
                     pill('bi-calendar', 'text-gray-600', 'Scan', esc(row.scanned_at || '-')),
                     pill('bi-person', 'text-info', 'Petugas', esc(row.picker || '-')),
+                    pill('bi-shop', 'text-primary', 'Toko', esc(row.toko || '-')),
                     pill('bi-box-seam', 'text-warning', 'Qty QC', `${row.scanned_qty ?? 0}/${row.required_qty ?? 0}`),
                     pill('bi-graph-up', 'text-success', 'Progress', `${row.qc_progress ?? 0}%`),
                 ].join('');
@@ -330,6 +338,11 @@
             if (!el) return;
             if (typeof $ !== 'undefined' && $(el).data('select2')) $(el).val(value).trigger('change.select2');
             else el.value = value;
+        }
+
+        function tokoCell(toko, channel) {
+            const channelHtml = channel && channel !== '-' ? `<div class="text-muted fs-9">${esc(channel)}</div>` : '';
+            return `<span class="fs-7">${esc(toko || '-')}</span>${channelHtml}`;
         }
 
         function qcStatusBadge(status) {

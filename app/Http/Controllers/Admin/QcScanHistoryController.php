@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\QcScanResi;
 use App\Models\User;
+use App\Support\TokoFilter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -26,6 +27,7 @@ class QcScanHistoryController extends Controller
         return view('admin.outbound.qc-scan-history.index', [
             'dataUrl' => route('admin.outbound.qc-scan-history.data'),
             'users' => $users,
+            'tokos' => TokoFilter::tokoOptions(),
             'today' => now()->toDateString(),
         ]);
     }
@@ -35,7 +37,7 @@ class QcScanHistoryController extends Controller
         $authUser = $request->user();
 
         $baseQuery = QcScanResi::query()
-            ->with(['scanner', 'resi', 'items.item'])
+            ->with(['scanner', 'resi.toko', 'resi.channel', 'items.item'])
             ->orderBy('scanned_at', 'desc')
             ->orderBy('id', 'desc');
 
@@ -59,7 +61,8 @@ class QcScanHistoryController extends Controller
                 })
                     ->orWhereHas('resi', function ($resiQ) use ($search) {
                         $resiQ->where('no_resi', 'like', "%{$search}%")
-                            ->orWhere('id_pesanan', 'like', "%{$search}%");
+                            ->orWhere('id_pesanan', 'like', "%{$search}%")
+                            ->orWhereHas('toko', fn ($tokoQ) => $tokoQ->where('name', 'like', "%{$search}%"));
                     })
                     ->orWhereHas('items', function ($itemQ) use ($search) {
                         $itemQ->where('sku', 'like', "%{$search}%");
@@ -70,6 +73,8 @@ class QcScanHistoryController extends Controller
         if ($userId = $request->integer('user_id')) {
             $query->where('scanned_by', $userId);
         }
+
+        TokoFilter::applyViaResi($query, 'resi_id', TokoFilter::fromRequest($request));
 
         $status = $request->input('status');
         if ($status === 'canceled') {
@@ -109,6 +114,8 @@ class QcScanHistoryController extends Controller
                 'id'           => $row->id,
                 'no_resi'      => $row->resi?->no_resi ?? '-',
                 'id_pesanan'   => $row->resi?->id_pesanan ?? '-',
+                'toko'         => $row->resi?->toko?->name ?? '-',
+                'channel'      => $row->resi?->channel?->name ?? '-',
                 'picker'       => $row->scanner?->name ?? '-',
                 'status'       => $isCanceled ? 'canceled' : $row->status,
                 'scanned_at'   => $row->scanned_at ? Carbon::parse($row->scanned_at)->format('Y-m-d H:i') : '',

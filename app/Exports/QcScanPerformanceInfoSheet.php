@@ -2,6 +2,7 @@
 
 namespace App\Exports;
 
+use App\Support\TokoFilter;
 use Illuminate\Support\Carbon;
 use Maatwebsite\Excel\Concerns\FromArray;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
@@ -28,6 +29,7 @@ class QcScanPerformanceInfoSheet implements FromArray, ShouldAutoSize, WithEvent
             ['Dibuat oleh', $this->generatedBy],
             ['Periode', $this->periodLabel()],
             ['Filter petugas', $this->filters['q'] ?: 'Semua petugas'],
+            ['Filter toko', TokoFilter::tokoLabel(TokoFilter::normalize($this->filters['toko_id'] ?? null))],
             ['', ''],
             ['DEFINISI METRIK', ''],
             ['Jam aktif', 'Jumlah blok jam yang memiliki minimal satu resi QC scan.'],
@@ -39,7 +41,7 @@ class QcScanPerformanceInfoSheet implements FromArray, ShouldAutoSize, WithEvent
             ['ISI WORKBOOK', ''],
             ['Ringkasan Harian', 'Performa setiap akun QC per hari.'],
             ['Performa Per Jam', 'Breakdown produktivitas akun QC di setiap blok jam.'],
-            ['Detail Resi', 'Data tingkat resi untuk audit dan analisis lanjutan.'],
+            ['Detail Resi', 'Data tingkat resi (termasuk toko & channel) untuk audit dan analisis lanjutan.'],
         ];
     }
 
@@ -49,9 +51,9 @@ class QcScanPerformanceInfoSheet implements FromArray, ShouldAutoSize, WithEvent
             AfterSheet::class => function (AfterSheet $event) {
                 $sheet = $event->sheet->getDelegate();
                 $sheet->mergeCells('A1:B1');
-                $sheet->mergeCells('A7:B7');
-                $sheet->mergeCells('A14:B14');
-                foreach ([1, 7, 14] as $row) {
+                $sheet->mergeCells('A8:B8');
+                $sheet->mergeCells('A15:B15');
+                foreach ([1, 8, 15] as $row) {
                     $sheet->getStyle("A{$row}:B{$row}")->applyFromArray([
                         'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF'], 'size' => $row === 1 ? 15 : 11],
                         'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => $row === 1 ? '1D4ED8' : '334155']],
@@ -61,7 +63,7 @@ class QcScanPerformanceInfoSheet implements FromArray, ShouldAutoSize, WithEvent
                 }
                 $sheet->getColumnDimension('A')->setWidth(24);
                 $sheet->getColumnDimension('B')->setWidth(90);
-                $sheet->getStyle('A1:B17')->getAlignment()->setWrapText(true)->setVertical(Alignment::VERTICAL_TOP);
+                $sheet->getStyle('A1:B18')->getAlignment()->setWrapText(true)->setVertical(Alignment::VERTICAL_TOP);
                 $sheet->freezePane('A2');
             },
         ];

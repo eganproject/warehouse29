@@ -14,7 +14,7 @@
                         <path d="M11 19C6.55556 19 3 15.4444 3 11C3 6.55556 6.55556 3 11 3C15.4444 3 19 6.55556 19 11C19 15.4444 15.4444 19 11 19ZM11 5C7.53333 5 5 7.53333 5 11C5 14.4667 7.53333 17 11 17C14.4667 17 17 14.4667 17 11C17 7.53333 14.4667 5 11 5Z" fill="black" />
                     </svg>
                 </span>
-                <input type="text" class="form-control form-control-solid w-250px ps-14" placeholder="Cari resi / petugas scan out" data-kt-filter="search" />
+                <input type="text" class="form-control form-control-solid w-250px ps-14" placeholder="Cari resi / toko / petugas scan out" data-kt-filter="search" />
             </div>
         </div>
         <div class="card-toolbar">
@@ -26,6 +26,7 @@
                     <option value="100">100</option>
                     <option value="500">500</option>
                 </select>
+                @include('admin.partials.toko-filter', ['tokos' => $tokos, 'id' => 'filter_toko', 'class' => 'w-175px'])
                 <input type="text" class="form-control form-control-solid w-150px" id="filter_date_from" placeholder="Dari" value="{{ $today ?? '' }}" />
                 <input type="text" class="form-control form-control-solid w-150px" id="filter_date_to" placeholder="Sampai" value="{{ $today ?? '' }}" />
                 <button type="button" class="btn btn-light" id="filter_date_apply">Filter</button>
@@ -46,6 +47,7 @@
                         <th>Kode Scan</th>
                         <th>ID Pesanan</th>
                         <th>No Resi</th>
+                        <th>Toko</th>
                         <th>Status</th>
                     </tr>
                 </thead>
@@ -67,6 +69,7 @@
         const dateFromEl = document.getElementById('filter_date_from');
         const dateToEl = document.getElementById('filter_date_to');
         const limitSelect = document.getElementById('filter_scan_out_limit');
+        const tokoSelect = document.getElementById('filter_toko');
         const dateApplyBtn = document.getElementById('filter_date_apply');
         const dateResetBtn = document.getElementById('filter_date_reset');
         let fpFrom = null;
@@ -99,6 +102,7 @@
                 dataSrc: 'data',
                 data: function(params) {
                     params.q = searchInput?.value || '';
+                    params.toko_id = tokoSelect?.value || '';
                     if (dateFromEl?.value) params.date_from = dateFromEl.value;
                     if (dateToEl?.value) params.date_to = dateToEl.value;
                 }
@@ -116,6 +120,11 @@
                 { data: 'scan_code' },
                 { data: 'id_pesanan' },
                 { data: 'no_resi' },
+                { data: 'toko', orderable: false, render: (data, type, row) => {
+                    const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (m) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+                    const channel = row.channel && row.channel !== '-' ? `<div class="text-muted fs-8">${esc(row.channel)}</div>` : '';
+                    return `${esc(data || '-')}${channel}`;
+                }},
                 { data: 'status', render: (status) => status === 'canceled'
                     ? '<span class="badge badge-light-danger">Dibatalkan / Reversed</span>'
                     : '<span class="badge badge-light-success">Selesai</span>' },
@@ -128,7 +137,9 @@
             dt.page.len(Number(limitSelect.value || 10)).draw();
         });
         dateApplyBtn?.addEventListener('click', reloadTable);
+        tokoSelect?.addEventListener('change', reloadTable);
         dateResetBtn?.addEventListener('click', () => {
+            if (tokoSelect) tokoSelect.value = '';
             if (fpFrom && todayStr) fpFrom.setDate(todayStr, true);
             if (fpTo && todayStr) fpTo.setDate(todayStr, true);
             if (!fpFrom && dateFromEl) dateFromEl.value = todayStr;

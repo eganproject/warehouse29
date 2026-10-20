@@ -196,11 +196,11 @@
         <div class="card report-filter-card mb-5">
             <div class="card-body p-5">
                 <div class="row g-4 align-items-end">
-                    <div class="col-xl-3 col-md-6">
+                    <div class="col-xl-2 col-md-6">
                         <label class="report-filter-label">Pencarian</label>
                         <div class="position-relative">
                             <i class="fa-solid fa-magnifying-glass position-absolute top-50 translate-middle-y ms-4 text-muted"></i>
-                            <input type="text" class="form-control form-control-solid ps-10 report-search" placeholder="Kode, resi, order, SKU, petugas">
+                            <input type="text" class="form-control form-control-solid ps-10 report-search" placeholder="Kode, resi, order, toko, SKU">
                         </div>
                     </div>
                     <div class="col-xl-2 col-6">
@@ -220,7 +220,11 @@
                             <option value="finalized">Selesai / masuk stok</option>
                         </select>
                     </div>
-                    <div class="col-xl-3 col-md-8">
+                    <div class="col-xl-2 col-md-4">
+                        <label class="report-filter-label">Toko Asal</label>
+                        @include('admin.partials.toko-filter', ['tokos' => $tokos, 'id' => 'inbound_filter_toko', 'class' => 'report-toko-filter'])
+                    </div>
+                    <div class="col-xl-2 col-md-4">
                         <label class="report-filter-label">Alasan Retur</label>
                         <select class="form-select form-select-solid report-extra-filter">
                             <option value="">Semua alasan</option>
@@ -261,11 +265,12 @@
         <div class="row g-5 mb-5">
             <div class="col-xl-7"><div class="card return-analysis-card"><div class="card-body p-5"><div class="d-flex flex-wrap justify-content-between gap-2 mb-2"><div><div class="return-analysis-title">Tren Qty Retur Masuk</div><div class="return-analysis-subtitle">Diterima dibanding barang rusak per hari</div></div><div class="return-legend"><span style="--legend-color:#2f8073">Diterima</span><span style="--legend-color:#d35151">Rusak</span></div></div><div class="return-trend report-trend"></div></div></div></div>
             <div class="col-xl-5"><div class="card return-analysis-card"><div class="card-body p-5"><div class="return-analysis-title">SKU Retur Terbanyak</div><div class="return-analysis-subtitle mb-5">Berdasarkan qty yang diterima</div><div class="report-top-skus"></div></div></div></div>
-            <div class="col-lg-6"><div class="card return-analysis-card"><div class="card-body p-5"><div class="return-analysis-title">Penyebab Retur Dominan</div><div class="return-analysis-subtitle mb-5">Qty diterima menurut alasan retur</div><div class="report-breakdown"></div></div></div></div>
-            <div class="col-lg-6"><div class="card return-analysis-card"><div class="card-body p-5"><div class="return-analysis-title">Kontributor Transaksi</div><div class="return-analysis-subtitle mb-5">Jumlah transaksi per petugas input</div><div class="report-submitters"></div></div></div></div>
+            <div class="col-lg-4"><div class="card return-analysis-card"><div class="card-body p-5"><div class="return-analysis-title">Penyebab Retur Dominan</div><div class="return-analysis-subtitle mb-5">Qty diterima menurut alasan retur</div><div class="report-breakdown"></div></div></div></div>
+            <div class="col-lg-4"><div class="card return-analysis-card"><div class="card-body p-5"><div class="return-analysis-title">Retur per Toko</div><div class="return-analysis-subtitle mb-5">Transaksi retur menurut toko asal resi</div><div class="report-tokos"></div></div></div></div>
+            <div class="col-lg-4"><div class="card return-analysis-card"><div class="card-body p-5"><div class="return-analysis-title">Kontributor Transaksi</div><div class="return-analysis-subtitle mb-5">Jumlah transaksi per petugas input</div><div class="report-submitters"></div></div></div></div>
         </div>
 
-        <div class="card return-table-card"><div class="card-header border-0 pt-5"><div><h3 class="card-title fw-bold mb-1">Detail Retur Masuk</h3><div class="text-muted fs-8 report-updated">Menyiapkan data...</div></div><div class="card-toolbar"><label class="d-flex align-items-center gap-2 text-muted fs-8">Tampilkan <select class="form-select form-select-sm form-select-solid report-limit w-80px"><option>10</option><option>25</option><option>50</option><option>100</option></select></label></div></div><div class="card-body pt-2"><div class="table-responsive"><table class="table align-middle table-row-dashed gy-4 report-table"><thead><tr class="text-uppercase"><th>Tanggal</th><th>Referensi</th><th>Resi / Order</th><th>Item</th><th>Qty & Kualitas</th><th>Alasan</th><th>Status</th><th>Petugas</th><th class="text-end">Detail</th></tr></thead><tbody></tbody></table></div></div></div>
+        <div class="card return-table-card"><div class="card-header border-0 pt-5"><div><h3 class="card-title fw-bold mb-1">Detail Retur Masuk</h3><div class="text-muted fs-8 report-updated">Menyiapkan data...</div></div><div class="card-toolbar"><label class="d-flex align-items-center gap-2 text-muted fs-8">Tampilkan <select class="form-select form-select-sm form-select-solid report-limit w-80px"><option>10</option><option>25</option><option>50</option><option>100</option></select></label></div></div><div class="card-body pt-2"><div class="table-responsive"><table class="table align-middle table-row-dashed gy-4 report-table"><thead><tr class="text-uppercase"><th>Tanggal</th><th>Referensi</th><th>Resi / Order / Toko</th><th>Item</th><th>Qty & Kualitas</th><th>Alasan</th><th>Status</th><th>Petugas</th><th class="text-end">Detail</th></tr></thead><tbody></tbody></table></div></div></div>
     </div>
 
     <div class="tab-pane fade" id="outbound-panel" role="tabpanel" data-report="outbound">
@@ -379,7 +384,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return [
                 { data: 'transacted_at', render: (value) => `<div class="fw-semibold text-nowrap">${formatDate(value)}</div><div class="text-muted fs-8">${esc((value || '').slice(11, 16))}</div>` },
                 { data: null, render: (row) => referenceCell(row) },
-                { data: null, render: (row) => `<div class="fw-semibold">${esc(row.return_resi_no)}</div><div class="text-muted fs-8 mt-1">Order: ${esc(row.order_no)}</div>` },
+                { data: null, render: (row) => `<div class="fw-semibold">${esc(row.return_resi_no)}</div><div class="text-muted fs-8 mt-1">Order: ${esc(row.order_no)}</div>${row.toko && row.toko !== '-' ? `<div class="text-muted fs-8 mt-1"><i class="fa-solid fa-shop me-1"></i>${esc(row.toko)}${row.channel && row.channel !== '-' ? ` · ${esc(row.channel)}` : ''}</div>` : ''}` },
                 { data: 'items', render: (items) => itemList(items, type) },
                 { data: null, render: (row) => qtyGrid(row, type) },
                 { data: 'items', render: reasonList },
@@ -407,6 +412,7 @@ document.addEventListener('DOMContentLoaded', () => {
             date_to: panel.querySelector('.report-date-to').value,
             status: panel.querySelector('.report-status').value,
             [type === 'inbound' ? 'reason_id' : 'stock_source']: panel.querySelector('.report-extra-filter').value,
+            ...(type === 'inbound' ? { toko_id: panel.querySelector('.report-toko-filter')?.value || '' } : {}),
         };
     }
 
@@ -462,6 +468,7 @@ document.addEventListener('DOMContentLoaded', () => {
             panel.querySelector('.report-insight').innerHTML = `<strong>${numberText(summary.approved)} transaksi</strong> masih di Gudang Retur (${numberText(summary.waiting_stock_qty)} qty menunggu finalisasi). Dari transaksi selesai, <strong>${numberText(summary.stocked_good_qty)} qty</strong> masuk stok reguler dan <strong>${numberText(summary.stocked_damaged_qty)} qty</strong> masuk stok rusak. Tingkat finalisasi ${percentText(summary.finalization_rate)}.`;
             renderRanks(panel.querySelector('.report-breakdown'), analytics.reasons, 'qty');
             renderRanks(panel.querySelector('.report-top-skus'), analytics.top_skus, 'qty', 'rusak');
+            renderRanks(panel.querySelector('.report-tokos'), analytics.tokos, 'transaksi', 'qty diterima');
         } else {
             setNote(panel, 'transactions', `${numberText(summary.distinct_sku)} SKU unik · approval ${percentText(summary.approval_rate)}`);
             setNote(panel, 'damaged_qty', `${percentText(summary.damaged_source_rate)} dari total qty`);
@@ -542,6 +549,8 @@ document.addEventListener('DOMContentLoaded', () => {
             panel.querySelector('.report-date-to').value = defaultTo;
             panel.querySelector('.report-status').value = '';
             panel.querySelector('.report-extra-filter').value = '';
+            const tokoFilter = panel.querySelector('.report-toko-filter');
+            if (tokoFilter) tokoFilter.value = '';
             panel.querySelector('.report-limit').value = '10';
             table.page.len(10);
             reload();

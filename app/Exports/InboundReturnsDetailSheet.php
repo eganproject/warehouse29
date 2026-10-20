@@ -15,7 +15,7 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 class InboundReturnsDetailSheet extends InboundReturnsTableSheet implements FromCollection, WithColumnFormatting, WithColumnWidths, WithHeadings, WithTitle
 {
-    protected string $lastColumn = 'AB';
+    protected string $lastColumn = 'AD';
 
     public function __construct(private Collection $transactions)
     {
@@ -37,6 +37,8 @@ class InboundReturnsDetailSheet extends InboundReturnsTableSheet implements From
             'No Resi',
             'ID Pesanan',
             'Kurir',
+            'Toko',
+            'Channel',
             'SKU',
             'Nama Item',
             'Qty Resi',
@@ -84,6 +86,8 @@ class InboundReturnsDetailSheet extends InboundReturnsTableSheet implements From
                     $this->safeText($transaction->return_resi_no ?: $transaction->resi?->no_resi, '-'),
                     $this->safeText($transaction->resi?->id_pesanan, '-'),
                     $this->safeText($transaction->resi?->kurir?->name, 'Tidak diketahui'),
+                    $this->safeText($transaction->resi?->toko?->name, 'Tanpa toko'),
+                    $this->safeText($transaction->resi?->channel?->name, '-'),
                     $this->safeText($item->item?->sku, '-'),
                     $this->safeText($item->item?->name, '-'),
                     $expected,
@@ -113,10 +117,10 @@ class InboundReturnsDetailSheet extends InboundReturnsTableSheet implements From
     {
         return [
             'A' => 8, 'B' => 24, 'C' => 18, 'D' => 16, 'E' => 19, 'F' => 22,
-            'G' => 20, 'H' => 18, 'I' => 18, 'J' => 35, 'K' => 12, 'L' => 14,
-            'M' => 11, 'N' => 21, 'O' => 12, 'P' => 12, 'Q' => 20, 'R' => 24,
-            'S' => 30, 'T' => 30, 'U' => 32, 'V' => 20, 'W' => 20, 'X' => 20,
-            'Y' => 20, 'Z' => 20, 'AA' => 18, 'AB' => 13,
+            'G' => 20, 'H' => 18, 'I' => 24, 'J' => 16, 'K' => 18, 'L' => 35,
+            'M' => 12, 'N' => 14, 'O' => 11, 'P' => 21, 'Q' => 12, 'R' => 12,
+            'S' => 20, 'T' => 24, 'U' => 30, 'V' => 30, 'W' => 32, 'X' => 20,
+            'Y' => 20, 'Z' => 20, 'AA' => 20, 'AB' => 20, 'AC' => 18, 'AD' => 13,
         ];
     }
 
@@ -124,14 +128,14 @@ class InboundReturnsDetailSheet extends InboundReturnsTableSheet implements From
     {
         return [
             'A' => NumberFormat::FORMAT_NUMBER,
-            'K' => '#,##0',
-            'L' => '#,##0',
             'M' => '#,##0',
-            'N' => NumberFormat::FORMAT_PERCENTAGE_00,
+            'N' => '#,##0',
             'O' => '#,##0',
-            'P' => '#,##0',
-            'Q' => NumberFormat::FORMAT_PERCENTAGE_00,
-            'AB' => NumberFormat::FORMAT_NUMBER,
+            'P' => NumberFormat::FORMAT_PERCENTAGE_00,
+            'Q' => '#,##0',
+            'R' => '#,##0',
+            'S' => NumberFormat::FORMAT_PERCENTAGE_00,
+            'AD' => NumberFormat::FORMAT_NUMBER,
         ];
     }
 
@@ -142,8 +146,8 @@ class InboundReturnsDetailSheet extends InboundReturnsTableSheet implements From
         }
 
         $sheet->getStyle("A2:A{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
-        $sheet->getStyle("K2:Q{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
-        $sheet->getStyle("AA2:AA{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle("M2:S{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_RIGHT);
+        $sheet->getStyle("AC2:AC{$highestRow}")->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
 
         for ($row = 2; $row <= $highestRow; $row++) {
             $status = (string) $sheet->getCell("D{$row}")->getValue();
@@ -158,20 +162,20 @@ class InboundReturnsDetailSheet extends InboundReturnsTableSheet implements From
                 'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],
             ]);
 
-            if ((int) $sheet->getCell("M{$row}")->getValue() > 0) {
-                $sheet->getStyle("M{$row}")->applyFromArray([
+            if ((int) $sheet->getCell("O{$row}")->getValue() > 0) {
+                $sheet->getStyle("O{$row}")->applyFromArray([
                     'font' => ['bold' => true, 'color' => ['rgb' => '9C6500']],
                     'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'FFEB9C']],
                 ]);
             }
-            if ((int) $sheet->getCell("P{$row}")->getValue() > 0) {
-                $sheet->getStyle("P{$row}")->applyFromArray([
+            if ((int) $sheet->getCell("R{$row}")->getValue() > 0) {
+                $sheet->getStyle("R{$row}")->applyFromArray([
                     'font' => ['bold' => true, 'color' => ['rgb' => '9C0006']],
                     'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'FFC7CE']],
                 ]);
             }
-            if ($sheet->getCell("AA{$row}")->getValue() === 'Perlu diperiksa') {
-                $sheet->getStyle("AA{$row}")->applyFromArray([
+            if ($sheet->getCell("AC{$row}")->getValue() === 'Perlu diperiksa') {
+                $sheet->getStyle("AC{$row}")->applyFromArray([
                     'font' => ['bold' => true, 'color' => ['rgb' => '9C0006']],
                     'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => 'FFC7CE']],
                 ]);
