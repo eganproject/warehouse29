@@ -1,6 +1,6 @@
 {{--
     Dropdown filter toko / channel untuk laporan berbasis resi.
-    Param: $tokos (Collection id,name), $id (default filter_toko), $class (lebar), $type ('toko'|'channel').
+    Param: $tokos (Collection id,name), $id (default filter_toko), $class (lebar), $type ('toko'|'channel'), $noneLabel (opsional).
 --}}
 @php
     $filterType = $type ?? 'toko';
@@ -11,5 +11,5 @@
     @foreach(($tokos ?? collect()) as $option)
         <option value="{{ $option->id }}">{{ $option->name }}</option>
     @endforeach
-    <option value="none">Tanpa {{ $filterLabel }}</option>
+    <option value="none">{{ $noneLabel ?? 'Tanpa '.$filterLabel }}</option>
 </select>

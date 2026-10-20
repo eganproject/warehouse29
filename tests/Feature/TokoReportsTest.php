@@ -12,8 +12,10 @@ use App\Models\QcScanResi;
 use App\Models\Resi;
 use App\Models\Toko;
 use App\Models\User;
+use App\Support\StockPeriodReport;
 use App\Support\TokoReport;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Facades\Excel;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use Tests\TestCase;
@@ -219,6 +221,65 @@ class TokoReportsTest extends TestCase
             ->assertOk()
             ->assertJsonPath('recordsFiltered', 1)
             ->assertJsonPath('data.0.code', 'RET-2');
+    }
+
+    public function test_stock_movement_reports_follow_toko_from_resi_source(): void
+    {
+        $item = Item::create(['sku' => 'STK-1', 'name' => 'Barang Stok', 'is_active' => true, 'is_bundle' => false, 'category_id' => 0]);
+        $qcAlpha = QcScanResi::whereHas('resi', fn ($q) => $q->where('id_pesanan', 'A1'))->value('id');
+        $qcBeta = QcScanResi::whereHas('resi', fn ($q) => $q->where('id_pesanan', 'B1'))->value('id');
+        foreach ([
+            ['in', 100, 'inbound', 999, '2026-09-04 08:00:00'],
+            ['out', 3, 'qc_resi', $qcAlpha, '2026-09-05 08:05:00'],
+            ['out', 2, 'qc_resi', $qcBeta, '2026-09-05 09:05:00'],
+            ['out', 1, 'outbound', 1, '2026-09-05 10:00:00'],
+        ] as [$direction, $qty, $type, $sourceId, $at]) {
+            DB::table('stock_mutations')->insert([
+                'item_id' => $item->id, 'direction' => $direction, 'qty' => $qty,
+                'source_type' => $type, 'source_id' => $sourceId, 'occurred_at' => $at,
+            ]);
+        }
+
+        // Halaman mutasi stok: filter & kolom toko.
+        $this->actingAs($this->user)
+            ->getJson(route('admin.inventory.stock-mutations.data', ['date_from' => '2026-09-05', 'date_to' => '2026-09-05', 'toko_id' => $this->alpha->id]))
+            ->assertOk()
+            ->assertJsonPath('recordsFiltered', 1)
+            ->assertJsonPath('data.0.toko', 'Toko Alpha')
+            ->assertJsonPath('data.0.channel', 'Shopee');
+        $this->actingAs($this->user)
+            ->getJson(route('admin.inventory.stock-mutations.data', ['date_from' => '2026-09-04', 'date_to' => '2026-09-05', 'toko_id' => 'none']))
+            ->assertOk()
+            ->assertJsonPath('recordsFiltered', 2);
+
+        // Laporan mutasi stok (rekap sumber) dengan filter toko.
+        $this->actingAs($this->user)
+            ->getJson(route('admin.reports.stock-mutations.data', ['date_from' => '2026-09-05', 'date_to' => '2026-09-05', 'toko_id' => $this->beta->id]))
+            ->assertOk()
+            ->assertJsonPath('summary.total_out', 2);
+
+        // Pergerakan barang: qty keluar mengikuti toko, stok akhir tetap stok gudang.
+        $report = app(StockPeriodReport::class);
+        $filters = ['date_from' => '2026-09-01', 'date_to' => '2026-09-05', 'stock_type' => 'regular', 'tab' => 'movement', 'toko_id' => (string) $this->alpha->id];
+        $row = $report->query($filters)->where('sku', 'STK-1')->first();
+        $this->assertEquals(3, $row->qty_out);
+        $this->assertEquals(1, $row->outgoing_frequency);
+        $this->assertEquals(94, $row->closing);
+        $this->assertSame([0, 0, 0, 0, 3], $report->dailyTrend($filters)['qty_out']);
+
+        $perToko = $report->outgoingPerToko(array_merge($filters, ['toko_id' => '']))->keyBy('toko');
+        $this->assertEquals(3, $perToko['Toko Alpha']->qty_out);
+        $this->assertEquals(2, $perToko['Toko Beta']->qty_out);
+        $this->assertEquals(1, $perToko['Bukan dari resi (manual/lainnya)']->qty_out);
+
+        // Tab saldo mengabaikan filter toko agar awal + in − out = akhir.
+        $balance = $report->query(array_merge($filters, ['tab' => 'balance']))->where('sku', 'STK-1')->first();
+        $this->assertEquals(6, $balance->qty_out);
+
+        $this->actingAs($this->user)
+            ->get(route('admin.reports.stock-as-of.index', $filters))
+            ->assertOk()
+            ->assertSee('Filter toko aktif');
     }
 
     private function resi(string $code, ?Toko $toko, ?Channel $channel = null, ?string $status = null, string $date = '2026-09-05'): Resi

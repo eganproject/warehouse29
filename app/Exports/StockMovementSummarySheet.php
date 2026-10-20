@@ -4,6 +4,7 @@ namespace App\Exports;
 
 use App\Models\Category;
 use App\Support\StockPeriodReport;
+use App\Support\TokoFilter;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromArray;
@@ -91,7 +92,7 @@ class StockMovementSummarySheet implements FromArray, WithCharts, WithColumnWidt
         $data[] = ['Segera isi ulang', $stockoutWithDemand, 'Validasi kebutuhan dan lead time; prioritaskan SKU yang masih memiliki demand.'];
         $data[] = ['Pantau cakupan < 30 hari', $criticalCover, 'Tinjau reorder point dengan mempertimbangkan lead time dan safety stock.'];
         $data[] = ['Evaluasi non-moving', $nonMoving, 'Cek usia stok dan putuskan promosi, transfer, retur, atau penghentian pengadaan.'];
-        $data[] = ['Catatan', 'Gunakan sheet Detail SKU untuk menindaklanjuti SKU dan sheet Tren Harian untuk melihat pola waktu.'];
+        $data[] = ['Catatan', 'Gunakan sheet Detail SKU untuk menindaklanjuti SKU, sheet Tren Harian untuk melihat pola waktu, dan sheet Keluar per Toko untuk melihat toko penyumbang barang keluar.'];
         $data[] = [''];
         $data[] = ['Catatan data', 'Total qty merupakan gabungan satuan masing-masing barang. Bundle virtual tidak disertakan agar komponen tidak terhitung ganda.'];
 
@@ -200,7 +201,9 @@ class StockMovementSummarySheet implements FromArray, WithCharts, WithColumnWidt
         $movement = StockPeriodReport::MOVEMENTS[$this->filters['movement'] ?? ''] ?? 'Semua pergerakan';
         $search = $this->filters['q'] ?? '';
 
-        return $this->safeText("{$category}; {$status}; {$movement}; SKU: ".($search !== '' ? $search : 'semua'));
+        $toko = TokoFilter::tokoLabel(StockPeriodReport::tokoId($this->filters));
+
+        return $this->safeText("{$category}; {$status}; {$movement}; SKU: ".($search !== '' ? $search : 'semua')."; Toko: {$toko}");
     }
 
     private function ratio(int|float $value, int|float $total): float

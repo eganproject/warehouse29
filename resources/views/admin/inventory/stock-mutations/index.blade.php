@@ -25,6 +25,7 @@
                     <option value="50">50</option>
                     <option value="100">100</option>
                 </select>
+                @include('admin.partials.toko-filter', ['tokos' => $tokos, 'id' => 'filter_toko', 'class' => 'w-175px', 'noneLabel' => 'Tanpa toko / bukan resi'])
                 <input type="text" class="form-control form-control-solid w-150px" id="filter_date_from" placeholder="Dari" value="{{ now()->toDateString() }}" />
                 <input type="text" class="form-control form-control-solid w-150px" id="filter_date_to" placeholder="Sampai" value="{{ now()->toDateString() }}" />
                 <button type="button" class="btn btn-light" id="filter_apply">Filter</button>
@@ -52,6 +53,7 @@
                         <th class="text-end">Stok Sesudah</th>
                         <th>Sumber</th>
                         <th>Kode</th>
+                        <th>Toko</th>
                         <th>Catatan</th>
                         <th class="text-end">Aksi</th>
                     </tr>
@@ -189,6 +191,7 @@
         const dateFromEl = document.getElementById('filter_date_from');
         const dateToEl = document.getElementById('filter_date_to');
         const limitSelect = document.getElementById('filter_stock_mutation_limit');
+        const tokoSelect = document.getElementById('filter_toko');
         const filterApplyBtn = document.getElementById('filter_apply');
         const filterResetBtn = document.getElementById('filter_reset');
         const exportBtn = document.getElementById('btn_export_stock_mutations');
@@ -222,6 +225,7 @@
                 dataSrc: 'data',
                 data: function(params) {
                     params.q = searchInput?.value || '';
+                    params.toko_id = tokoSelect?.value || '';
                     if (dateFromEl?.value) params.date_from = dateFromEl.value;
                     if (dateToEl?.value) params.date_to = dateToEl.value;
                 }
@@ -237,6 +241,11 @@
                 { data: 'stock_after', className: 'text-end fw-bold', render: data => data === null || data === undefined ? '-' : data },
                 { data: 'source' },
                 { data: 'source_code' },
+                { data: 'toko', orderable: false, render: (data, type, row) => {
+                    const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (m) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+                    const channel = row.channel && row.channel !== '-' ? `<div class="text-muted fs-8">${esc(row.channel)}</div>` : '';
+                    return `${esc(data || '-')}${channel}`;
+                } },
                 { data: 'note' },
                 { data: 'id', orderable:false, searchable:false, className:'text-end', render: (data) => {
                     const detailItem = `<div class="menu-item px-3"><a href="#" class="menu-link px-3 btn-detail" data-id="${data}">Detail</a></div>`;
@@ -269,7 +278,9 @@
             dt.page.len(Number(limitSelect.value || 10)).draw();
         });
         filterApplyBtn?.addEventListener('click', reloadTable);
+        tokoSelect?.addEventListener('change', reloadTable);
         filterResetBtn?.addEventListener('click', () => {
+            if (tokoSelect) tokoSelect.value = '';
             if (fpFrom) fpFrom.setDate(todayStr, true); else if (dateFromEl) dateFromEl.value = todayStr;
             if (fpTo) fpTo.setDate(todayStr, true); else if (dateToEl) dateToEl.value = todayStr;
             if (limitSelect) {
@@ -303,6 +314,7 @@
             if (q) params.set('q', q);
             params.set('date_from', dateFromEl?.value || todayStr);
             params.set('date_to', dateToEl?.value || todayStr);
+            if (tokoSelect?.value) params.set('toko_id', tokoSelect.value);
             const query = params.toString();
             const url = query ? `${exportUrl}?${query}` : exportUrl;
 

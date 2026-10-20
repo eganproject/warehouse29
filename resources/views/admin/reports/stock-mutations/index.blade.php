@@ -21,8 +21,11 @@
                     <option value="adjustment">Adjustment</option>
                     <option value="damaged">Damaged</option>
                     <option value="qc">QC</option>
+                    <option value="qc_resi">QC Resi</option>
+                    <option value="resi_cancellation">Cancel Resi</option>
                     <option value="picker">Picker</option>
                 </select>
+                @include('admin.partials.toko-filter', ['tokos' => $tokos, 'id' => 'filter_toko', 'class' => 'w-175px', 'noneLabel' => 'Tanpa toko / bukan resi'])
                 <select id="filter_limit" class="form-select form-select-solid w-100px">
                     <option value="10" selected>10</option>
                     <option value="25">25</option>
@@ -80,6 +83,7 @@
         const dateFromEl = document.getElementById('filter_date_from');
         const dateToEl = document.getElementById('filter_date_to');
         const sourceTypeEl = document.getElementById('filter_source_type');
+        const tokoEl = document.getElementById('filter_toko');
         const limitEl = document.getElementById('filter_limit');
         const applyBtn = document.getElementById('filter_apply');
         const resetBtn = document.getElementById('filter_reset');
@@ -115,6 +119,7 @@
                     params.date_from = dateFromEl?.value || '';
                     params.date_to = dateToEl?.value || '';
                     params.source_type = sourceTypeEl?.value || '';
+                    params.toko_id = tokoEl?.value || '';
                 }
             },
             columns: [
@@ -133,10 +138,12 @@
         searchInput?.addEventListener('keyup', (e) => { if (e.key === 'Enter') reload(); });
         applyBtn?.addEventListener('click', reload);
         sourceTypeEl?.addEventListener('change', reload);
+        tokoEl?.addEventListener('change', reload);
         limitEl?.addEventListener('change', () => dt.page.len(Number(limitEl.value || 10)).draw());
         resetBtn?.addEventListener('click', () => {
             if (searchInput) searchInput.value = '';
             if (sourceTypeEl) sourceTypeEl.value = '';
+            if (tokoEl) tokoEl.value = '';
             if (fpFrom) fpFrom.setDate(todayStr, true); else dateFromEl.value = todayStr;
             if (fpTo) fpTo.setDate(todayStr, true); else dateToEl.value = todayStr;
             if (limitEl) {

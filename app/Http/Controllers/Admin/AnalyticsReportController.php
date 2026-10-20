@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Category;
+use App\Support\StockMutationToko;
 use App\Support\TokoFilter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -15,6 +16,7 @@ class AnalyticsReportController extends Controller
     {
         return view('admin.reports.stock-mutations.index', [
             'dataUrl' => route('admin.reports.stock-mutations.data'),
+            'tokos' => TokoFilter::tokoOptions(),
             'today' => now()->toDateString(),
         ]);
     }
@@ -26,6 +28,8 @@ class AnalyticsReportController extends Controller
         $base = DB::table('stock_mutations as sm')
             ->leftJoin('items as i', 'i.id', '=', 'sm.item_id')
             ->whereBetween('sm.occurred_at', [$from, $to]);
+
+        StockMutationToko::applyFilter($base, 'stock_mutations', 'sm.id', TokoFilter::fromRequest($request));
 
         $sourceType = trim((string) $request->input('source_type', ''));
         if ($sourceType !== '') {

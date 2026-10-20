@@ -57,7 +57,7 @@ class StockMovementAnalysisExportTest extends TestCase
             $reader->setIncludeCharts(true);
             $spreadsheet = $reader->load($temporaryFile);
 
-            $this->assertSame(['Ringkasan', 'Detail SKU', 'Tren Harian'], $spreadsheet->getSheetNames());
+            $this->assertSame(['Ringkasan', 'Detail SKU', 'Tren Harian', 'Keluar per Toko'], $spreadsheet->getSheetNames());
 
             $summary = $spreadsheet->getSheetByName('Ringkasan');
             $this->assertSame('LAPORAN ANALISIS PERGERAKAN STOK', $summary->getCell('A1')->getValue());

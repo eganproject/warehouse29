@@ -102,6 +102,7 @@
                 <div class="sr-field"><label for="q">Cari SKU</label><input class="sr-input" id="q" name="q" value="{{ $filters['q'] }}" placeholder="Masukkan SKU lengkap" maxlength="200"></div>
                 <div class="sr-field"><label for="status">Status Stok Akhir</label><select class="sr-input" id="status" name="status">@foreach (['' => 'Semua status', 'positive' => 'Stok positif', 'zero' => 'Stok nol', 'negative' => 'Stok negatif', 'low' => 'Di bawah safety stock'] as $value => $label)<option value="{{ $value }}" @selected($filters['status'] === $value)>{{ $label }}</option>@endforeach</select></div>
                 @if ($isMovement)
+                    <div class="sr-field"><label for="toko_id">Toko</label><select class="sr-input" id="toko_id" name="toko_id"><option value="">Semua toko</option>@foreach ($tokos as $toko)<option value="{{ $toko->id }}" @selected((string) $filters['toko_id'] === (string) $toko->id)>{{ $toko->name }}</option>@endforeach<option value="none" @selected($filters['toko_id'] === 'none')>Tanpa toko / bukan resi</option></select></div>
                     <div class="sr-field"><label for="movement">Pergerakan</label><select class="sr-input" id="movement" name="movement"><option value="">Semua pergerakan</option>@foreach ($movements as $value => $label)<option value="{{ $value }}" @selected($filters['movement'] === $value)>{{ $label }}</option>@endforeach</select></div>
                 @endif
                 <div class="sr-field"><label for="per_page">Baris per Halaman</label><select class="sr-input" id="per_page" name="per_page">@foreach ([10, 25, 50, 100] as $count)<option value="{{ $count }}" @selected($filters['per_page'] === $count)>{{ $count }} baris</option>@endforeach</select></div>
@@ -185,6 +186,7 @@
         <div class="sr-note">
             @if ($isMovement)
                 <strong>Kriteria pergerakan:</strong> SKU berqty keluar diurutkan dari terbesar. Fast Moving menyusun lapisan kontribusi awal hingga 70%; Medium Moving menyusun lapisan berikutnya hingga 90%; Slow Moving mengisi sisa kontribusi setelah 90%; Non Moving tidak memiliki barang keluar selama periode.<br>
+                @if ($filters['toko_id'] !== '')<strong>Filter toko aktif:</strong> qty masuk/keluar, frequency, kontribusi, dan klasifikasi hanya dihitung dari mutasi resi toko tersebut (QC resi, cancel resi, retur terhubung resi). Stok akhir dan days cover tetap memakai stok gudang karena stok tidak dipisah per toko.<br>@endif
                 Kontribusi dihitung terhadap seluruh qty keluar SKU fisik aktif pada periode. Frequency adalah jumlah kejadian mutasi keluar; hari aktif menunjukkan jumlah tanggal unik terjadinya barang keluar. Rata-rata = qty keluar ÷ {{ $days }} hari kalender. Days Cover = stok akhir ÷ rata-rata per hari. Tanggal terakhir keluar dihitung sampai tanggal akhir, termasuk sebelum periode.<br>
             @endif
             Hanya SKU fisik aktif; bundle virtual tidak dijumlahkan agar komponennya tidak terhitung ganda. Saldo berasal dari mutasi yang tercatat, bukan stok saat ini. Total qty mengikuti satuan masing-masing barang. Rentang maksimal 366 hari.
