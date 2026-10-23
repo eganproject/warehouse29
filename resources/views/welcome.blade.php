@@ -223,7 +223,6 @@
                     <p style="margin:0 0 14px 0;">Jika ini terlihat, masalahnya ada di asset/CSS. Coba hard refresh atau jalankan <code>npm run build</code>.</p>
                     <p style="margin:0 0 14px 0;">
                         <a href="{{ route('login') }}" style="display:inline-block;background:#111;color:#fff;padding:10px 16px;border-radius:10px;text-decoration:none;">Masuk</a>
-                        <a href="{{ route('register') }}" style="display:inline-block;margin-left:8px;border:1px solid #d1d5db;padding:10px 16px;border-radius:10px;color:#111;text-decoration:none;">Daftar</a>
                     </p>
                 </div>
             </div>
@@ -326,8 +325,6 @@
                     <p>© {{ date('Y') }} {{ config('app.name', 'Aplikasi') }} — Access Control Platform.</p>
                     <div style="display:flex; gap:10px; align-items:center;">
                         <a href="{{ route('login') }}">Login</a>
-                        <span>•</span>
-                        <a href="{{ route('register') }}">Register</a>
                     </div>
                 </footer>
             </div>
