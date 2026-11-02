@@ -157,6 +157,53 @@ class StockPeriodReport
             ->get();
     }
 
+    /**
+     * Barang keluar per toko dipecah per kategori barang (sheet export pergerakan).
+     * Urutan: toko dengan qty keluar terbesar dulu, lalu kategori terbesar di toko tsb.
+     */
+    public function outgoingPerTokoCategory(array $filters): Collection
+    {
+        $start = Carbon::parse($filters['date_from'])->startOfDay();
+        $end = Carbon::parse($filters['date_to'])->addDay()->startOfDay();
+        $table = $filters['stock_type'] === 'damaged' ? 'damaged_stock_mutations' : 'stock_mutations';
+        $filteredItems = $this->query($filters)->select('id', 'category');
+        $tokoKey = 'CASE WHEN smt_resi.id IS NULL THEN -1 ELSE COALESCE(smt_resi.toko_id, 0) END';
+
+        $query = DB::table($table.' as sm')
+            ->joinSub($filteredItems, 'filtered_items', 'filtered_items.id', '=', 'sm.item_id')
+            ->where('sm.direction', 'out')
+            ->where('sm.qty', '>', 0)
+            ->where('sm.occurred_at', '>=', $start)
+            ->where('sm.occurred_at', '<', $end);
+        StockMutationToko::join($query, 'sm');
+        if (($tokoCondition = self::tokoCondition($filters)) !== '') {
+            $query->whereRaw(substr($tokoCondition, 5));
+        }
+
+        $rows = $query
+            ->groupByRaw($tokoKey.', filtered_items.category')
+            ->selectRaw($tokoKey.' as toko_key')
+            ->selectRaw("CASE WHEN MAX(smt_resi.id) IS NULL THEN 'Bukan dari resi (manual/lainnya)' ELSE COALESCE(MAX(smt_toko.name), 'Tanpa toko') END as toko")
+            ->addSelect('filtered_items.category')
+            ->selectRaw('COALESCE(SUM(sm.qty), 0) as qty_out')
+            ->selectRaw('COUNT(DISTINCT sm.item_id) as sku_count')
+            ->get();
+
+        $tokoTotals = $rows->groupBy('toko_key')->map(fn ($group) => (int) $group->sum('qty_out'));
+        $categoryTotals = $rows->groupBy('category')->map(fn ($group) => (int) $group->sum('qty_out'));
+
+        return $rows
+            ->map(function ($row) use ($tokoTotals, $categoryTotals) {
+                $row->qty_out = (int) $row->qty_out;
+                $row->toko_total = $tokoTotals[$row->toko_key];
+                $row->category_total = $categoryTotals[$row->category];
+
+                return $row;
+            })
+            ->sort(fn ($a, $b) => [$b->toko_total, $a->toko, $b->qty_out, $a->category] <=> [$a->toko_total, $b->toko, $a->qty_out, $b->category])
+            ->values();
+    }
+
     public function ordered(array $filters): Builder
     {
         $query = $this->query($filters);

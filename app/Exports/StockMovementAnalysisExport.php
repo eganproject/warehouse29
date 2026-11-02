@@ -29,6 +29,7 @@ class StockMovementAnalysisExport implements WithMultipleSheets
             new StockMovementDetailSheet($rows),
             new StockMovementTrendSheet($trend),
             new StockMovementTokoSheet($report->outgoingPerToko($this->filters)),
+            new StockMovementTokoCategorySheet($report->outgoingPerTokoCategory($this->filters)),
         ];
     }
 }
